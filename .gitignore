@@ -20,6 +20,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Data (local JSON store)
+data/
+
 # Logs
 *.log
 npm-debug.log*
