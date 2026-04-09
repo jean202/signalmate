@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { parseChatText } from "@/lib/chat-parser";
 import styles from "./analysis-experience.module.css";
 
 const sampleConversation = `[오후 8:10] 나: 오늘 잘 들어갔어요?
@@ -276,6 +277,12 @@ function inferSenderRole(token: string | undefined): SenderRole {
 }
 
 function parseConversationMessages(rawText: string): ConversationMessageInput[] {
+  const result = parseChatText(rawText, "나");
+  if (result.messages.length > 0) {
+    return result.messages;
+  }
+
+  // Fallback: simple line-by-line parsing for minimal input
   return rawText
     .split("\n")
     .map((line) => line.trim())
@@ -446,6 +453,7 @@ export function AnalysisExperience() {
             userGoal,
             saveMode,
             rawText,
+            selfName: "나",
             messages,
           }),
         });
