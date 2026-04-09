@@ -2,6 +2,7 @@ import { errorResponse, successResponse } from "@/lib/api-response";
 import { createConversation, type SaveMode, type SenderRole } from "@/lib/store";
 import { mergeSituationContext, type GuidedAnswers } from "@/lib/situation-context-builder";
 import { getCurrentUserId } from "@/lib/auth-helpers";
+import { parseChatText } from "@/lib/chat-parser";
 
 type ConversationMessageInput = {
   senderRole?: "self" | "other" | "unknown";
@@ -18,6 +19,8 @@ type ConversationCreateBody = {
   userGoal?: string;
   saveMode?: string;
   rawText?: string;
+  /** Hint for which sender name is "self" in auto-parsed chat */
+  selfName?: string;
   /** Mode A: 자유 텍스트 상황 설명 */
   situationContext?: string;
   /** Mode B: 가이드 질문 응답 */
@@ -48,28 +51,38 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.rawText?.trim()) {
-    return errorResponse(400, "VALIDATION_ERROR", "rawText is required.");
+  if (!body.rawText?.trim() && (!Array.isArray(body.messages) || body.messages.length === 0)) {
+    return errorResponse(400, "VALIDATION_ERROR", "rawText or messages is required.");
   }
 
-  if (!Array.isArray(body.messages) || body.messages.length === 0) {
-    return errorResponse(400, "VALIDATION_ERROR", "messages must contain at least one item.");
-  }
+  let normalizedMessages: { senderRole: SenderRole; messageText: string; sentAt: string | null; sequenceNo: number }[];
 
-  const normalizedMessages = body.messages
-    .map((message, index) => ({
-      senderRole: validSenderRoles.includes(message.senderRole ?? "unknown")
-        ? (message.senderRole ?? "unknown")
-        : "unknown",
-      messageText: message.messageText?.trim() ?? "",
-      sentAt: typeof message.sentAt === "string" ? message.sentAt : null,
-      sequenceNo: Number.isInteger(message.sequenceNo) ? (message.sequenceNo as number) : index + 1,
-    }))
-    .filter((message) => message.messageText.length > 0)
-    .sort((left, right) => left.sequenceNo - right.sequenceNo);
+  if (Array.isArray(body.messages) && body.messages.length > 0) {
+    // Mode 1: Pre-parsed messages provided
+    normalizedMessages = body.messages
+      .map((message, index) => ({
+        senderRole: validSenderRoles.includes(message.senderRole ?? "unknown")
+          ? (message.senderRole ?? "unknown")
+          : ("unknown" as SenderRole),
+        messageText: message.messageText?.trim() ?? "",
+        sentAt: typeof message.sentAt === "string" ? message.sentAt : null,
+        sequenceNo: Number.isInteger(message.sequenceNo) ? (message.sequenceNo as number) : index + 1,
+      }))
+      .filter((message) => message.messageText.length > 0)
+      .sort((left, right) => left.sequenceNo - right.sequenceNo);
+  } else {
+    // Mode 2: Auto-parse from rawText
+    const parseResult = parseChatText(body.rawText!, body.selfName);
+    normalizedMessages = parseResult.messages.map((m) => ({
+      senderRole: m.senderRole as SenderRole,
+      messageText: m.messageText,
+      sentAt: m.sentAt,
+      sequenceNo: m.sequenceNo,
+    }));
+  }
 
   if (normalizedMessages.length === 0) {
-    return errorResponse(400, "VALIDATION_ERROR", "messages must contain text content.");
+    return errorResponse(400, "VALIDATION_ERROR", "Could not parse any messages from the input.");
   }
 
   if (body.saveMode && !validSaveModes.includes(body.saveMode as SaveMode)) {
@@ -92,7 +105,7 @@ export async function POST(request: Request) {
     meetingChannel: body.meetingChannel,
     userGoal: body.userGoal,
     saveMode: (body.saveMode as SaveMode | undefined) ?? "temporary",
-    rawText: body.rawText,
+    rawText: body.rawText ?? "",
     situationContext,
     userId,
     messages: normalizedMessages,
