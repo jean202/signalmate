@@ -1,0 +1,341 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../node_modules/.prisma/client"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector, uuidOssp(map: "uuid-ossp")]
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum UserStatus {
+  active
+  deleted
+  suspended
+}
+
+enum AuthProvider {
+  local
+  google
+  kakao
+  apple
+}
+
+enum SourceType {
+  manual
+  kakao
+  sms
+  dating_app
+  other
+}
+
+enum RelationshipStage {
+  before_meeting
+  after_first_date
+  after_second_date
+  ongoing_chat
+  cooling_down
+}
+
+enum MeetingChannel {
+  blind_date
+  dating_app
+  marriage_agency
+  mutual_friend
+  other
+}
+
+enum UserGoal {
+  continue_chat
+  ask_for_date
+  evaluate_interest
+  decide_to_stop
+}
+
+enum SaveMode {
+  temporary
+  saved
+}
+
+enum SenderRole {
+  self
+  other
+  unknown
+}
+
+enum ConfidenceLevel {
+  low
+  medium
+  high
+}
+
+enum RecommendedAction {
+  keep_light
+  suggest_date
+  slow_down
+  wait_for_response
+  consider_stopping
+}
+
+enum AnalysisStatus {
+  queued
+  processing
+  completed
+  failed
+}
+
+enum SignalType {
+  positive
+  ambiguous
+  caution
+}
+
+enum RecommendationType {
+  next_message
+  tone_guide
+  avoid_phrase
+}
+
+enum SubscriptionStatus {
+  active
+  canceled
+  expired
+  paused
+}
+
+enum BillingProvider {
+  stripe
+  toss
+  manual
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model User {
+  id             String         @id @default(uuid()) @db.Uuid
+  email          String?        @db.Text
+  passwordHash   String?        @map("password_hash") @db.Text
+  authProvider   AuthProvider   @default(local) @map("auth_provider")
+  providerUserId String?        @map("provider_user_id") @db.Text
+  nickname       String?        @db.Text
+  locale         String         @default("ko-KR") @db.Text
+  timezone       String         @default("Asia/Seoul") @db.Text
+  status         UserStatus     @default(active)
+  lastLoginAt    DateTime?      @map("last_login_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  conversations  Conversation[]
+  analyses       Analysis[]
+  subscriptions  Subscription[]
+  payments       Payment[]
+
+  @@unique([authProvider, providerUserId])
+  @@index([email])
+  @@map("users")
+}
+
+model WaitlistSignup {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @db.Text
+  source    String   @default("landing") @db.Text
+  note      String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email])
+  @@map("waitlist_signups")
+}
+
+model Conversation {
+  id                      String                @id @default(uuid()) @db.Uuid
+  userId                  String?               @map("user_id") @db.Uuid
+  sessionId               String?               @map("session_id") @db.Uuid
+  title                   String?               @db.Text
+  sourceType              SourceType            @default(manual) @map("source_type")
+  relationshipStage       RelationshipStage     @map("relationship_stage")
+  meetingChannel          MeetingChannel        @map("meeting_channel")
+  userGoal                UserGoal              @map("user_goal")
+  saveMode                SaveMode              @default(temporary) @map("save_mode")
+  rawTextRedacted         String?               @map("raw_text_redacted") @db.Text
+  rawTextStorageExpiresAt DateTime?             @map("raw_text_storage_expires_at") @db.Timestamptz(6)
+  situationContext        String?               @map("situation_context") @db.Text
+  analysisContext         Json                  @default("{}") @map("analysis_context")
+  createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                    User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages                ConversationMessage[]
+  analyses                Analysis[]
+  embedding               ConversationEmbedding?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  senderRole     SenderRole   @map("sender_role")
+  messageText    String       @map("message_text") @db.Text
+  sentAt         DateTime?    @map("sent_at") @db.Timestamptz(6)
+  sequenceNo     Int          @map("sequence_no")
+  messageLength  Int          @default(0) @map("message_length")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, sequenceNo])
+  @@index([conversationId, sequenceNo])
+  @@map("conversation_messages")
+}
+
+model Analysis {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  userId                  String?                  @map("user_id") @db.Uuid
+  sessionId               String?                  @map("session_id") @db.Uuid
+  conversationId          String                   @map("conversation_id") @db.Uuid
+  analysisVersion         String                   @default("v1") @map("analysis_version") @db.Text
+  modelName               String?                  @map("model_name") @db.Text
+  overallSummary          String                   @map("overall_summary") @db.Text
+  positiveSignalCount     Int                      @default(0) @map("positive_signal_count")
+  ambiguousSignalCount    Int                      @default(0) @map("ambiguous_signal_count")
+  cautionSignalCount      Int                      @default(0) @map("caution_signal_count")
+  confidenceLevel         ConfidenceLevel          @default(medium) @map("confidence_level")
+  recommendedAction       RecommendedAction        @map("recommended_action")
+  recommendedActionReason String                   @map("recommended_action_reason") @db.Text
+  analysisStatus          AnalysisStatus           @default(queued) @map("analysis_status")
+  errorMessage            String?                  @map("error_message") @db.Text
+  analysisMeta            Json                     @default("{}") @map("analysis_meta")
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt             DateTime?                @map("completed_at") @db.Timestamptz(6)
+  user                    User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversation            Conversation             @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  signals                 AnalysisSignal[]
+  recommendations         AnalysisRecommendation[]
+  payments                Payment[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("analyses")
+}
+
+model AnalysisSignal {
+  id              String          @id @default(uuid()) @db.Uuid
+  analysisId      String          @map("analysis_id") @db.Uuid
+  signalType      SignalType      @map("signal_type")
+  signalKey       String          @map("signal_key") @db.Text
+  title           String          @db.Text
+  description     String          @db.Text
+  evidenceText    String          @map("evidence_text") @db.Text
+  confidenceLevel ConfidenceLevel @default(medium) @map("confidence_level")
+  metrics         Json            @default("{}")
+  displayOrder    Int             @default(0) @map("display_order")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  analysis        Analysis        @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId, displayOrder])
+  @@map("analysis_signals")
+}
+
+model AnalysisRecommendation {
+  id                 String             @id @default(uuid()) @db.Uuid
+  analysisId         String             @map("analysis_id") @db.Uuid
+  recommendationType RecommendationType @map("recommendation_type")
+  title              String             @db.Text
+  content            String             @db.Text
+  rationale          String             @db.Text
+  toneLabel          String?            @map("tone_label") @db.Text
+  displayOrder       Int                @default(0) @map("display_order")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  analysis           Analysis           @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId, displayOrder])
+  @@map("analysis_recommendations")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  userId                 String             @map("user_id") @db.Uuid
+  planCode               String             @map("plan_code") @db.Text
+  status                 SubscriptionStatus @default(active)
+  billingProvider        BillingProvider     @map("billing_provider")
+  providerSubscriptionId String?            @map("provider_subscription_id") @db.Text
+  currentPeriodStart     DateTime           @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd       DateTime           @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd      Boolean            @default(false) @map("cancel_at_period_end")
+  startedAt              DateTime           @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt                DateTime?          @map("ended_at") @db.Timestamptz(6)
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments               Payment[]
+
+  @@unique([providerSubscriptionId])
+  @@index([userId, status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                String          @id @default(uuid()) @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  analysisId        String?         @map("analysis_id") @db.Uuid
+  subscriptionId    String?         @map("subscription_id") @db.Uuid
+  paymentProvider   BillingProvider @map("payment_provider")
+  providerPaymentId String          @map("provider_payment_id") @db.Text
+  amount            Int
+  currency          String          @default("KRW") @db.Text
+  paymentStatus     PaymentStatus   @default(pending) @map("payment_status")
+  paidAt            DateTime?       @map("paid_at") @db.Timestamptz(6)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis          Analysis?       @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  subscription      Subscription?   @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@unique([providerPaymentId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("payments")
+}
+
+// ─── Phase 3: Vector Embeddings (RAG) ────────────────────
+
+model ConversationEmbedding {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @unique @map("conversation_id") @db.Uuid
+  summaryText    String       @map("summary_text") @db.Text
+  outcomeLabel   String?      @map("outcome_label") @db.Text
+  embedding      Unsupported("vector(1536)")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_embeddings")
+}
+
+// ─── Phase 1: AI Usage Tracking ──────────────────────────
+
+model AiUsageLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  analysisId    String?  @map("analysis_id") @db.Uuid
+  modelName     String   @map("model_name") @db.Text
+  chainStep     String?  @map("chain_step") @db.Text
+  inputTokens   Int      @map("input_tokens")
+  outputTokens  Int      @map("output_tokens")
+  totalTokens   Int      @map("total_tokens")
+  costUsd       Float    @map("cost_usd")
+  durationMs    Int      @map("duration_ms")
+  success       Boolean  @default(true)
+  errorMessage  String?  @map("error_message") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([analysisId])
+  @@index([createdAt(sort: Desc)])
+  @@map("ai_usage_logs")
+}

@@ -1,0 +1,856 @@
+openapi: 3.1.0
+info:
+  title: SignalMate API
+  version: 0.1.0
+  description: >
+    SignalMate MVP API for waitlist capture, conversation upload,
+    relationship signal analysis, recommendations, and checkout.
+servers:
+  - url: https://api.signalmate.example.com/api/v1
+    description: Production example
+  - url: http://localhost:3000/api/v1
+    description: Local development
+tags:
+  - name: Auth
+  - name: Waitlist
+  - name: Conversations
+  - name: Analyses
+  - name: Payments
+paths:
+  /auth/email/sign-up:
+    post:
+      tags: [Auth]
+      summary: Sign up with email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailSignUpRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /auth/email/sign-in:
+    post:
+      tags: [Auth]
+      summary: Sign in with email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailSignInRequest"
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+  /waitlist:
+    post:
+      tags: [Waitlist]
+      summary: Register for early access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WaitlistCreateRequest"
+      responses:
+        "201":
+          description: Waitlist signup created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitlistCreateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+  /conversations:
+    post:
+      tags: [Conversations]
+      summary: Create a conversation upload
+      security:
+        - bearerAuth: []
+        - sessionHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationCreateRequest"
+      responses:
+        "201":
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationCreateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+  /conversations/{conversationId}:
+    get:
+      tags: [Conversations]
+      summary: Get conversation details
+      security:
+        - bearerAuth: []
+        - sessionHeader: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      responses:
+        "200":
+          description: Conversation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    patch:
+      tags: [Conversations]
+      summary: Update a conversation title or save mode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationUpdateRequest"
+      responses:
+        "200":
+          description: Conversation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationUpdateResponse"
+    delete:
+      tags: [Conversations]
+      summary: Delete a conversation
+      security:
+        - bearerAuth: []
+        - sessionHeader: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      responses:
+        "200":
+          description: Conversation deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+  /conversations/{conversationId}/analyses:
+    post:
+      tags: [Analyses]
+      summary: Enqueue a new analysis
+      security:
+        - bearerAuth: []
+        - sessionHeader: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisCreateRequest"
+      responses:
+        "202":
+          description: Analysis accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisCreateResponse"
+  /analyses/{analysisId}:
+    get:
+      tags: [Analyses]
+      summary: Get analysis summary
+      security:
+        - bearerAuth: []
+        - sessionHeader: []
+      parameters:
+        - $ref: "#/components/parameters/AnalysisId"
+      responses:
+        "200":
+          description: Analysis summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /analyses/{analysisId}/signals:
+    get:
+      tags: [Analyses]
+      summary: Get analysis signal cards
+      security:
+        - bearerAuth: []
+        - sessionHeader: []
+      parameters:
+        - $ref: "#/components/parameters/AnalysisId"
+      responses:
+        "200":
+          description: Signal cards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalListResponse"
+  /analyses/{analysisId}/recommendations:
+    get:
+      tags: [Analyses]
+      summary: Get recommendation cards
+      security:
+        - bearerAuth: []
+        - sessionHeader: []
+      parameters:
+        - $ref: "#/components/parameters/AnalysisId"
+      responses:
+        "200":
+          description: Recommendation cards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationListResponse"
+  /me/analyses:
+    get:
+      tags: [Analyses]
+      summary: List analyses for the current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated analysis list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisListResponse"
+  /payments/checkout:
+    post:
+      tags: [Payments]
+      summary: Create a checkout session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutCreateRequest"
+      responses:
+        "201":
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutCreateResponse"
+  /webhooks/payments:
+    post:
+      tags: [Payments]
+      summary: Receive payment provider webhooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook received
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    sessionHeader:
+      type: apiKey
+      in: header
+      name: X-Session-Id
+  parameters:
+    ConversationId:
+      in: path
+      name: conversationId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AnalysisId:
+      in: path
+      name: analysisId
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    ValidationError:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ConflictError:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        data:
+          type: "null"
+        error:
+          $ref: "#/components/schemas/ApiError"
+    AuthUser:
+      type: object
+      required: [id, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+          nullable: true
+    AuthSuccessResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [user, accessToken]
+          properties:
+            user:
+              $ref: "#/components/schemas/AuthUser"
+            accessToken:
+              type: string
+        error:
+          type: "null"
+    EmailSignUpRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 40
+    EmailSignInRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    WaitlistCreateRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+        source:
+          type: string
+          default: landing
+        note:
+          type: string
+          maxLength: 500
+    WaitlistCreateResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [waitlistId]
+          properties:
+            waitlistId:
+              type: string
+              format: uuid
+        error:
+          type: "null"
+    ConversationMessageInput:
+      type: object
+      required: [senderRole, messageText, sequenceNo]
+      properties:
+        senderRole:
+          type: string
+          enum: [self, other, unknown]
+        messageText:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        sequenceNo:
+          type: integer
+          minimum: 1
+    ConversationCreateRequest:
+      type: object
+      required:
+        - relationshipStage
+        - meetingChannel
+        - userGoal
+        - rawText
+        - messages
+      properties:
+        title:
+          type: string
+        sourceType:
+          type: string
+          enum: [manual, kakao, sms, dating_app, other]
+          default: manual
+        relationshipStage:
+          type: string
+          enum: [before_meeting, after_first_date, after_second_date, ongoing_chat, cooling_down]
+        meetingChannel:
+          type: string
+          enum: [blind_date, dating_app, marriage_agency, mutual_friend, other]
+        userGoal:
+          type: string
+          enum: [continue_chat, ask_for_date, evaluate_interest, decide_to_stop]
+        saveMode:
+          type: string
+          enum: [temporary, saved]
+          default: temporary
+        rawText:
+          type: string
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ConversationMessageInput"
+    ConversationCreateResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [conversation]
+          properties:
+            conversation:
+              $ref: "#/components/schemas/ConversationSummary"
+        error:
+          type: "null"
+    ConversationSummary:
+      type: object
+      required: [id, saveMode, relationshipStage]
+      properties:
+        id:
+          type: string
+          format: uuid
+        saveMode:
+          type: string
+          enum: [temporary, saved]
+        relationshipStage:
+          type: string
+        messageCount:
+          type: integer
+    ConversationDetailResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [conversation, messages]
+          properties:
+            conversation:
+              type: object
+              required:
+                - id
+                - sourceType
+                - relationshipStage
+                - meetingChannel
+                - userGoal
+                - saveMode
+                - createdAt
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                  nullable: true
+                sourceType:
+                  type: string
+                relationshipStage:
+                  type: string
+                meetingChannel:
+                  type: string
+                userGoal:
+                  type: string
+                saveMode:
+                  type: string
+                createdAt:
+                  type: string
+                  format: date-time
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/ConversationMessageInput"
+        error:
+          type: "null"
+    ConversationUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        saveMode:
+          type: string
+          enum: [temporary, saved]
+    ConversationUpdateResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [conversation]
+          properties:
+            conversation:
+              $ref: "#/components/schemas/ConversationSummary"
+        error:
+          type: "null"
+    AnalysisCreateRequest:
+      type: object
+      properties:
+        analysisVersion:
+          type: string
+          default: v1
+        modelName:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+    AnalysisCreateResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [analysis]
+          properties:
+            analysis:
+              type: object
+              required: [id, analysisStatus]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                analysisStatus:
+                  type: string
+                  enum: [queued, processing, completed, failed]
+        error:
+          type: "null"
+    AnalysisDetail:
+      type: object
+      required:
+        - id
+        - analysisStatus
+        - overallSummary
+        - positiveSignalCount
+        - ambiguousSignalCount
+        - cautionSignalCount
+        - confidenceLevel
+        - recommendedAction
+        - recommendedActionReason
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        analysisStatus:
+          type: string
+          enum: [queued, processing, completed, failed]
+        overallSummary:
+          type: string
+        positiveSignalCount:
+          type: integer
+        ambiguousSignalCount:
+          type: integer
+        cautionSignalCount:
+          type: integer
+        confidenceLevel:
+          type: string
+          enum: [low, medium, high]
+        recommendedAction:
+          type: string
+          enum: [keep_light, suggest_date, slow_down, wait_for_response, consider_stopping]
+        recommendedActionReason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AnalysisDetailResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [analysis]
+          properties:
+            analysis:
+              $ref: "#/components/schemas/AnalysisDetail"
+        error:
+          type: "null"
+    SignalCard:
+      type: object
+      required:
+        - id
+        - signalType
+        - signalKey
+        - title
+        - description
+        - evidenceText
+        - confidenceLevel
+        - displayOrder
+      properties:
+        id:
+          type: string
+          format: uuid
+        signalType:
+          type: string
+          enum: [positive, ambiguous, caution]
+        signalKey:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        evidenceText:
+          type: string
+        confidenceLevel:
+          type: string
+          enum: [low, medium, high]
+        displayOrder:
+          type: integer
+    SignalListResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [signals]
+          properties:
+            signals:
+              type: array
+              items:
+                $ref: "#/components/schemas/SignalCard"
+        error:
+          type: "null"
+    RecommendationCard:
+      type: object
+      required:
+        - id
+        - recommendationType
+        - title
+        - content
+        - rationale
+      properties:
+        id:
+          type: string
+          format: uuid
+        recommendationType:
+          type: string
+          enum: [next_message, tone_guide, avoid_phrase]
+        title:
+          type: string
+        content:
+          type: string
+        rationale:
+          type: string
+        toneLabel:
+          type: string
+          nullable: true
+    RecommendationListResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [recommendations]
+          properties:
+            recommendations:
+              type: array
+              items:
+                $ref: "#/components/schemas/RecommendationCard"
+        error:
+          type: "null"
+    AnalysisListItem:
+      type: object
+      required: [analysisId, conversationTitle, overallSummary, recommendedAction, createdAt]
+      properties:
+        analysisId:
+          type: string
+          format: uuid
+        conversationTitle:
+          type: string
+        overallSummary:
+          type: string
+        recommendedAction:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    AnalysisListResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/AnalysisListItem"
+            nextCursor:
+              type: string
+              nullable: true
+        error:
+          type: "null"
+    CheckoutCreateRequest:
+      type: object
+      required: [purchaseType, provider]
+      properties:
+        purchaseType:
+          type: string
+          enum: [single_analysis, subscription]
+        analysisId:
+          type: string
+          format: uuid
+          nullable: true
+        planCode:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          enum: [toss, stripe]
+    CheckoutCreateResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [paymentId, checkoutUrl]
+          properties:
+            paymentId:
+              type: string
+              format: uuid
+            checkoutUrl:
+              type: string
+              format: uri
+        error:
+          type: "null"
+    DeleteResponse:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [deleted]
+          properties:
+            deleted:
+              type: boolean
+              const: true
+        error:
+          type: "null"

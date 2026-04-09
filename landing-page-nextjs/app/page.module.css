@@ -1,0 +1,588 @@
+.page {
+  position: relative;
+  overflow: hidden;
+}
+
+.backgroundGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.42), transparent 18rem),
+    radial-gradient(circle at 82% 8%, rgba(255, 255, 255, 0.24), transparent 24rem);
+}
+
+.hero,
+.section,
+.previewSection,
+.waitlistSection {
+  position: relative;
+  z-index: 1;
+  width: min(1200px, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.hero {
+  padding: 1.25rem 0 4rem;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0 2rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: #1d1a17;
+  color: #f5ecdf;
+  font-size: 1rem;
+}
+
+.brandText {
+  font-size: 0.92rem;
+}
+
+.nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  color: rgba(29, 26, 23, 0.78);
+}
+
+.navButton,
+.primaryCta,
+.secondaryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.navButton {
+  padding: 0.8rem 1.15rem;
+  border: 1px solid rgba(29, 26, 23, 0.12);
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  gap: 2rem;
+  align-items: stretch;
+}
+
+.heroCopy {
+  padding: 2rem 0 1rem;
+}
+
+.eyebrow,
+.sectionLabel,
+.panelKicker {
+  margin: 0 0 0.9rem;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8e4c39;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: clamp(3.3rem, 7vw, 6.4rem);
+  line-height: 0.93;
+  letter-spacing: -0.03em;
+  max-width: 10.5ch;
+}
+
+.description {
+  margin: 1.5rem 0 0;
+  max-width: 40rem;
+  font-size: 1.08rem;
+  line-height: 1.75;
+  color: rgba(29, 26, 23, 0.82);
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 2rem;
+}
+
+.primaryCta,
+.secondaryCta {
+  min-height: 3.45rem;
+  padding: 0.95rem 1.4rem;
+  font-weight: 800;
+}
+
+.primaryCta {
+  border: none;
+  background: #1d1a17;
+  color: #f8f0e7;
+  box-shadow: 0 16px 40px rgba(29, 26, 23, 0.16);
+}
+
+.secondaryCta {
+  border: 1px solid rgba(29, 26, 23, 0.14);
+  background: rgba(255, 255, 255, 0.58);
+  color: #1d1a17;
+}
+
+.primaryCta:hover,
+.secondaryCta:hover,
+.navButton:hover {
+  transform: translateY(-2px);
+}
+
+.proofList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.6rem 0 0;
+}
+
+.proofList li {
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(29, 26, 23, 0.08);
+  font-size: 0.95rem;
+}
+
+.heroPanel {
+  position: relative;
+  padding: 1.35rem;
+  border-radius: 1.8rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 251, 247, 0.72)),
+    #fff;
+  border: 1px solid rgba(29, 26, 23, 0.1);
+  box-shadow: 0 30px 60px rgba(81, 56, 37, 0.16);
+}
+
+.heroPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0.9rem;
+  border-radius: 1.2rem;
+  border: 1px solid rgba(29, 26, 23, 0.06);
+  pointer-events: none;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.panelScore {
+  font-size: 0.92rem;
+  color: rgba(29, 26, 23, 0.7);
+}
+
+.panelSummary {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.2rem;
+  background: #1f70671a;
+  color: #174740;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.panelSignals {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.signalCard {
+  padding: 1rem 1.1rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(29, 26, 23, 0.08);
+}
+
+.signalCard h2 {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+}
+
+.signalCard p {
+  margin: 0.55rem 0 0;
+  line-height: 1.65;
+  color: rgba(29, 26, 23, 0.76);
+  font-size: 0.95rem;
+}
+
+.signalMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  color: #8e4c39;
+  font-size: 0.83rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.signalMeta strong {
+  color: #1d1a17;
+  font-size: 1.15rem;
+  letter-spacing: 0;
+}
+
+.panelFootnote {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(29, 26, 23, 0.08);
+  color: rgba(29, 26, 23, 0.72);
+  line-height: 1.6;
+}
+
+.ribbon {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto;
+  overflow: hidden;
+  border-top: 1px solid rgba(29, 26, 23, 0.08);
+  border-bottom: 1px solid rgba(29, 26, 23, 0.08);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.ribbonTrack {
+  display: flex;
+  gap: 2rem;
+  min-height: 3.4rem;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  min-width: 100%;
+  padding: 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(29, 26, 23, 0.74);
+}
+
+.section,
+.previewSection,
+.waitlistSection {
+  padding: 5.2rem 0 0;
+}
+
+.sectionIntro {
+  max-width: 44rem;
+}
+
+.sectionIntro h2 {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: clamp(2.2rem, 4vw, 3.8rem);
+  line-height: 1;
+}
+
+.painGrid,
+.methodGrid,
+.stepsGrid,
+.pricingGrid,
+.faqList,
+.previewGrid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.painGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.painCard,
+.methodCard,
+.stepCard,
+.planCard,
+.faqItem,
+.previewBoard,
+.recommendationPanel,
+.waitlistCard {
+  border-radius: 1.5rem;
+  border: 1px solid rgba(29, 26, 23, 0.08);
+  background: rgba(255, 252, 248, 0.74);
+  box-shadow: 0 22px 40px rgba(81, 56, 37, 0.08);
+}
+
+.painCard {
+  padding: 1.2rem;
+  min-height: 11rem;
+}
+
+.painIndex {
+  display: inline-flex;
+  margin-bottom: 1rem;
+  color: #8e4c39;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.painCard p,
+.methodCard p,
+.stepCard p,
+.faqItem p,
+.planHeader p,
+.recommendationHint,
+.waitlistCopy p {
+  line-height: 1.7;
+  color: rgba(29, 26, 23, 0.75);
+}
+
+.methodGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.methodCard,
+.stepCard,
+.faqItem {
+  padding: 1.3rem;
+}
+
+.methodCard h3,
+.stepCard h3,
+.faqItem h3,
+.planHeader h3 {
+  margin: 0;
+  font-size: 1.12rem;
+}
+
+.stepNumber {
+  display: inline-flex;
+  margin-bottom: 1rem;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #1f7067;
+}
+
+.stepsGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.previewGrid {
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+}
+
+.previewBoard,
+.recommendationPanel {
+  padding: 1.5rem;
+}
+
+.previewBoardHeader,
+.recommendationHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8e4c39;
+}
+
+.previewBoardSummary {
+  margin: 1rem 0 0;
+  font-size: 1.1rem;
+  line-height: 1.75;
+}
+
+.previewSignalList {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+
+.previewSignalRow {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: rgba(29, 26, 23, 0.04);
+}
+
+.previewSignalRow span {
+  font-weight: 800;
+  color: #1f7067;
+}
+
+.previewSignalRow p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.recommendationList,
+.planList {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.recommendationList li,
+.planList li {
+  margin-top: 0.7rem;
+  line-height: 1.7;
+}
+
+.pricingGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.planCard {
+  padding: 1.4rem;
+}
+
+.planHeader p {
+  margin: 0.45rem 0 0;
+}
+
+.planPrice {
+  display: inline-flex;
+  margin-top: 1.2rem;
+  font-family: var(--font-display), serif;
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.faqList {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.waitlistSection {
+  padding-bottom: 5rem;
+}
+
+.waitlistCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 1.25rem;
+  padding: 1.4rem;
+  background:
+    radial-gradient(circle at right top, rgba(31, 112, 103, 0.18), transparent 24rem),
+    rgba(255, 252, 248, 0.82);
+}
+
+.waitlistCopy {
+  padding: 0.6rem;
+}
+
+.waitlistForm {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.25rem;
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(29, 26, 23, 0.08);
+}
+
+.inputLabel {
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8e4c39;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border: 1px solid rgba(29, 26, 23, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0.95rem 1rem;
+  color: #1d1a17;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+@media (max-width: 1100px) {
+  .heroGrid,
+  .previewGrid,
+  .waitlistCard {
+    grid-template-columns: 1fr;
+  }
+
+  .painGrid,
+  .methodGrid,
+  .stepsGrid,
+  .pricingGrid,
+  .faqList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .title {
+    max-width: none;
+    font-size: clamp(2.8rem, 15vw, 4.4rem);
+  }
+
+  .painGrid,
+  .methodGrid,
+  .stepsGrid,
+  .pricingGrid,
+  .faqList {
+    grid-template-columns: 1fr;
+  }
+
+  .proofList {
+    flex-direction: column;
+  }
+
+  .previewSignalRow,
+  .panelHeader,
+  .previewBoardHeader,
+  .recommendationHeader {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

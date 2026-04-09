@@ -1,0 +1,25 @@
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+.claude/
+
+# Node
+node_modules/
+
+# Env (안전망 — 서브폴더 .gitignore와 중복돼도 OK)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+.next/
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
