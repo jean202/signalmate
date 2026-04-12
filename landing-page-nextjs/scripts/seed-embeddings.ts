@@ -32,10 +32,20 @@ const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 type SeedConversation = {
   rawText: string;
-  relationshipStage: string;
-  meetingChannel: string;
-  userGoal: string;
-  recommendedAction: string;
+  relationshipStage:
+    | "before_meeting"
+    | "after_first_date"
+    | "after_second_date"
+    | "ongoing_chat"
+    | "cooling_down";
+  meetingChannel: "blind_date" | "dating_app" | "marriage_agency" | "mutual_friend" | "other";
+  userGoal: "continue_chat" | "ask_for_date" | "evaluate_interest" | "decide_to_stop";
+  recommendedAction:
+    | "keep_light"
+    | "suggest_date"
+    | "slow_down"
+    | "wait_for_response"
+    | "consider_stopping";
   outcomeLabel: string;
   overallSummary: string;
   positiveCount: number;
@@ -442,12 +452,12 @@ async function main() {
       const conversation = await prisma.conversation.create({
         data: {
           title: `시드 대화 #${successCount + 1}`,
-          sourceType: "seed",
+          sourceType: "other",
           relationshipStage: seed.relationshipStage,
           meetingChannel: seed.meetingChannel,
           userGoal: seed.userGoal,
           saveMode: "saved",
-          rawText: seed.rawText,
+          rawTextRedacted: seed.rawText,
           messages: { create: messages },
         },
       });
