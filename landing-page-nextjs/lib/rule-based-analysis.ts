@@ -151,6 +151,17 @@ function buildSignalFactory() {
   };
 }
 
+function hasLowEngagementPattern(metrics: MessageMetrics) {
+  const shortReplyRatio =
+    metrics.otherMessages > 0 ? metrics.otherShortReplyCount / metrics.otherMessages : 0;
+
+  return (
+    metrics.toneDrop ||
+    (metrics.selfToOtherRatio >= 2.5 && metrics.selfMessages >= 5) ||
+    (metrics.otherMessages >= 3 && shortReplyRatio >= 0.6)
+  );
+}
+
 function buildSummary(metrics: MessageMetrics, positiveCount: number, cautionCount: number) {
   if (metrics.otherMessages === 0) {
     return "상대 반응이 아직 없어 관계 신호를 충분히 읽기 어려운 상태입니다.";
@@ -158,6 +169,10 @@ function buildSummary(metrics: MessageMetrics, positiveCount: number, cautionCou
 
   if (positiveCount >= 2 && cautionCount === 0) {
     return "대화 흐름은 비교적 안정적이며, 가볍게 다음 제안까지 검토할 만한 상태입니다.";
+  }
+
+  if (hasLowEngagementPattern(metrics) && positiveCount <= 1) {
+    return "반응은 이어지더라도 현재는 속도를 낮추고 해석을 보수적으로 가져가는 편이 안전합니다.";
   }
 
   if (positiveCount >= 1 && cautionCount >= 1) {
@@ -205,6 +220,8 @@ function buildRecommendedAction(
   action: RecommendedAction;
   reason: string;
 } {
+  const lowEngagementPattern = hasLowEngagementPattern(metrics);
+
   if (metrics.otherMessages === 0) {
     return {
       action: "wait_for_response",
@@ -225,8 +242,11 @@ function buildRecommendedAction(
     metrics.otherDefinitePlanCount === 0
   ) {
     return {
-      action: positiveCount > 0 ? "keep_light" : "wait_for_response",
-      reason: "일정 관련 반응은 왔지만 아직 구체화가 약하므로, 압박보다 가벼운 연결이 더 안전합니다.",
+      action: positiveCount >= 2 && !lowEngagementPattern ? "keep_light" : "slow_down",
+      reason:
+        positiveCount >= 2 && !lowEngagementPattern
+          ? "일정 관련 반응은 왔지만 아직 구체화가 약하므로, 압박보다 가벼운 연결이 더 안전합니다."
+          : "답장은 오더라도 확답과 참여도가 함께 약해 보여서, 지금은 밀어붙이기보다 속도를 늦추는 편이 낫습니다.",
     };
   }
 
@@ -238,9 +258,28 @@ function buildRecommendedAction(
   }
 
   if (metrics.lastSenderRole === "self") {
+    if (lowEngagementPattern && positiveCount === 0) {
+      return {
+        action: "slow_down",
+        reason: "내 메시지가 더 많이 쌓였고 상대 참여도도 약해 보여서, 추가 접근보다 텀을 두고 흐름을 재평가하는 편이 좋습니다.",
+      };
+    }
+
     return {
       action: "wait_for_response",
       reason: "마지막 공이 아직 상대에게 있으므로, 답장을 재촉하기보다 반응을 기다리는 편이 좋습니다.",
+    };
+  }
+
+  if (
+    lowEngagementPattern &&
+    positiveCount <= 1 &&
+    metrics.otherFutureMentionCount === 0 &&
+    metrics.otherDefinitePlanCount === 0
+  ) {
+    return {
+      action: "slow_down",
+      reason: "답장은 이어져도 참여도가 떨어지는 패턴이 보여서, 지금은 연결 강도를 높이기보다 온도를 낮게 유지하는 편이 좋습니다.",
     };
   }
 

@@ -90,17 +90,54 @@ signalmate/
 
 ## 실행 방법
 
+### Quick Start (규칙 기반 분석만)
+
 ```bash
 cd landing-page-nextjs
 npm install
 cp .env.example .env.local
-# .env.local에 ANTHROPIC_API_KEY 설정
+# Claude API 키 없이도 동작합니다 (USE_DB=false)
 
 npm run dev
 # → http://localhost:3000/analyze
 ```
 
 Claude API 키 없이도 규칙 기반 분석으로 동작합니다.
+
+### 구현 현황
+
+`landing-page-nextjs` 폴더에 전체 MVP가 포함되어 있습니다.
+
+#### 프론트엔드
+- 랜딩페이지 (제품 소개, FAQ, 가격, 대기자 등록)
+- 4단계 분석 체험 UI (입력 → 맥락 선택 → 로딩 → 결과)
+- 추천 메시지 복사 기능
+
+#### 백엔드 API
+- `POST /api/v1/conversations` — 대화 생성 (rawText 자동 파싱 지원)
+- `POST /api/v1/conversations/:id/analyses` — 분석 실행 (SSE 스트리밍)
+- `GET /api/v1/analyses/:id` / `signals` / `recommendations`
+- `POST /api/v1/waitlist` — 대기자 등록
+
+#### 분석 엔진
+- **규칙 기반**: 답장 흐름, 질문 비율, 미래 언급, 약속 구체성 등 16 패턴
+- **하이브리드**: 규칙 결과를 Claude API로 강화 (API 키 없으면 규칙만으로 동작)
+- **RAG**: OpenAI 임베딩 기반 유사 대화 검색 (pgvector)
+
+#### 채팅 파서
+- 카카오톡 내보내기 (한국어/대괄호/영문 형식)
+- 시간+이름, 단순 이름:메시지 형식
+- 자동 형식 감지 + sender role 배정
+
+#### 데이터 저장
+- `USE_DB=true`: PostgreSQL + Prisma
+- `USE_DB=false`: 로컬 JSON 파일 (DB 없이 데모 가능)
+
+### 테스트
+
+```bash
+npm test                      # vitest (chat-parser + rule-based-analysis)
+```
 
 상세 설정 (PostgreSQL + pgvector, 전체 파이프라인):
 → [landing-page-nextjs/README.md](./landing-page-nextjs/README.md)
