@@ -102,7 +102,12 @@ type ConversationUpdateInput = {
 
 type AnalysisCreateInput = Omit<StoredAnalysis, "id" | "createdAt" | "completedAt">;
 
-const dataDirectory = path.join(process.cwd(), "data");
+// Vercel Lambda의 /var/task는 읽기 전용. /tmp는 쓰기 가능 (Lambda당 512MB).
+// 로컬 개발에서는 process.cwd()/data를 유지.
+const dataDirectory =
+  process.env.NODE_ENV === "production"
+    ? "/tmp/signalmate-data"
+    : path.join(process.cwd(), "data");
 const analysisStoreFilePath = path.join(dataDirectory, "analysis-dev.json");
 
 async function ensureStoreExists() {

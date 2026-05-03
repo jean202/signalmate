@@ -2,34 +2,35 @@
   display: grid;
   gap: 0.7rem;
   padding: 1.25rem;
-  border-radius: 1.2rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(29, 26, 23, 0.08);
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid var(--color-border);
 }
 
 .inputLabel {
-  font-size: 0.86rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8e4c39;
+  color: var(--brand-pink);
 }
 
 .input,
 .textarea {
   width: 100%;
-  border: 1px solid rgba(29, 26, 23, 0.12);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 0.95rem 1rem;
-  color: #1d1a17;
+  border: 1px solid var(--color-border);
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.85rem 1rem;
+  color: var(--color-ink);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .input:focus,
 .textarea:focus {
   outline: none;
-  border-color: rgba(31, 112, 103, 0.5);
-  box-shadow: 0 0 0 4px rgba(31, 112, 103, 0.1);
+  border-color: var(--brand-pink);
+  box-shadow: 0 0 0 4px rgba(255, 79, 129, 0.14);
 }
 
 .textarea {
@@ -40,23 +41,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 3.45rem;
-  padding: 0.95rem 1.4rem;
+  min-height: 3.2rem;
+  padding: 0.9rem 1.4rem;
   border: none;
   border-radius: 999px;
-  background: #1d1a17;
-  color: #f8f0e7;
-  font-weight: 800;
+  background: var(--brand-gradient);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
   cursor: pointer;
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
     opacity 180ms ease;
-  box-shadow: 0 16px 40px rgba(29, 26, 23, 0.16);
+  box-shadow: var(--shadow-cta);
 }
 
 .submitButton:hover:not(:disabled) {
   transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(255, 79, 129, 0.4);
 }
 
 .submitButton:disabled {
@@ -65,30 +68,32 @@
 }
 
 .statusBox {
-  border-radius: 1rem;
+  border-radius: 0.85rem;
   padding: 0.9rem 1rem;
   font-size: 0.95rem;
   line-height: 1.65;
 }
 
 .statusPending {
-  background: rgba(29, 26, 23, 0.06);
-  color: rgba(29, 26, 23, 0.8);
+  background: rgba(27, 19, 48, 0.05);
+  color: var(--color-ink-soft);
 }
 
 .statusSuccess {
-  background: rgba(31, 112, 103, 0.12);
-  color: #174740;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  color: #7e22ce;
 }
 
 .statusError {
-  background: rgba(164, 57, 37, 0.12);
-  color: #7f2c1f;
+  background: rgba(255, 79, 129, 0.1);
+  border: 1px solid rgba(255, 79, 129, 0.22);
+  color: #b53163;
 }
 
 .finePrint {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   line-height: 1.6;
-  color: rgba(29, 26, 23, 0.68);
+  color: var(--color-ink-mute);
 }

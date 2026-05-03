@@ -364,6 +364,63 @@ export async function listAnalysisSummaries(userId?: string) {
   }));
 }
 
+// ─── Payments ────────────────────────────────────────────
+
+export async function createPendingPayment(input: {
+  userId: string;
+  orderId: string;
+  purchaseType: "single_analysis" | "subscription_monthly";
+  amount: number;
+  analysisId?: string | null;
+}): Promise<{ id: string; orderId: string }> {
+  const row = await prisma.payment.create({
+    data: {
+      userId: input.userId,
+      analysisId: input.analysisId ?? null,
+      paymentProvider: "toss",
+      providerPaymentId: input.orderId,
+      amount: input.amount,
+      currency: "KRW",
+      paymentStatus: "pending",
+    },
+  });
+  return { id: row.id, orderId: input.orderId };
+}
+
+export async function confirmPayment(input: {
+  orderId: string;
+  paymentKey: string;
+}): Promise<void> {
+  await prisma.payment.update({
+    where: { providerPaymentId: input.orderId },
+    data: {
+      paymentStatus: "paid",
+      providerPaymentId: input.paymentKey,
+    },
+  });
+}
+
+export async function failPayment(orderId: string): Promise<void> {
+  await prisma.payment.updateMany({
+    where: { providerPaymentId: orderId, paymentStatus: "pending" },
+    data: { paymentStatus: "failed" },
+  });
+}
+
+export async function getUserPayments(userId: string) {
+  return prisma.payment.findMany({
+    where: { userId, paymentStatus: "paid" },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      amount: true,
+      currency: true,
+      createdAt: true,
+      analysisId: true,
+    },
+  });
+}
+
 // ─── Waitlist ────────────────────────────────────────────
 
 export type WaitlistEntry = {

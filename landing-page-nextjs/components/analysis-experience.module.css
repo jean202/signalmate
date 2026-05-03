@@ -10,8 +10,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.5), transparent 20rem),
-    radial-gradient(circle at 84% 10%, rgba(31, 112, 103, 0.16), transparent 22rem);
+    radial-gradient(circle at 14% 8%, rgba(255, 79, 129, 0.16), transparent 22rem),
+    radial-gradient(circle at 86% 4%, rgba(168, 85, 247, 0.14), transparent 24rem);
 }
 
 .shell {
@@ -25,10 +25,10 @@
 .hero,
 .card,
 .resultsShell {
-  border-radius: 1.8rem;
-  border: 1px solid rgba(29, 26, 23, 0.08);
-  background: rgba(255, 252, 248, 0.76);
-  box-shadow: 0 24px 48px rgba(81, 56, 37, 0.08);
+  border-radius: 1.5rem;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-card);
 }
 
 .topbar {
@@ -50,19 +50,20 @@
 .brandMark {
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 999px;
-  background: #1d1a17;
-  color: #f5ecdf;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 14px;
+  background: var(--brand-gradient);
+  color: #fff;
   font-weight: 800;
+  box-shadow: 0 6px 16px rgba(255, 79, 129, 0.32);
 }
 
 .brandText {
-  font-size: 0.95rem;
+  font-size: 1.02rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
 }
 
 .topActions {
@@ -80,16 +81,23 @@
   align-items: center;
   justify-content: center;
   min-height: 2.35rem;
-  padding: 0.55rem 0.9rem;
+  padding: 0.55rem 1rem;
   border-radius: 999px;
-  border: 1px solid rgba(29, 26, 23, 0.1);
-  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-ink);
   font-size: 0.88rem;
-  font-weight: 800;
+  font-weight: 700;
+}
+
+.demoBadge {
+  background: var(--brand-gradient-soft);
+  border-color: rgba(255, 79, 129, 0.18);
+  color: #b53163;
 }
 
 .topLink {
-  color: #1d1a17;
+  color: var(--color-ink);
 }
 
 .hero {
@@ -105,20 +113,21 @@
 
 .kicker {
   margin: 0 0 0.8rem;
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #8e4c39;
+  color: var(--brand-pink);
 }
 
 .title {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2.9rem, 6vw, 5rem);
-  line-height: 0.95;
-  letter-spacing: -0.03em;
-  max-width: 11ch;
+  font-size: clamp(1.85rem, 3.4vw, 2.6rem);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  color: var(--color-ink);
+  max-width: 22ch;
 }
 
 .description,
@@ -131,22 +140,22 @@
 .disclaimer,
 .tipCard p {
   line-height: 1.7;
-  color: rgba(29, 26, 23, 0.76);
+  color: var(--color-ink-soft);
 }
 
 .description {
-  margin: 1.3rem 0 0;
-  max-width: 40rem;
-  font-size: 1.05rem;
+  margin: 1rem 0 0;
+  max-width: 36rem;
+  font-size: 0.98rem;
 }
 
 .trustPanel {
   padding: 1.35rem;
-  border-radius: 1.45rem;
+  border-radius: 1.25rem;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(253, 248, 241, 0.64)),
+    linear-gradient(160deg, rgba(255, 79, 129, 0.06), rgba(168, 85, 247, 0.04)),
     #fff;
-  border: 1px solid rgba(29, 26, 23, 0.08);
+  border: 1px solid var(--color-border);
 }
 
 .panelHeader {
@@ -157,9 +166,11 @@
 .panelHeader strong,
 .cardHeader h2,
 .resultsHero h2 {
-  font-family: var(--font-display), serif;
-  font-size: clamp(1.9rem, 3vw, 2.8rem);
-  line-height: 1;
+  font-size: clamp(1.3rem, 2.2vw, 1.7rem);
+  line-height: 1.25;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--color-ink);
 }
 
 .trustList {
@@ -184,8 +195,8 @@
   gap: 0.9rem;
   align-items: center;
   padding: 1rem;
-  border-radius: 1.3rem;
-  border: 1px solid rgba(29, 26, 23, 0.08);
+  border-radius: 1rem;
+  border: 1px solid var(--color-border);
   backdrop-filter: blur(12px);
 }
 
@@ -195,52 +206,55 @@
 }
 
 .stepItem strong {
-  font-size: 0.98rem;
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .stepItem span {
-  color: rgba(29, 26, 23, 0.62);
-  font-size: 0.9rem;
+  color: var(--color-ink-mute);
+  font-size: 0.86rem;
 }
 
 .stepIndex {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.04em;
 }
 
 .stepItemCurrent {
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 18px 36px rgba(81, 56, 37, 0.08);
+  background: #fff;
+  border-color: rgba(255, 79, 129, 0.32);
+  box-shadow: 0 10px 24px rgba(255, 79, 129, 0.14);
 }
 
 .stepItemCurrent .stepIndex {
-  background: #1d1a17;
-  color: #f5ecdf;
+  background: var(--brand-gradient);
+  color: #fff;
 }
 
 .stepItemDone {
-  background: rgba(31, 112, 103, 0.12);
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.18);
 }
 
 .stepItemDone .stepIndex {
-  background: #1f7067;
-  color: #f3f7f6;
+  background: var(--brand-purple);
+  color: #fff;
 }
 
 .stepItemIdle {
-  background: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .stepItemIdle .stepIndex {
-  background: rgba(29, 26, 23, 0.08);
-  color: rgba(29, 26, 23, 0.74);
+  background: rgba(27, 19, 48, 0.06);
+  color: var(--color-ink-mute);
 }
 
 .card,
@@ -279,9 +293,9 @@
 .previewCard,
 .resultCard,
 .choiceSection {
-  border-radius: 1.35rem;
-  border: 1px solid rgba(29, 26, 23, 0.08);
-  background: rgba(255, 255, 255, 0.58);
+  border-radius: 1.1rem;
+  border: 1px solid var(--color-border);
+  background: #fff;
 }
 
 .inputColumn,
@@ -293,28 +307,29 @@
 .fieldLabel {
   display: inline-flex;
   margin-bottom: 0.75rem;
-  font-size: 0.86rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8e4c39;
+  color: var(--brand-pink);
 }
 
 .textarea {
   width: 100%;
   min-height: 23rem;
-  padding: 1rem 1.05rem;
-  border: 1px solid rgba(29, 26, 23, 0.12);
-  border-radius: 1.2rem;
-  background: rgba(255, 255, 255, 0.88);
-  color: #1d1a17;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: #fff;
+  color: var(--color-ink);
   resize: vertical;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .textarea:focus {
   outline: none;
-  border-color: rgba(31, 112, 103, 0.48);
-  box-shadow: 0 0 0 4px rgba(31, 112, 103, 0.1);
+  border-color: var(--brand-pink);
+  box-shadow: 0 0 0 4px rgba(255, 79, 129, 0.14);
 }
 
 .metaRow {
@@ -322,20 +337,21 @@
   justify-content: space-between;
   gap: 1rem;
   margin-top: 0.9rem;
-  font-size: 0.9rem;
-  color: rgba(29, 26, 23, 0.62);
+  font-size: 0.88rem;
+  color: var(--color-ink-mute);
 }
 
 .hint {
   margin: 0.8rem 0 0;
   line-height: 1.65;
-  color: rgba(29, 26, 23, 0.72);
+  color: var(--color-ink-soft);
 }
 
 .hint code {
-  padding: 0.1rem 0.35rem;
+  padding: 0.1rem 0.4rem;
   border-radius: 0.4rem;
-  background: rgba(29, 26, 23, 0.08);
+  background: rgba(255, 79, 129, 0.1);
+  color: #b53163;
 }
 
 .ghostButton,
@@ -345,10 +361,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 3.2rem;
-  padding: 0.9rem 1.25rem;
+  min-height: 3rem;
+  padding: 0.85rem 1.35rem;
   border-radius: 999px;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: -0.005em;
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -359,16 +376,16 @@
 .ghostButton,
 .secondaryButton,
 .copyButton {
-  border: 1px solid rgba(29, 26, 23, 0.12);
-  background: rgba(255, 255, 255, 0.68);
-  color: #1d1a17;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-ink);
 }
 
 .primaryButton {
   border: none;
-  background: #1d1a17;
-  color: #f8f0e7;
-  box-shadow: 0 16px 36px rgba(29, 26, 23, 0.16);
+  background: var(--brand-gradient);
+  color: #fff;
+  box-shadow: var(--shadow-cta);
 }
 
 .ghostButton:hover,
@@ -376,6 +393,10 @@
 .primaryButton:hover,
 .secondaryButton:hover {
   transform: translateY(-2px);
+}
+
+.primaryButton:hover {
+  box-shadow: 0 16px 36px rgba(255, 79, 129, 0.4);
 }
 
 .previewList,
@@ -393,8 +414,9 @@
 
 .previewList li {
   padding: 0.85rem 0.95rem;
-  border-radius: 1rem;
-  background: rgba(29, 26, 23, 0.04);
+  border-radius: 0.85rem;
+  background: rgba(255, 79, 129, 0.05);
+  border: 1px solid rgba(255, 79, 129, 0.1);
 }
 
 .previewList li p {
@@ -403,16 +425,16 @@
 }
 
 .previewRole {
-  font-size: 0.84rem;
-  font-weight: 800;
-  color: #1f7067;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--brand-pink);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .previewEmpty {
   line-height: 1.65;
-  color: rgba(29, 26, 23, 0.62);
+  color: var(--color-ink-mute);
 }
 
 .tipCard,
@@ -420,8 +442,9 @@
 .excerptBox {
   margin-top: 1rem;
   padding: 0.95rem 1rem;
-  border-radius: 1rem;
-  background: rgba(31, 112, 103, 0.08);
+  border-radius: 0.9rem;
+  background: rgba(168, 85, 247, 0.07);
+  border: 1px solid rgba(168, 85, 247, 0.14);
 }
 
 .tipCard strong,
@@ -437,9 +460,10 @@
 .errorBox {
   margin-top: 1rem;
   padding: 0.95rem 1rem;
-  border-radius: 1rem;
-  background: rgba(164, 57, 37, 0.12);
-  color: #7f2c1f;
+  border-radius: 0.9rem;
+  background: rgba(255, 79, 129, 0.1);
+  border: 1px solid rgba(255, 79, 129, 0.2);
+  color: #b53163;
   line-height: 1.65;
 }
 
@@ -477,24 +501,33 @@
   gap: 0.35rem;
   text-align: left;
   padding: 0.95rem 1rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(29, 26, 23, 0.08);
-  background: rgba(255, 255, 255, 0.72);
+  border-radius: 0.9rem;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.choiceCard:hover {
+  border-color: rgba(255, 79, 129, 0.3);
+  transform: translateY(-1px);
 }
 
 .choiceCard strong {
-  font-size: 1rem;
+  font-size: 0.98rem;
+  font-weight: 700;
 }
 
 .choiceCard span {
   line-height: 1.6;
-  color: rgba(29, 26, 23, 0.68);
+  color: var(--color-ink-mute);
+  font-size: 0.9rem;
 }
 
 .choiceCardActive {
-  border-color: rgba(31, 112, 103, 0.44);
-  background: rgba(31, 112, 103, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(31, 112, 103, 0.08);
+  border-color: var(--brand-pink);
+  background: linear-gradient(135deg, rgba(255, 79, 129, 0.08), rgba(168, 85, 247, 0.06));
+  box-shadow: 0 0 0 3px rgba(255, 79, 129, 0.12);
 }
 
 .summaryStrip,
@@ -519,10 +552,10 @@
 .loadingMeter {
   position: relative;
   width: min(32rem, 100%);
-  height: 0.8rem;
+  height: 0.6rem;
   margin: 1.5rem auto 0;
   border-radius: 999px;
-  background: rgba(29, 26, 23, 0.08);
+  background: rgba(27, 19, 48, 0.06);
   overflow: hidden;
 }
 
@@ -531,7 +564,7 @@
   inset: 0 auto 0 0;
   width: 38%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #8e4c39, #1f7067);
+  background: var(--brand-gradient);
   animation: loadingSlide 1.8s ease-in-out infinite;
 }
 
@@ -544,10 +577,11 @@
 
 .loadingChecklistItem {
   padding: 0.9rem 1rem;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.64);
-  border: 1px solid rgba(29, 26, 23, 0.08);
-  font-weight: 700;
+  border-radius: 0.9rem;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+  font-size: 0.92rem;
 }
 
 .resultsShell {
@@ -568,23 +602,24 @@
 
 .resultsBadgePanel {
   padding: 1.2rem;
-  border-radius: 1.35rem;
+  border-radius: 1.1rem;
   background:
-    radial-gradient(circle at right top, rgba(31, 112, 103, 0.18), transparent 18rem),
-    rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(29, 26, 23, 0.08);
+    radial-gradient(circle at right top, rgba(255, 79, 129, 0.14), transparent 18rem),
+    #fff;
+  border: 1px solid var(--color-border);
 }
 
 .resultsBadgePanel strong {
   display: block;
   margin-top: 0.85rem;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
 .resultsBadgePanel p {
   margin: 0.7rem 0 0;
   line-height: 1.65;
-  color: rgba(29, 26, 23, 0.74);
+  color: var(--color-ink-soft);
 }
 
 .statGrid {
@@ -595,26 +630,28 @@
 
 .statCard {
   padding: 1rem;
-  border-radius: 1.2rem;
-  border: 1px solid rgba(29, 26, 23, 0.08);
-  background: rgba(255, 255, 255, 0.62);
+  border-radius: 1rem;
+  border: 1px solid var(--color-border);
+  background: #fff;
 }
 
 .statCard span {
   display: block;
-  font-size: 0.84rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8e4c39;
+  color: var(--brand-pink);
 }
 
 .statCard strong {
   display: block;
   margin-top: 0.45rem;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2rem, 5vw, 2.8rem);
+  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
   line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
 }
 
 .resultsGrid {
@@ -629,9 +666,9 @@
 .signalCard,
 .recommendationCard {
   padding: 1rem;
-  border-radius: 1.1rem;
-  background: rgba(29, 26, 23, 0.04);
-  border: 1px solid rgba(29, 26, 23, 0.06);
+  border-radius: 0.95rem;
+  background: #fff;
+  border: 1px solid var(--color-border);
 }
 
 .signalHeader,
@@ -640,26 +677,29 @@
   justify-content: space-between;
   gap: 0.75rem;
   align-items: center;
-  font-size: 0.82rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .signalType,
 .recommendationMeta span {
-  color: #1f7067;
+  color: var(--brand-pink);
 }
 
 .signalConfidence,
 .recommendationMeta strong,
 .helperText {
-  color: rgba(29, 26, 23, 0.58);
+  color: var(--color-ink-mute);
 }
 
 .signalCard h4,
 .recommendationCard h4 {
   margin: 0.65rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
 }
 
 .signalCard p,
@@ -680,9 +720,9 @@
 }
 
 .copyButtonActive {
-  background: rgba(31, 112, 103, 0.14);
-  border-color: rgba(31, 112, 103, 0.28);
-  color: #174740;
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.32);
+  color: #7e22ce;
 }
 
 .excerptBox {
@@ -716,6 +756,124 @@
   }
 }
 
+/* ── 스트리밍 애니메이션 ──────────────────────────────────────────────── */
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes enhancingPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* 신호 카드 — 초기 등장 */
+.signalCard {
+  animation: cardEnter 320ms ease backwards;
+}
+
+/* 신호 카드 텍스트 영역 — 강화 중 페이드 + 강화 완료 후 fade-in */
+.signalCardText {
+  transition: opacity 400ms ease;
+}
+
+.signalListEnhancing .signalCardText {
+  animation: enhancingPulse 1.4s ease-in-out infinite;
+}
+
+/* 추천 카드 — 초기 등장 */
+.recommendationCard {
+  animation: cardEnter 320ms ease backwards;
+}
+
+/* 스켈레톤 shimmer 공통 */
+.skeletonTitle,
+.skeletonLine,
+.skeletonBadge,
+.skeletonCard,
+.signalCardSkeleton,
+.recSkeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 79, 129, 0.06) 25%,
+    rgba(255, 79, 129, 0.14) 50%,
+    rgba(255, 79, 129, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.6rem;
+}
+
+.skeletonTitle {
+  height: 2.8rem;
+  width: 80%;
+  margin-bottom: 0.8rem;
+}
+
+.skeletonLine {
+  display: block;
+  height: 1rem;
+  width: 60%;
+  margin-top: 0.9rem;
+}
+
+.skeletonBadge {
+  height: 7rem;
+}
+
+.skeletonCard {
+  height: 5.5rem;
+}
+
+.signalCardSkeleton {
+  height: 7rem;
+  animation: shimmer 1.5s ease-in-out infinite, cardEnter 320ms ease backwards;
+}
+
+.recSkeleton {
+  height: 6rem;
+  animation: shimmer 1.5s ease-in-out infinite, cardEnter 320ms ease backwards;
+}
+
+/* AI 강화 중 배지 */
+.enhancingBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  color: #7e22ce;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  animation: enhancingPulse 1.4s ease-in-out infinite;
+}
+
 @media (max-width: 1040px) {
   .hero,
   .inputLayout,
@@ -746,7 +904,7 @@
 
   .title {
     max-width: none;
-    font-size: clamp(2.5rem, 14vw, 4rem);
+    font-size: clamp(1.65rem, 7vw, 2.2rem);
   }
 
   .stepRail,

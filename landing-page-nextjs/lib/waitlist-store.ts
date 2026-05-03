@@ -10,7 +10,10 @@ export type WaitlistEntry = {
   createdAt: string;
 };
 
-const dataDirectory = path.join(process.cwd(), "data");
+const dataDirectory =
+  process.env.NODE_ENV === "production"
+    ? "/tmp/signalmate-data"
+    : path.join(process.cwd(), "data");
 const waitlistFilePath = path.join(dataDirectory, "waitlist-dev.json");
 
 async function ensureStoreExists() {

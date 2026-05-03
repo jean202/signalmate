@@ -1,7 +1,30 @@
 :root {
   color-scheme: light;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-display:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+    "Helvetica Neue", Arial, sans-serif;
+  --font-body:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+    "Helvetica Neue", Arial, sans-serif;
+
+  --color-ink: #1b1330;
+  --color-ink-soft: rgba(27, 19, 48, 0.7);
+  --color-ink-mute: rgba(27, 19, 48, 0.55);
+  --color-surface: #ffffff;
+  --color-surface-soft: rgba(255, 255, 255, 0.78);
+  --color-border: rgba(27, 19, 48, 0.08);
+
+  --brand-pink: #ff4f81;
+  --brand-coral: #ff7a59;
+  --brand-purple: #a855f7;
+  --brand-gradient: linear-gradient(135deg, #ff4f81 0%, #ff7a59 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #ffe4ee 0%, #ffe9df 100%);
+
+  --shadow-card: 0 12px 32px rgba(255, 79, 129, 0.08),
+    0 2px 8px rgba(27, 19, 48, 0.04);
+  --shadow-cta: 0 12px 28px rgba(255, 79, 129, 0.32);
 }
 
 * {
@@ -14,12 +37,17 @@ html {
 
 body {
   margin: 0;
-  font-family: var(--font-body), sans-serif;
+  font-family: var(--font-body);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background:
-    radial-gradient(circle at top left, rgba(235, 101, 54, 0.18), transparent 28rem),
-    radial-gradient(circle at 80% 20%, rgba(31, 112, 103, 0.16), transparent 26rem),
-    linear-gradient(180deg, #f5ecdf 0%, #efe1d1 48%, #ead8c7 100%);
-  color: #1d1a17;
+    radial-gradient(circle at 12% -6%, rgba(255, 79, 129, 0.18), transparent 32rem),
+    radial-gradient(circle at 88% 8%, rgba(168, 85, 247, 0.14), transparent 30rem),
+    radial-gradient(circle at 50% 100%, rgba(255, 122, 89, 0.12), transparent 36rem),
+    linear-gradient(180deg, #fff7fa 0%, #fdf2f8 50%, #fbeef6 100%);
+  color: var(--color-ink);
+  letter-spacing: -0.005em;
 }
 
 a {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { parseChatText } from "@/lib/chat-parser";
+import { PaymentButton } from "@/components/payment-button";
 import styles from "./analysis-experience.module.css";
 
 const sampleConversation = `[오후 8:10] 나: 오늘 잘 들어갔어요?
@@ -15,7 +16,7 @@ const sampleConversation = `[오후 8:10] 나: 오늘 잘 들어갔어요?
 const progressSteps = [
   { key: "input", label: "채팅 입력", caption: "대화 붙여넣기" },
   { key: "context", label: "상황 선택", caption: "맥락 보정" },
-  { key: "loading", label: "분석 진행", caption: "신호 해석" },
+  { key: "loading", label: "신호 분석", caption: "규칙 + AI" },
   { key: "results", label: "결과 확인", caption: "액션 추천" },
 ] as const;
 
@@ -122,6 +123,33 @@ type RecommendedAction =
   | "consider_stopping";
 type RecommendationType = "next_message" | "tone_guide" | "avoid_phrase";
 type SignalType = "positive" | "ambiguous" | "caution";
+
+// "idle"          → SSE 연결 전 (스켈레톤 표시)
+// "rules_visible" → rule_complete 수신, Claude 강화 대기 중 (신호 카드 표시 + 펄스)
+// "enhancing"     → signals_enhanced 수신, 추천 대기 중
+// "complete"      → complete 수신, 모든 버튼 활성화
+type StreamPhase = "idle" | "rules_visible" | "enhancing" | "complete";
+
+type StreamingState = {
+  analysisId: string | null;
+  conversationId: string;
+  streamPhase: StreamPhase;
+  signals: SignalRecord[];
+  recommendations: RecommendationRecord[];
+  overallSummary: string;
+  positiveSignalCount: number;
+  ambiguousSignalCount: number;
+  cautionSignalCount: number;
+  recommendedAction: RecommendedAction;
+  recommendedActionReason: string;
+  confidenceLevel: ConfidenceLevel;
+  rawText: string;
+  messageCount: number;
+  relationshipStage: RelationshipStage;
+  meetingChannel: MeetingChannel;
+  userGoal: UserGoal;
+  saveMode: SaveMode;
+};
 
 type ChoiceOption<T extends string> = {
   value: T;
@@ -366,7 +394,7 @@ export function AnalysisExperience() {
   const [userGoal, setUserGoal] = useState<UserGoal>("evaluate_interest");
   const [saveMode, setSaveMode] = useState<SaveMode>("temporary");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [analysisSession, setAnalysisSession] = useState<AnalysisSession | null>(null);
+  const [streamingState, setStreamingState] = useState<StreamingState | null>(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [copiedRecommendationId, setCopiedRecommendationId] = useState<string | null>(null);
 
@@ -431,20 +459,28 @@ export function AnalysisExperience() {
     }
 
     setErrorMessage(null);
-    setAnalysisSession(null);
+    setStreamingState(null);
     setStep("loading");
 
     try {
-      const pipeline = (async () => {
-        const conversationResponse = await requestJson<{
-          conversation: {
-            id: string;
-          };
-        }>("/api/v1/conversations", {
+      // 1단계: 대화 생성 (서버에서 파싱 + situationContext 병합)
+      const conversationResponse = await requestJson<{
+        conversation: {
+          id: string;
+          rawText: string;
+          relationshipStage: string;
+          meetingChannel: string;
+          userGoal: string;
+          situationContext?: string | null;
+          messages: Array<{ senderRole: string; messageText: string; sentAt: string | null; sequenceNo: number }>;
+          messageCount: number;
+          saveMode: string;
+        };
+      }>(
+        "/api/v1/conversations",
+        {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: "직접 붙여넣은 대화",
             sourceType: "manual",
@@ -456,62 +492,152 @@ export function AnalysisExperience() {
             selfName: "나",
             messages,
           }),
-        });
+        },
+      );
 
-        const analysisResponse = await requestJson<{
-          analysis: {
-            id: string;
-          };
-        }>(`/api/v1/conversations/${conversationResponse.conversation.id}/analyses`, {
+      const { conversation: createdConversation } = conversationResponse;
+      const conversationId = createdConversation.id;
+
+      // 스트리밍 초기 상태 세팅 (스켈레톤 표시용)
+      const baseState: StreamingState = {
+        analysisId: null,
+        conversationId,
+        streamPhase: "idle",
+        signals: [],
+        recommendations: [],
+        overallSummary: "",
+        positiveSignalCount: 0,
+        ambiguousSignalCount: 0,
+        cautionSignalCount: 0,
+        recommendedAction: "keep_light",
+        recommendedActionReason: "",
+        confidenceLevel: "low",
+        rawText,
+        messageCount: createdConversation.messageCount,
+        relationshipStage,
+        meetingChannel,
+        userGoal,
+        saveMode,
+      };
+
+      // 2단계: SSE 스트림 연결 — 대화 데이터를 인라인으로 포함해 stateless 동작
+      // conversationInline을 함께 보내면 서버가 DB 조회 없이 분석 실행 (Vercel 호환)
+      const response = await fetch(
+        `/api/v1/conversations/${conversationId}/analyses/stream`,
+        {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             analysisVersion: "v1",
-            modelName: "mock-hybrid-rules",
-            context: {
-              includeRecommendations: true,
-              saveMode,
+            conversationInline: {
+              rawText: createdConversation.rawText,
+              relationshipStage: createdConversation.relationshipStage,
+              meetingChannel: createdConversation.meetingChannel,
+              userGoal: createdConversation.userGoal,
+              situationContext: createdConversation.situationContext ?? null,
+              messages: createdConversation.messages,
             },
           }),
-        });
+        },
+      );
 
-        const [analysisDetail, signalList, recommendationList] = await Promise.all([
-          requestJson<{ analysis: AnalysisRecord }>(`/api/v1/analyses/${analysisResponse.analysis.id}`),
-          requestJson<{ signals: SignalRecord[] }>(
-            `/api/v1/analyses/${analysisResponse.analysis.id}/signals`,
-          ),
-          requestJson<{ recommendations: RecommendationRecord[] }>(
-            `/api/v1/analyses/${analysisResponse.analysis.id}/recommendations`,
-          ),
-        ]);
+      if (!response.ok || !response.body) {
+        throw new Error("스트림 연결에 실패했습니다.");
+      }
 
-        return {
-          conversationId: conversationResponse.conversation.id,
-          analysis: analysisDetail.analysis,
-          signals: signalList.signals,
-          recommendations: recommendationList.recommendations,
-          rawText,
-          messageCount: messages.length,
-          relationshipStage,
-          meetingChannel,
-          userGoal,
-          saveMode,
-        } satisfies AnalysisSession;
-      })();
-
-      const [session] = await Promise.all([
-        pipeline,
-        new Promise<void>((resolve) => {
-          window.setTimeout(resolve, 1600);
-        }),
-      ]);
-
-      setAnalysisSession(session);
+      // 결과 화면 전환 (스켈레톤 상태로 먼저 표시)
+      setStreamingState(baseState);
       setStep("results");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      // SSE 파싱 루프
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let boundary: number;
+        while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+          const block = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+
+          let eventType = "message";
+          let dataLine = "";
+
+          for (const line of block.split("\n")) {
+            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+            else if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
+          }
+
+          if (!dataLine) continue;
+
+          if (eventType === "error") {
+            const payload = JSON.parse(dataLine) as { message: string };
+            throw new Error(payload.message);
+          }
+
+          if (eventType === "progress") {
+            const payload = JSON.parse(dataLine) as Record<string, unknown>;
+
+            if (payload.type === "rule_complete") {
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      streamPhase: "rules_visible",
+                      signals: payload.signals as SignalRecord[],
+                      overallSummary: payload.overallSummary as string,
+                      positiveSignalCount: payload.positiveSignalCount as number,
+                      ambiguousSignalCount: payload.ambiguousSignalCount as number,
+                      cautionSignalCount: payload.cautionSignalCount as number,
+                      recommendedAction: payload.recommendedAction as RecommendedAction,
+                      recommendedActionReason: payload.recommendedActionReason as string,
+                      confidenceLevel: payload.confidenceLevel as ConfidenceLevel,
+                    }
+                  : prev,
+              );
+            } else if (payload.type === "signals_enhanced") {
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      streamPhase: "enhancing",
+                      signals: payload.signals as SignalRecord[],
+                      overallSummary: payload.overallSummary as string,
+                    }
+                  : prev,
+              );
+            } else if (payload.type === "recommendations_ready") {
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      recommendations: payload.recommendations as RecommendationRecord[],
+                      recommendedActionReason: payload.recommendedActionReason as string,
+                    }
+                  : prev,
+              );
+            } else if (payload.type === "complete") {
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      analysisId: payload.analysisId as string,
+                      streamPhase: "complete",
+                    }
+                  : prev,
+              );
+            }
+          }
+        }
+      }
     } catch (error) {
       setStep("context");
+      setStreamingState(null);
       setErrorMessage(
         error instanceof Error
           ? error.message
@@ -530,7 +656,7 @@ export function AnalysisExperience() {
   }
 
   function handleRestart() {
-    setAnalysisSession(null);
+    setStreamingState(null);
     setCopiedRecommendationId(null);
     setErrorMessage(null);
     setStep("input");
@@ -768,54 +894,83 @@ export function AnalysisExperience() {
           </section>
         ) : null}
 
-        {step === "results" && analysisSession ? (
+        {step === "results" && streamingState ? (
           <section className={styles.resultsShell}>
+            {/* ── 요약 헤더 ───────────────────────────────────────────────── */}
             <div className={styles.resultsHero}>
               <div>
                 <p className={styles.kicker}>STEP 4</p>
-                <h2>{analysisSession.analysis.overallSummary}</h2>
+                {streamingState.streamPhase === "idle" ? (
+                  <div className={styles.skeletonTitle} />
+                ) : (
+                  <h2>{streamingState.overallSummary}</h2>
+                )}
                 <p className={styles.resultsDescription}>
-                  추천 액션은 <strong>{actionLabels[analysisSession.analysis.recommendedAction]}</strong>
-                  로 정리되었습니다. 지금 단계에서는 단정형 판정보다 대화 패턴 기반 해석을
-                  먼저 보여주는 흐름입니다.
+                  {streamingState.streamPhase === "idle" ? (
+                    <span className={styles.skeletonLine} />
+                  ) : (
+                    <>
+                      추천 액션은{" "}
+                      <strong>{actionLabels[streamingState.recommendedAction]}</strong>
+                      으로 정리되었습니다. 지금 단계에서는 단정형 판정보다 대화 패턴 기반
+                      해석을 먼저 보여주는 흐름입니다.
+                    </>
+                  )}
                 </p>
               </div>
               <aside className={styles.resultsBadgePanel}>
-                <span className={styles.confidenceBadge}>
-                  {confidenceLabels[analysisSession.analysis.confidenceLevel]}
-                </span>
-                <strong>{actionLabels[analysisSession.analysis.recommendedAction]}</strong>
-                <p>{analysisSession.analysis.recommendedActionReason}</p>
+                {streamingState.streamPhase === "idle" ? (
+                  <div className={styles.skeletonBadge} />
+                ) : (
+                  <>
+                    <span className={styles.confidenceBadge}>
+                      {confidenceLabels[streamingState.confidenceLevel]}
+                    </span>
+                    <strong>{actionLabels[streamingState.recommendedAction]}</strong>
+                    <p>{streamingState.recommendedActionReason}</p>
+                  </>
+                )}
               </aside>
             </div>
 
+            {/* ── 통계 카드 ───────────────────────────────────────────────── */}
             <div className={styles.statGrid}>
-              <article className={styles.statCard}>
-                <span>Positive</span>
-                <strong>{analysisSession.analysis.positiveSignalCount}</strong>
-              </article>
-              <article className={styles.statCard}>
-                <span>Ambiguous</span>
-                <strong>{analysisSession.analysis.ambiguousSignalCount}</strong>
-              </article>
-              <article className={styles.statCard}>
-                <span>Caution</span>
-                <strong>{analysisSession.analysis.cautionSignalCount}</strong>
-              </article>
-              <article className={styles.statCard}>
-                <span>Messages</span>
-                <strong>{analysisSession.messageCount}</strong>
-              </article>
+              {streamingState.streamPhase === "idle" ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className={`${styles.statCard} ${styles.skeletonCard}`} />
+                ))
+              ) : (
+                <>
+                  <article className={styles.statCard}>
+                    <span>Positive</span>
+                    <strong>{streamingState.positiveSignalCount}</strong>
+                  </article>
+                  <article className={styles.statCard}>
+                    <span>Ambiguous</span>
+                    <strong>{streamingState.ambiguousSignalCount}</strong>
+                  </article>
+                  <article className={styles.statCard}>
+                    <span>Caution</span>
+                    <strong>{streamingState.cautionSignalCount}</strong>
+                  </article>
+                  <article className={styles.statCard}>
+                    <span>Messages</span>
+                    <strong>{streamingState.messageCount}</strong>
+                  </article>
+                </>
+              )}
             </div>
 
             <div className={styles.contextTags}>
-              <span>{relationshipLabels[analysisSession.relationshipStage]}</span>
-              <span>{meetingLabels[analysisSession.meetingChannel]}</span>
-              <span>{goalLabels[analysisSession.userGoal]}</span>
-              <span>{saveModeLabels[analysisSession.saveMode]}</span>
+              <span>{relationshipLabels[streamingState.relationshipStage]}</span>
+              <span>{meetingLabels[streamingState.meetingChannel]}</span>
+              <span>{goalLabels[streamingState.userGoal]}</span>
+              <span>{saveModeLabels[streamingState.saveMode]}</span>
             </div>
 
+            {/* ── 신호 카드 + 추천 카드 ────────────────────────────────────── */}
             <div className={styles.resultsGrid}>
+              {/* 신호 카드 열 */}
               <div className={styles.resultColumn}>
                 <div className={styles.resultCard}>
                   <div className={styles.resultCardHeader}>
@@ -823,25 +978,56 @@ export function AnalysisExperience() {
                       <p className={styles.kicker}>SIGNALS</p>
                       <h3>근거 카드</h3>
                     </div>
+                    {streamingState.streamPhase === "rules_visible" ? (
+                      <span className={styles.enhancingBadge}>AI 강화 중...</span>
+                    ) : null}
                   </div>
-                  <div className={styles.signalList}>
-                    {analysisSession.signals.map((signal) => (
-                      <article key={signal.id} className={styles.signalCard}>
-                        <div className={styles.signalHeader}>
-                          <span className={styles.signalType}>{signalLabels[signal.signalType]}</span>
-                          <span className={styles.signalConfidence}>
-                            {confidenceLabels[signal.confidenceLevel]}
-                          </span>
-                        </div>
-                        <h4>{signal.title}</h4>
-                        <p>{signal.description}</p>
-                        <div className={styles.evidenceBox}>{signal.evidenceText}</div>
-                      </article>
-                    ))}
-                  </div>
+
+                  {streamingState.streamPhase === "idle" ? (
+                    <div className={styles.signalList}>
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={`${styles.signalCard} ${styles.signalCardSkeleton}`}
+                          style={{ animationDelay: `${i * 120}ms` }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      className={`${styles.signalList} ${
+                        streamingState.streamPhase === "rules_visible"
+                          ? styles.signalListEnhancing
+                          : ""
+                      }`}
+                    >
+                      {streamingState.signals.map((signal, index) => (
+                        <article
+                          key={`${signal.id}-${streamingState.streamPhase}`}
+                          className={styles.signalCard}
+                          style={{ animationDelay: `${index * 70}ms` }}
+                        >
+                          <div className={styles.signalHeader}>
+                            <span className={styles.signalType}>
+                              {signalLabels[signal.signalType]}
+                            </span>
+                            <span className={styles.signalConfidence}>
+                              {confidenceLabels[signal.confidenceLevel]}
+                            </span>
+                          </div>
+                          <div className={styles.signalCardText}>
+                            <h4>{signal.title}</h4>
+                            <p>{signal.description}</p>
+                            <div className={styles.evidenceBox}>{signal.evidenceText}</div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
+              {/* 추천 카드 열 */}
               <div className={styles.resultColumn}>
                 <div className={styles.resultCard}>
                   <div className={styles.resultCardHeader}>
@@ -850,32 +1036,59 @@ export function AnalysisExperience() {
                       <h3>추천 메시지와 톤 가이드</h3>
                     </div>
                   </div>
-                  <div className={styles.recommendationList}>
-                    {analysisSession.recommendations.map((recommendation) => {
-                      const isCopied = copiedRecommendationId === recommendation.id;
 
-                      return (
-                        <article key={recommendation.id} className={styles.recommendationCard}>
-                          <div className={styles.recommendationMeta}>
-                            <span>{recommendationLabels[recommendation.recommendationType]}</span>
-                            {recommendation.toneLabel ? <strong>{recommendation.toneLabel}</strong> : null}
-                          </div>
-                          <h4>{recommendation.title}</h4>
-                          <p className={styles.recommendationContent}>{recommendation.content}</p>
-                          <p className={styles.recommendationReason}>{recommendation.rationale}</p>
-                          <button
-                            type="button"
-                            className={`${styles.copyButton} ${isCopied ? styles.copyButtonActive : ""}`}
-                            onClick={() =>
-                              handleCopyRecommendation(recommendation.id, recommendation.content)
-                            }
+                  {streamingState.recommendations.length === 0 ? (
+                    <div className={styles.recommendationList}>
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={styles.recSkeleton}
+                          style={{ animationDelay: `${i * 160}ms` }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={styles.recommendationList}>
+                      {streamingState.recommendations.map((recommendation, index) => {
+                        const isCopied = copiedRecommendationId === recommendation.id;
+                        return (
+                          <article
+                            key={recommendation.id}
+                            className={styles.recommendationCard}
+                            style={{ animationDelay: `${index * 90}ms` }}
                           >
-                            {isCopied ? "복사됨" : "문구 복사"}
-                          </button>
-                        </article>
-                      );
-                    })}
-                  </div>
+                            <div className={styles.recommendationMeta}>
+                              <span>
+                                {recommendationLabels[recommendation.recommendationType]}
+                              </span>
+                              {recommendation.toneLabel ? (
+                                <strong>{recommendation.toneLabel}</strong>
+                              ) : null}
+                            </div>
+                            <h4>{recommendation.title}</h4>
+                            <p className={styles.recommendationContent}>
+                              {recommendation.content}
+                            </p>
+                            <p className={styles.recommendationReason}>
+                              {recommendation.rationale}
+                            </p>
+                            <button
+                              type="button"
+                              className={`${styles.copyButton} ${isCopied ? styles.copyButtonActive : ""}`}
+                              onClick={() =>
+                                handleCopyRecommendation(
+                                  recommendation.id,
+                                  recommendation.content,
+                                )
+                              }
+                            >
+                              {isCopied ? "복사됨" : "문구 복사"}
+                            </button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className={styles.resultCard}>
@@ -884,7 +1097,9 @@ export function AnalysisExperience() {
                       <p className={styles.kicker}>INPUT SNAPSHOT</p>
                       <h3>이번 분석에 사용한 대화</h3>
                     </div>
-                    <span className={styles.helperText}>conversationId: {analysisSession.conversationId}</span>
+                    <span className={styles.helperText}>
+                      conversationId: {streamingState.conversationId}
+                    </span>
                   </div>
                   <div className={styles.excerptBox}>
                     {excerptLines.map((line) => (
@@ -892,15 +1107,26 @@ export function AnalysisExperience() {
                     ))}
                   </div>
                   <p className={styles.disclaimer}>
-                    이 결과는 데모용 mock API를 바탕으로 조립된 체험입니다. 다음 단계에서는 실제
-                    규칙 기반 분석 로직으로 교체하면 됩니다.
+                    채팅 데이터는 분석 후 서버에 저장되지 않으며, 익명화 처리됩니다.
                   </p>
                 </div>
               </div>
             </div>
 
+            {/* ── 액션 버튼 (complete 단계에서만 완전 활성화) ───────────── */}
             <div className={styles.actions}>
-              <button type="button" className={styles.primaryButton} onClick={handleRestart}>
+              {streamingState.analysisId ? (
+                <PaymentButton
+                  purchaseType="single_analysis"
+                  analysisId={streamingState.analysisId}
+                />
+              ) : null}
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={handleRestart}
+                disabled={streamingState.streamPhase !== "complete"}
+              >
                 다른 대화 다시 분석
               </button>
               <Link href="/#waitlist" className={styles.secondaryButton}>
