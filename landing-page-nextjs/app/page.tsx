@@ -3,9 +3,9 @@ import styles from "./page.module.css";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 const proofPoints = [
-  "점술형 판정이 아니라 대화 패턴 기반 해석",
-  "비저장 모드 기준으로 첫 분석 가능",
-  "결과만이 아니라 다음 메시지까지 제안",
+  "감이 아니라, 대화 속 진짜 신호를 봐요",
+  "회원가입 없이 바로 시작할 수 있어요",
+  "다음에 뭐라고 보낼지까지 알려드려요",
 ];
 
 const painPoints = [
@@ -17,40 +17,40 @@ const painPoints = [
 
 const signalCards = [
   {
-    label: "Positive",
+    label: "좋은 신호",
     count: "04",
     title: "대화를 끊지 않고 이어가고 있어요",
-    body: "상대는 답장이 길지 않아도 흐름을 끊지 않고 다시 반응합니다. 관계를 완전히 닫은 패턴은 아닙니다.",
+    body: "답장이 짧더라도 끝까지 답을 해주고 있어요. 마음을 닫은 건 아니라는 뜻이에요.",
   },
   {
-    label: "Ambiguous",
+    label: "애매한 신호",
     count: "02",
-    title: "질문을 되돌려주는 비율은 낮아요",
-    body: "호감은 있을 수 있지만 주도적 탐색 단계로 보기는 어렵습니다. 지금은 가볍게 온도를 유지하는 편이 자연스럽습니다.",
+    title: "질문을 잘 되묻지는 않아요",
+    body: "관심이 없는 건 아니지만, 먼저 알아가려는 적극성은 아직 약해요. 지금은 가볍게 분위기를 유지하는 게 좋아요.",
   },
   {
-    label: "Caution",
+    label: "조심할 신호",
     count: "01",
-    title: "약속 구체화는 아직 약합니다",
-    body: "대화 자체는 이어지지만 일정 확정 의지가 충분히 드러나지 않습니다. 강한 제안보다 공통 화제를 활용한 연결이 더 적합합니다.",
+    title: "약속을 구체적으로 안 잡고 있어요",
+    body: "대화는 이어지는데 만나자는 얘기는 흐려져요. 강하게 제안하기보다 공통 관심사로 자연스럽게 다시 연결해보세요.",
   },
 ];
 
 const steps = [
   {
     number: "01",
-    title: "채팅을 붙여넣습니다",
-    body: "카카오톡, 문자, 소개팅 앱 대화를 그대로 넣을 수 있습니다.",
+    title: "대화를 붙여넣어요",
+    body: "카카오톡이든 문자든 소개팅 앱이든, 그냥 그대로 복사해서 넣어주세요.",
   },
   {
     number: "02",
-    title: "지금 상황을 선택합니다",
-    body: "첫 만남 전인지, 애프터 전인지, 관계가 식는 중인지 간단히 선택합니다.",
+    title: "지금 상황을 골라요",
+    body: "첫 만남 전인지, 애프터 고민 중인지, 분위기가 식는 것 같은지 선택해주세요.",
   },
   {
     number: "03",
-    title: "신호와 다음 액션을 확인합니다",
-    body: "긍정, 애매, 주의 신호와 바로 보낼 수 있는 메시지 제안을 함께 봅니다.",
+    title: "결과랑 다음 메시지를 확인해요",
+    body: "신호 분석부터 바로 복사해서 보낼 수 있는 메시지까지 한 번에 보여드려요.",
   },
 ];
 
@@ -64,38 +64,38 @@ const plans = [
   {
     name: "Lite",
     price: "무료",
-    note: "처음 써보는 사용자용",
-    items: ["간단 분석 1회", "신호 요약 확인", "비저장 모드 지원"],
+    note: "처음이세요? 가볍게 시작해보세요",
+    items: ["간단 분석 1회", "신호 요약 확인", "저장 없이 바로 이용"],
   },
   {
     name: "Deep Read",
     price: "3,900원~",
-    note: "한 번 더 정확히 보고 싶을 때",
-    items: ["심화 분석", "근거 카드 전체 공개", "다음 메시지 추천"],
+    note: "더 자세히 보고 싶을 때",
+    items: ["꼼꼼한 분석", "신호별 자세한 이유", "맞춤 메시지 추천"],
   },
   {
     name: "Pulse",
     price: "월 9,900원~",
-    note: "반복적으로 쓰는 사용자용",
-    items: ["분석 저장", "관계 타임라인", "메시지 추천 확장"],
+    note: "자주 쓰시는 분들께",
+    items: ["분석 결과 저장", "관계 흐름 한눈에 보기", "메시지 추천 더 다양하게"],
   },
 ];
 
 const faqs = [
   {
-    question: "상대의 진짜 마음을 맞혀주나요?",
+    question: "상대 마음을 정확히 맞혀주나요?",
     answer:
-      "아니요. SignalMate는 상대 감정을 단정하지 않습니다. 대신 채팅 속 패턴을 근거로 관계 신호를 구조화해 보여줍니다.",
+      "아니요. 마음을 함부로 단정하지 않아요. 대신 대화에서 보이는 신호들을 차근차근 알려드려요. 결국 결정하는 건 본인이니까요.",
   },
   {
-    question: "카카오톡 연동이 필요한가요?",
+    question: "카카오톡이랑 연동해야 하나요?",
     answer:
-      "초기 버전은 붙여넣기 방식으로 시작하는 것이 적합합니다. 메신저 연동 없이도 빠르게 체험할 수 있습니다.",
+      "아니요, 그냥 대화를 복사해서 붙여넣기만 하면 돼요. 별도 연동이나 로그인 없이 바로 써보실 수 있어요.",
   },
   {
-    question: "채팅 내용이 저장되나요?",
+    question: "제가 넣은 대화는 저장되나요?",
     answer:
-      "비저장 모드를 기본 흐름 중 하나로 두고, 저장 여부는 사용자가 직접 선택하도록 설계합니다.",
+      "기본은 저장하지 않아요. 원하실 때만 직접 선택해서 저장하실 수 있으니까 안심하고 사용하세요.",
   },
 ];
 
@@ -110,25 +110,25 @@ export default function Home() {
             <span className={styles.brandText}>SignalMate</span>
           </div>
           <nav className={styles.nav}>
-            <a href="#method">How It Works</a>
-            <a href="#pricing">Pricing</a>
+            <a href="#method">어떻게 동작해요?</a>
+            <a href="#pricing">요금제</a>
             <a href="#waitlist" className={styles.navButton}>
-              Early Access
+              먼저 써보기
             </a>
           </nav>
         </header>
 
         <div className={styles.heroGrid}>
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}>CHAT-BASED RELATIONSHIP SIGNALS</p>
+            <p className={styles.eyebrow}>이 사람, 진짜 나한테 관심 있을까?</p>
             <h1 className={styles.title}>
-              채팅 속 관계 신호를 읽고,
+              대화만 보여주세요,
               <br />
-              다음 메시지까지 정리해줍니다
+              마음을 읽어드릴게요
             </h1>
             <p className={styles.description}>
-              소개팅, 썸, 연애 초기 단계의 대화를 바탕으로 긍정 신호, 애매한 신호,
-              주의 신호를 나눠 보여주고 지금 어떤 메시지를 보내면 좋은지 제안합니다.
+              소개팅, 썸, 연애 초기. 답장은 오는데 마음은 모르겠는 그 순간,
+              대화 속 신호를 읽고 어떻게 답하면 좋을지까지 알려드려요.
             </p>
             <div className={styles.heroActions}>
               <Link href="/analyze" className={styles.primaryCta}>
@@ -147,12 +147,12 @@ export default function Home() {
 
           <aside className={styles.heroPanel}>
             <div className={styles.panelHeader}>
-              <span className={styles.panelKicker}>ANALYSIS SNAPSHOT</span>
-              <span className={styles.panelScore}>관심 신호 4 / 애매 2 / 주의 1</span>
+              <span className={styles.panelKicker}>분석 결과 미리보기</span>
+              <span className={styles.panelScore}>좋은 신호 4 · 애매한 신호 2 · 조심 1</span>
             </div>
             <div className={styles.panelSummary}>
-              상대는 대화를 닫지 않고 이어가고 있지만, 아직 적극적인 확신 단계는 아닙니다.
-              지금은 부담 없이 온도를 유지하는 메시지가 맞습니다.
+              대화는 잘 이어지고 있지만, 아직 확신은 이른 단계예요.
+              지금은 부담 없이 가볍게 이어가는 게 좋겠어요.
             </div>
             <div className={styles.panelSignals}>
               {signalCards.map((card) => (
@@ -167,7 +167,7 @@ export default function Home() {
               ))}
             </div>
             <div className={styles.panelFootnote}>
-              추천 액션: 강하게 밀기보다 공통 화제로 자연스럽게 다시 연결하기
+              💡 너무 들이대기보다, 자연스럽게 공통 관심사로 다시 말 걸어보세요
             </div>
           </aside>
         </div>
@@ -175,17 +175,17 @@ export default function Home() {
 
       <section className={styles.ribbon}>
         <div className={styles.ribbonTrack}>
-          <span>친구 조언보다 구조적</span>
-          <span>점술보다 현실적</span>
-          <span>숫자보다 근거 중심</span>
-          <span>결과보다 행동 제안</span>
+          <span>친구한테 묻는 것보다 또렷하게</span>
+          <span>운세 말고, 진짜 대화 분석</span>
+          <span>점수가 아니라 이유까지</span>
+          <span>다음 메시지까지 함께</span>
         </div>
       </section>
 
       <section className={styles.section}>
         <div className={styles.sectionIntro}>
-          <p className={styles.sectionLabel}>WHY THIS EXISTS</p>
-          <h2>이런 순간 때문에 사람들은 결국 채팅 캡처를 친구에게 보냅니다</h2>
+          <p className={styles.sectionLabel}>이런 적 있으시죠?</p>
+          <h2>혼자 보기엔 너무 헷갈리는 순간들</h2>
         </div>
         <div className={styles.painGrid}>
           {painPoints.map((point, index) => (
@@ -199,29 +199,29 @@ export default function Home() {
 
       <section className={styles.section} id="method">
         <div className={styles.sectionIntro}>
-          <p className={styles.sectionLabel}>SIGNAL OVER FORTUNE</p>
-          <h2>숫자만 던지지 않고, 왜 그렇게 보였는지 설명합니다</h2>
+          <p className={styles.sectionLabel}>이렇게 도와드려요</p>
+          <h2>점수가 아니라, 왜 그렇게 보이는지 함께 알려드려요</h2>
         </div>
         <div className={styles.methodGrid}>
           <article className={styles.methodCard}>
-            <h3>긍정 / 애매 / 주의 신호 분리</h3>
+            <h3>좋은 신호 / 애매한 신호 / 조심할 신호</h3>
             <p>
-              답장 템포, 질문 비율, 약속 구체성, 후속 반응 흐름을 기준으로 관계
-              신호를 나눠 보여줍니다.
+              답장 속도, 질문을 되묻는 빈도, 약속을 잡으려는 의지, 대화를 이어가는
+              방식까지 꼼꼼히 봐서 알려드려요.
             </p>
           </article>
           <article className={styles.methodCard}>
-            <h3>근거 카드 제공</h3>
+            <h3>왜 그렇게 보이는지 설명</h3>
             <p>
-              결과마다 어떤 패턴을 보고 그렇게 해석했는지 문장 근거를 함께
-              제시합니다.
+              그냥 결과만 던지지 않아요. 어떤 부분에서 그 신호가 보였는지
+              구체적인 이유를 함께 보여드려요.
             </p>
           </article>
           <article className={styles.methodCard}>
-            <h3>다음 메시지 추천</h3>
+            <h3>지금 보낼 메시지 제안</h3>
             <p>
-              지금은 가볍게 이어갈지, 약속을 제안할지, 텀을 둘지 상황별로 바로
-              써먹을 수 있는 액션을 줍니다.
+              가볍게 이어갈까? 만나자고 해볼까? 아니면 좀 기다려볼까?
+              상황에 맞는 메시지를 바로 복사해서 쓸 수 있게 드려요.
             </p>
           </article>
         </div>
@@ -229,8 +229,8 @@ export default function Home() {
 
       <section className={styles.section}>
         <div className={styles.sectionIntro}>
-          <p className={styles.sectionLabel}>THREE STEPS</p>
-          <h2>분석까지 걸리는 흐름은 짧아야 합니다</h2>
+          <p className={styles.sectionLabel}>딱 3단계</p>
+          <h2>1분이면 충분해요</h2>
         </div>
         <div className={styles.stepsGrid}>
           {steps.map((step) => (
@@ -245,18 +245,18 @@ export default function Home() {
 
       <section className={styles.previewSection} id="preview">
         <div className={styles.sectionIntro}>
-          <p className={styles.sectionLabel}>RESULT PREVIEW</p>
-          <h2>결과는 한눈에 읽히고, 바로 행동으로 이어져야 합니다</h2>
+          <p className={styles.sectionLabel}>결과 미리보기</p>
+          <h2>한눈에 알아보고, 바로 메시지를 보낼 수 있어요</h2>
         </div>
         <div className={styles.previewGrid}>
           <div className={styles.previewBoard}>
             <div className={styles.previewBoardHeader}>
               <span>오늘 대화 분석 결과</span>
-              <strong>Medium confidence</strong>
+              <strong>조심스럽게 분석</strong>
             </div>
             <p className={styles.previewBoardSummary}>
-              관심 신호는 분명히 보이지만, 지금 단계에서는 강한 확신보다 탐색형
-              흐름에 가깝습니다.
+              관심은 분명히 있어 보이지만, 아직은 서로 알아가는 단계예요.
+              너무 앞서가기보다 지금 분위기를 잘 유지해보세요.
             </p>
             <div className={styles.previewSignalList}>
               {signalCards.map((card) => (
@@ -270,7 +270,7 @@ export default function Home() {
 
           <div className={styles.recommendationPanel}>
             <div className={styles.recommendationHeader}>
-              <span>NEXT MESSAGE OPTIONS</span>
+              <span>이렇게 보내보세요</span>
               <strong>가볍게 이어가기</strong>
             </div>
             <ul className={styles.recommendationList}>
@@ -279,8 +279,7 @@ export default function Home() {
               ))}
             </ul>
             <p className={styles.recommendationHint}>
-              지금은 감정 표현을 무겁게 올리기보다, 공통 화제를 활용한 연결이 더
-              안전합니다.
+              💌 지금은 마음을 너무 진하게 표현하기보단, 공통 관심사로 자연스럽게 이어가는 게 좋아요.
             </p>
           </div>
         </div>
@@ -288,8 +287,8 @@ export default function Home() {
 
       <section className={styles.section} id="pricing">
         <div className={styles.sectionIntro}>
-          <p className={styles.sectionLabel}>MONETIZATION</p>
-          <h2>필요할 때는 가볍게, 반복되면 더 깊게</h2>
+          <p className={styles.sectionLabel}>요금제</p>
+          <h2>필요한 만큼만, 부담 없이</h2>
         </div>
         <div className={styles.pricingGrid}>
           {plans.map((plan) => (
@@ -311,8 +310,8 @@ export default function Home() {
 
       <section className={styles.section}>
         <div className={styles.sectionIntro}>
-          <p className={styles.sectionLabel}>FAQ</p>
-          <h2>신뢰를 깎는 표현보다, 설계 원칙을 먼저 보여줍니다</h2>
+          <p className={styles.sectionLabel}>자주 묻는 질문</p>
+          <h2>궁금한 점이 있으세요?</h2>
         </div>
         <div className={styles.faqList}>
           {faqs.map((faq) => (
@@ -327,12 +326,12 @@ export default function Home() {
       <section className={styles.waitlistSection} id="waitlist">
         <div className={styles.waitlistCard}>
           <div className={styles.waitlistCopy}>
-            <p className={styles.sectionLabel}>EARLY ACCESS</p>
-            <h2>애매한 채팅을 감으로만 보지 않으려는 사람들을 먼저 모읍니다</h2>
+            <p className={styles.sectionLabel}>먼저 만나보세요</p>
+            <h2>가장 먼저 써보실 분들을 모십니다</h2>
             <p>
-              첫 베타는 소개팅 후속 대화, 애프터 판단, 다음 메시지 추천에 집중합니다.
-              대기자 등록을 받아 초기 인터뷰와 베타 테스트 대상으로 연결하는 흐름을
-              상정했습니다.
+              소개팅 후 답장 분석, 애프터 고민, 다음 메시지 추천. 진짜 필요한 순간에
+              가장 먼저 SignalMate를 써보실 수 있도록 준비 중이에요.
+              이메일을 남겨주시면 오픈하자마자 알려드릴게요.
             </p>
           </div>
           <WaitlistForm />

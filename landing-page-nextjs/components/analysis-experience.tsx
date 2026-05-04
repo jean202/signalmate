@@ -14,38 +14,38 @@ const sampleConversation = `[오후 8:10] 나: 오늘 잘 들어갔어요?
 [오후 8:31] 상대: 이번 주말은 조금 애매한데, 다음 주는 괜찮을 것 같아요.`;
 
 const progressSteps = [
-  { key: "input", label: "채팅 입력", caption: "대화 붙여넣기" },
-  { key: "context", label: "상황 선택", caption: "맥락 보정" },
-  { key: "loading", label: "신호 분석", caption: "규칙 + AI" },
-  { key: "results", label: "결과 확인", caption: "액션 추천" },
+  { key: "input", label: "대화 붙여넣기", caption: "카톡 그대로" },
+  { key: "context", label: "상황 알려주기", caption: "어떤 사이?" },
+  { key: "loading", label: "신호 읽는 중", caption: "잠깐만요" },
+  { key: "results", label: "결과 확인", caption: "다음 메시지까지" },
 ] as const;
 
 const loadingMessages = [
-  "답장 흐름과 대화 지속 패턴을 정리하고 있습니다.",
-  "질문 비율과 후속 반응의 온도를 읽고 있습니다.",
-  "약속 구체성과 다음 액션 후보를 정리하고 있습니다.",
+  "답장이 어떻게 오가는지 살펴보고 있어요.",
+  "서로 얼마나 관심을 가지고 있는지 읽고 있어요.",
+  "약속이 잘 잡히고 있는지, 어떤 메시지가 좋을지 정리하고 있어요.",
 ];
 
 const relationshipStageOptions = [
   {
     value: "before_meeting",
     label: "첫 만남 전",
-    description: "대화 톤과 기대치가 맞는지 먼저 읽습니다.",
+    description: "아직 만나기 전이에요. 분위기가 잘 맞는지 보고 싶어요.",
   },
   {
     value: "after_first_date",
     label: "첫 만남 후",
-    description: "애프터 가능성과 후속 메시지 톤을 잡습니다.",
+    description: "한 번 만나봤어요. 애프터 보낼지 고민돼요.",
   },
   {
     value: "after_second_date",
     label: "두세 번 만남 후",
-    description: "관계 진전인지 관성인지 더 분명히 봅니다.",
+    description: "몇 번 만났어요. 진짜 관심이 있는 건지 궁금해요.",
   },
   {
     value: "cooling_down",
     label: "식어가는 느낌",
-    description: "속도를 늦출지, 다시 연결할지 판단합니다.",
+    description: "분위기가 예전 같지 않아요. 어떻게 해야 할지 모르겠어요.",
   },
 ] as const;
 
@@ -53,58 +53,58 @@ const meetingChannelOptions = [
   {
     value: "blind_date",
     label: "소개팅",
-    description: "예의와 관심이 섞인 초반 대화를 전제로 봅니다.",
+    description: "지인이 소개해준 자리에서 만났어요.",
   },
   {
     value: "dating_app",
     label: "데이팅 앱",
-    description: "탐색형 대화와 이탈 가능성을 함께 고려합니다.",
+    description: "틴더, 범블, 글램 같은 앱에서 매칭됐어요.",
   },
   {
     value: "mutual_friend",
     label: "지인 소개",
-    description: "완전한 낯섦보다 관계 부담이 조금 있는 상황입니다.",
+    description: "친구를 통해 알게 된 사이예요.",
   },
   {
     value: "other",
     label: "기타",
-    description: "특정 채널보다 대화 패턴 자체를 중심으로 해석합니다.",
+    description: "그 외 다른 인연이에요.",
   },
 ] as const;
 
 const userGoalOptions = [
   {
     value: "evaluate_interest",
-    label: "관심 신호 파악",
-    description: "예의인지 호감인지 헷갈릴 때 적합합니다.",
+    label: "관심이 있는 걸까?",
+    description: "예의인지 진짜 관심인지 헷갈려요.",
   },
   {
     value: "ask_for_date",
-    label: "약속 제안 타이밍",
-    description: "지금 밀어도 되는지 보고 싶을 때 씁니다.",
+    label: "지금 만나자고 해도 될까?",
+    description: "약속 잡기 좋은 타이밍인지 알고 싶어요.",
   },
   {
     value: "continue_chat",
-    label: "대화 이어가기",
-    description: "가볍게 온도를 유지할 방법을 찾습니다.",
+    label: "대화 어떻게 이어갈까?",
+    description: "분위기 유지하면서 가볍게 이어가고 싶어요.",
   },
   {
     value: "decide_to_stop",
-    label: "정리할지 판단",
-    description: "반응이 흐려질 때 과투자를 막는 용도입니다.",
+    label: "정리해야 할까?",
+    description: "반응이 식어가는 것 같아 마음을 정리할지 고민이에요.",
   },
 ] as const;
 
 const saveModeOptions = [
   {
     value: "temporary",
-    label: "비저장 모드",
-    description: "체험 중심. 저장 없이 빠르게 분석합니다.",
+    label: "저장 안 하기",
+    description: "분석만 보고 끝낼게요. 대화는 남기지 않아요.",
   },
   {
     value: "saved",
-    label: "저장 예정 모드",
-    description: "나중에 저장/재분석 흐름으로 확장할 전제를 둡니다.",
+    label: "저장하기",
+    description: "나중에 다시 보고 싶어요. 안전하게 보관해주세요.",
   },
 ] as const;
 
@@ -681,27 +681,25 @@ export function AnalysisExperience() {
 
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
-            <p className={styles.kicker}>REAL MVP FLOW</p>
+            <p className={styles.kicker}>지금 바로 시작</p>
             <h1 className={styles.title}>
-              채팅을 붙여넣고,
-              <br />
-              바로 관계 신호를 확인하세요
+              대화를 붙여넣어 보세요
             </h1>
             <p className={styles.description}>
-              랜딩 설명만 보는 대신 입력, 상황 선택, 분석 로딩, 결과 확인까지 MVP 핵심
-              흐름을 한 번에 체험할 수 있도록 구성했습니다.
+              카카오톡이든 문자든 그대로 복사해서 넣어주세요.
+              상황을 골라주시면, 신호 분석부터 다음 메시지 추천까지 한 번에 보여드릴게요.
             </p>
           </div>
 
           <aside className={styles.trustPanel}>
             <div className={styles.panelHeader}>
-              <span className={styles.kicker}>WHY THIS MATTERS</span>
-              <strong>신뢰가 먼저인 분석</strong>
+              <span className={styles.kicker}>이런 점은 안심하세요</span>
+              <strong>편하게 써보세요</strong>
             </div>
             <ul className={styles.trustList}>
-              <li>상대 마음을 단정하지 않고 대화 패턴을 설명합니다.</li>
-              <li>비저장 모드를 기본값으로 두고 체험할 수 있습니다.</li>
-              <li>결과는 점수보다 다음 액션 추천까지 연결됩니다.</li>
+              <li>마음을 함부로 단정하지 않아요. 신호를 차근차근 설명해드려요.</li>
+              <li>대화 내용은 저장하지 않아요. 가볍게 체험해보세요.</li>
+              <li>점수만 보여주는 게 아니라, 어떻게 답할지까지 알려드려요.</li>
             </ul>
           </aside>
         </section>
@@ -735,18 +733,18 @@ export function AnalysisExperience() {
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <div>
-                <p className={styles.kicker}>STEP 1</p>
-                <h2>분석할 대화를 붙여넣으세요</h2>
+                <p className={styles.kicker}>1단계</p>
+                <h2>분석하고 싶은 대화를 붙여넣어 주세요</h2>
               </div>
               <button type="button" className={styles.ghostButton} onClick={handleFillSample}>
-                샘플 대화 넣기
+                예시 보기
               </button>
             </div>
 
             <div className={styles.inputLayout}>
               <div className={styles.inputColumn}>
                 <label className={styles.fieldLabel} htmlFor="conversation-input">
-                  채팅 텍스트
+                  대화 내용
                 </label>
                 <textarea
                   id="conversation-input"
@@ -757,18 +755,18 @@ export function AnalysisExperience() {
                   placeholder={`예시\n[오후 8:10] 나: 오늘 잘 들어갔어요?\n[오후 8:13] 상대: 네 덕분에요 :)`}
                 />
                 <div className={styles.metaRow}>
-                  <span>{rawText.trim().length} chars</span>
-                  <span>{parsedMessages.length} messages detected</span>
+                  <span>{rawText.trim().length}자</span>
+                  <span>메시지 {parsedMessages.length}개 인식됨</span>
                 </div>
                 <p className={styles.hint}>
-                  각 줄 앞에 <code>나:</code>, <code>상대:</code> 같은 화자 표시를 붙이면
-                  더 안정적으로 읽습니다. 형식이 완벽하지 않아도 줄 단위로 임시 분석합니다.
+                  각 줄 앞에 <code>나:</code>, <code>상대:</code> 같은 표시를 붙이면 더 잘 분석돼요.
+                  형식이 좀 다르더라도 괜찮으니 편하게 넣어주세요.
                 </p>
               </div>
 
               <aside className={styles.previewCard}>
-                <p className={styles.kicker}>LIVE PREVIEW</p>
-                <h3>입력 인식 상태</h3>
+                <p className={styles.kicker}>실시간 확인</p>
+                <h3>이렇게 인식되고 있어요</h3>
                 <ul className={styles.previewList}>
                   {parsedMessages.slice(0, 4).map((message) => (
                     <li key={message.sequenceNo}>
@@ -784,13 +782,13 @@ export function AnalysisExperience() {
                   ))}
                   {parsedMessages.length === 0 ? (
                     <li className={styles.previewEmpty}>
-                      아직 인식된 메시지가 없습니다. 샘플을 넣거나 직접 붙여넣어 보세요.
+                      아직 입력된 게 없어요. 예시를 보거나 직접 붙여넣어 주세요.
                     </li>
                   ) : null}
                 </ul>
                 <div className={styles.tipCard}>
-                  <strong>민감정보 주의</strong>
-                  <p>이 체험 플로우는 참고용입니다. 이름, 연락처, 계정 정보는 지운 뒤 넣는 편이 안전합니다.</p>
+                  <strong>이건 알아두세요</strong>
+                  <p>이름, 연락처, 계정 정보 같은 민감한 정보는 지우고 넣어주시면 더 안전해요.</p>
                 </div>
               </aside>
             </div>
@@ -799,10 +797,10 @@ export function AnalysisExperience() {
 
             <div className={styles.actions}>
               <button type="button" className={styles.primaryButton} onClick={handleMoveToContext}>
-                상황 선택으로 이동
+                다음으로
               </button>
               <Link href="/" className={styles.secondaryButton}>
-                랜딩으로 돌아가기
+                홈으로 돌아가기
               </Link>
             </div>
           </section>
@@ -812,22 +810,22 @@ export function AnalysisExperience() {
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <div>
-                <p className={styles.kicker}>STEP 2</p>
-                <h2>해석에 필요한 최소 맥락만 고르세요</h2>
+                <p className={styles.kicker}>2단계</p>
+                <h2>지금 어떤 상황인지 알려주세요</h2>
               </div>
-              <span className={styles.helperText}>선택지는 짧고 분명해야 합니다.</span>
+              <span className={styles.helperText}>딱 맞는 답을 찾아드리려면 필요해요</span>
             </div>
 
             <div className={styles.contextLayout}>
               <div className={styles.contextColumn}>
                 <ChoiceGroup
-                  label="관계 단계"
+                  label="지금 어떤 사이세요?"
                   options={relationshipStageOptions}
                   value={relationshipStage}
                   onChange={setRelationshipStage}
                 />
                 <ChoiceGroup
-                  label="만남 채널"
+                  label="어떻게 만나셨어요?"
                   options={meetingChannelOptions}
                   value={meetingChannel}
                   onChange={setMeetingChannel}
@@ -836,13 +834,13 @@ export function AnalysisExperience() {
 
               <div className={styles.contextColumn}>
                 <ChoiceGroup
-                  label="현재 목표"
+                  label="가장 궁금한 점이 뭐예요?"
                   options={userGoalOptions}
                   value={userGoal}
                   onChange={setUserGoal}
                 />
                 <ChoiceGroup
-                  label="저장 방식"
+                  label="대화 저장할까요?"
                   options={saveModeOptions}
                   value={saveMode}
                   onChange={setSaveMode}
@@ -871,7 +869,7 @@ export function AnalysisExperience() {
                   setStep("input");
                 }}
               >
-                입력 수정하기
+                대화 다시 입력
               </button>
             </div>
           </section>
@@ -879,16 +877,16 @@ export function AnalysisExperience() {
 
         {step === "loading" ? (
           <section className={`${styles.card} ${styles.loadingCard}`}>
-            <p className={styles.kicker}>STEP 3</p>
-            <h2>채팅 속 신호를 정리하고 있습니다</h2>
+            <p className={styles.kicker}>3단계</p>
+            <h2>대화 속 신호를 읽고 있어요</h2>
             <p className={styles.loadingDescription}>{loadingMessages[loadingMessageIndex]}</p>
             <div className={styles.loadingMeter} aria-hidden="true">
               <span />
             </div>
             <div className={styles.loadingChecklist}>
-              <div className={styles.loadingChecklistItem}>답장 흐름 요약</div>
-              <div className={styles.loadingChecklistItem}>질문 비율 정리</div>
-              <div className={styles.loadingChecklistItem}>약속 신호 해석</div>
+              <div className={styles.loadingChecklistItem}>답장 흐름 살펴보기</div>
+              <div className={styles.loadingChecklistItem}>질문 빈도 확인</div>
+              <div className={styles.loadingChecklistItem}>약속 신호 읽기</div>
               <div className={styles.loadingChecklistItem}>다음 메시지 초안 생성</div>
             </div>
           </section>
@@ -899,7 +897,7 @@ export function AnalysisExperience() {
             {/* ── 요약 헤더 ───────────────────────────────────────────────── */}
             <div className={styles.resultsHero}>
               <div>
-                <p className={styles.kicker}>STEP 4</p>
+                <p className={styles.kicker}>분석 결과</p>
                 {streamingState.streamPhase === "idle" ? (
                   <div className={styles.skeletonTitle} />
                 ) : (
@@ -910,10 +908,9 @@ export function AnalysisExperience() {
                     <span className={styles.skeletonLine} />
                   ) : (
                     <>
-                      추천 액션은{" "}
+                      지금 추천드리는 행동은{" "}
                       <strong>{actionLabels[streamingState.recommendedAction]}</strong>
-                      으로 정리되었습니다. 지금 단계에서는 단정형 판정보다 대화 패턴 기반
-                      해석을 먼저 보여주는 흐름입니다.
+                      이에요. 마음을 함부로 단정하지 않고, 대화에서 보이는 신호를 그대로 보여드릴게요.
                     </>
                   )}
                 </p>
@@ -942,19 +939,19 @@ export function AnalysisExperience() {
               ) : (
                 <>
                   <article className={styles.statCard}>
-                    <span>Positive</span>
+                    <span>좋은 신호</span>
                     <strong>{streamingState.positiveSignalCount}</strong>
                   </article>
                   <article className={styles.statCard}>
-                    <span>Ambiguous</span>
+                    <span>애매한 신호</span>
                     <strong>{streamingState.ambiguousSignalCount}</strong>
                   </article>
                   <article className={styles.statCard}>
-                    <span>Caution</span>
+                    <span>조심할 신호</span>
                     <strong>{streamingState.cautionSignalCount}</strong>
                   </article>
                   <article className={styles.statCard}>
-                    <span>Messages</span>
+                    <span>전체 메시지</span>
                     <strong>{streamingState.messageCount}</strong>
                   </article>
                 </>
@@ -975,11 +972,11 @@ export function AnalysisExperience() {
                 <div className={styles.resultCard}>
                   <div className={styles.resultCardHeader}>
                     <div>
-                      <p className={styles.kicker}>SIGNALS</p>
-                      <h3>근거 카드</h3>
+                      <p className={styles.kicker}>읽어낸 신호</p>
+                      <h3>이런 점이 보였어요</h3>
                     </div>
                     {streamingState.streamPhase === "rules_visible" ? (
-                      <span className={styles.enhancingBadge}>AI 강화 중...</span>
+                      <span className={styles.enhancingBadge}>더 자세히 보는 중...</span>
                     ) : null}
                   </div>
 
@@ -1032,8 +1029,8 @@ export function AnalysisExperience() {
                 <div className={styles.resultCard}>
                   <div className={styles.resultCardHeader}>
                     <div>
-                      <p className={styles.kicker}>NEXT ACTION</p>
-                      <h3>추천 메시지와 톤 가이드</h3>
+                      <p className={styles.kicker}>이렇게 답해보세요</p>
+                      <h3>지금 보내기 좋은 메시지</h3>
                     </div>
                   </div>
 
@@ -1094,12 +1091,9 @@ export function AnalysisExperience() {
                 <div className={styles.resultCard}>
                   <div className={styles.resultCardHeader}>
                     <div>
-                      <p className={styles.kicker}>INPUT SNAPSHOT</p>
-                      <h3>이번 분석에 사용한 대화</h3>
+                      <p className={styles.kicker}>입력한 대화</p>
+                      <h3>분석에 쓰인 대화 일부</h3>
                     </div>
-                    <span className={styles.helperText}>
-                      conversationId: {streamingState.conversationId}
-                    </span>
                   </div>
                   <div className={styles.excerptBox}>
                     {excerptLines.map((line) => (
@@ -1107,7 +1101,7 @@ export function AnalysisExperience() {
                     ))}
                   </div>
                   <p className={styles.disclaimer}>
-                    채팅 데이터는 분석 후 서버에 저장되지 않으며, 익명화 처리됩니다.
+                    안심하세요. 입력하신 대화는 분석이 끝나면 서버에 남지 않아요.
                   </p>
                 </div>
               </div>
@@ -1127,10 +1121,10 @@ export function AnalysisExperience() {
                 onClick={handleRestart}
                 disabled={streamingState.streamPhase !== "complete"}
               >
-                다른 대화 다시 분석
+                다른 대화 분석하기
               </button>
               <Link href="/#waitlist" className={styles.secondaryButton}>
-                얼리 액세스 등록
+                먼저 써보기 신청
               </Link>
             </div>
           </section>

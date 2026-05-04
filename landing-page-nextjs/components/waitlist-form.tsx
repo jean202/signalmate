@@ -39,7 +39,7 @@ export function WaitlistForm() {
       if (!response.ok || !payload.success) {
         setState({
           kind: "error",
-          message: payload.error?.message || "대기자 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+          message: payload.error?.message || "신청이 안 됐어요. 잠시 후 다시 시도해주세요.",
         });
         return;
       }
@@ -48,12 +48,12 @@ export function WaitlistForm() {
       setNote("");
       setState({
         kind: "success",
-        message: "대기자 등록이 완료되었습니다. 베타 오픈 전에 먼저 안내드리겠습니다.",
+        message: "신청 완료! 베타 오픈하면 가장 먼저 알려드릴게요 :)",
       });
     } catch {
       setState({
         kind: "error",
-        message: "네트워크 오류로 등록하지 못했습니다. 연결 상태를 확인해 주세요.",
+        message: "연결이 잠시 끊긴 것 같아요. 다시 시도해주세요.",
       });
     }
   }
@@ -75,13 +75,13 @@ export function WaitlistForm() {
       />
 
       <label className={styles.inputLabel} htmlFor="note">
-        가장 필요한 상황
+        어떤 순간에 가장 필요하세요? (선택)
       </label>
       <textarea
         className={styles.textarea}
         id="note"
         name="note"
-        placeholder="예: 소개팅 후 애프터 가능성 해석"
+        placeholder="예: 소개팅 후에 애프터 보낼지 말지 고민될 때"
         rows={4}
         value={note}
         onChange={(event) => setNote(event.target.value)}
@@ -89,7 +89,7 @@ export function WaitlistForm() {
 
       {state.kind === "pending" ? (
         <div className={`${styles.statusBox} ${styles.statusPending}`}>
-          등록 요청을 처리하고 있습니다.
+          등록 중이에요...
         </div>
       ) : null}
       {state.kind === "success" ? (
@@ -100,12 +100,11 @@ export function WaitlistForm() {
       ) : null}
 
       <button className={styles.submitButton} type="submit" disabled={state.kind === "pending"}>
-        {state.kind === "pending" ? "등록 중..." : "베타 대기자 등록"}
+        {state.kind === "pending" ? "등록 중..." : "먼저 써보기 신청"}
       </button>
 
       <p className={styles.finePrint}>
-        현재 프로토타입은 로컬 개발용 저장 방식을 사용합니다. 운영 전환 시 PostgreSQL
-        기반 저장으로 교체하는 전제를 두고 있습니다.
+        이메일은 베타 오픈 안내에만 사용해요. 스팸은 절대 보내지 않을게요.
       </p>
     </form>
   );
