@@ -97,3 +97,31 @@
   line-height: 1.6;
   color: var(--color-ink-mute);
 }
+
+@media (max-width: 720px) {
+  .form {
+    padding: 1rem;
+    border-radius: 0.9rem;
+  }
+
+  .input,
+  .textarea {
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.75rem;
+  }
+
+  .submitButton {
+    min-height: 3rem;
+    padding: 0.8rem 1.2rem;
+    font-size: 0.95rem;
+  }
+
+  .statusBox {
+    font-size: 0.9rem;
+    padding: 0.8rem 0.95rem;
+  }
+
+  .finePrint {
+    font-size: 0.85rem;
+  }
+}

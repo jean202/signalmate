@@ -48,6 +48,17 @@ body {
     linear-gradient(180deg, #fff7fa 0%, #fdf2f8 50%, #fbeef6 100%);
   color: var(--color-ink);
   letter-spacing: -0.005em;
+  /* 모바일에서 사이드 스크롤이 생기지 않게 — 큰 그라디언트나 absolute 요소가 넘칠 때 가드 */
+  overflow-x: hidden;
+}
+
+/* 모바일 입력 폼 자동 확대 방지 (iOS Safari) */
+@media (max-width: 720px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 a {

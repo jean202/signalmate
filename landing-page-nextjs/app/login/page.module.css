@@ -92,3 +92,24 @@
   color: #667eea;
   text-decoration: underline;
 }
+
+@media (max-width: 480px) {
+  .card {
+    padding: 2.2rem 1.5rem;
+    border-radius: 14px;
+  }
+
+  .title {
+    font-size: 1.65rem;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .button {
+    padding: 0.8rem 1.2rem;
+    font-size: 0.95rem;
+  }
+}

@@ -892,25 +892,128 @@
 
 @media (max-width: 720px) {
   .page {
-    padding-bottom: 3rem;
+    padding: 0.75rem 0 2.5rem;
   }
 
-  .topbar,
-  .topActions,
+  .shell {
+    width: min(1180px, calc(100% - 1.25rem));
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.85rem 1rem;
+    gap: 0.7rem;
+    margin-bottom: 0.75rem;
+    border-radius: 1.1rem;
+  }
+
+  .topActions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .demoBadge,
+  .topLink {
+    flex: 1 1 auto;
+    min-height: 2.1rem;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.78rem;
+  }
+
+  .brandMark {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 12px;
+  }
+
+  .brandText {
+    font-size: 0.95rem;
+  }
+
   .actions {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .hero,
+  .card,
+  .resultsShell {
+    padding: 1.1rem;
+    border-radius: 1.2rem;
   }
 
   .title {
     max-width: none;
-    font-size: clamp(1.65rem, 7vw, 2.2rem);
+    font-size: clamp(1.5rem, 7vw, 2rem);
+    line-height: 1.2;
   }
 
-  .stepRail,
-  .statGrid,
-  .loadingChecklist {
+  .description {
+    font-size: 0.92rem;
+    margin-top: 0.75rem;
+  }
+
+  .trustPanel {
+    padding: 1rem;
+    border-radius: 1.1rem;
+  }
+
+  .panelHeader strong,
+  .cardHeader h2,
+  .resultsHero h2 {
+    font-size: clamp(1.15rem, 5.5vw, 1.4rem);
+  }
+
+  .stepRail {
     grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .stepItem {
+    padding: 0.75rem 0.85rem;
+    gap: 0.7rem;
+  }
+
+  .stepIndex {
+    width: 1.7rem;
+    height: 1.7rem;
+    font-size: 0.72rem;
+  }
+
+  .stepItem strong {
+    font-size: 0.88rem;
+  }
+
+  .stepItem span {
+    font-size: 0.78rem;
+  }
+
+  .inputColumn,
+  .previewCard,
+  .resultCard {
+    padding: 0.95rem;
+    border-radius: 1rem;
+  }
+
+  .textarea {
+    min-height: 14rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 0.85rem;
+  }
+
+  .ghostButton,
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+    padding: 0.8rem 1.2rem;
+  }
+
+  .copyButton {
+    width: 100%;
   }
 
   .metaRow,
@@ -922,10 +1025,134 @@
     align-items: flex-start;
   }
 
-  .ghostButton,
-  .primaryButton,
-  .secondaryButton,
-  .copyButton {
-    width: 100%;
+  .resultsHero {
+    gap: 0.75rem;
+  }
+
+  .resultsBadgePanel {
+    padding: 1rem;
+    border-radius: 1rem;
+  }
+
+  .resultsBadgePanel strong {
+    font-size: 1.05rem;
+  }
+
+  .statGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+
+  .statCard {
+    padding: 0.75rem 0.85rem;
+    border-radius: 0.85rem;
+  }
+
+  .statCard span {
+    font-size: 0.7rem;
+  }
+
+  .statCard strong {
+    font-size: 1.45rem;
+  }
+
+  .loadingCard {
+    padding: 2rem 1rem;
+  }
+
+  .loadingDescription {
+    font-size: 0.95rem;
+  }
+
+  .loadingChecklist {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+
+  .loadingChecklistItem {
+    padding: 0.7rem 0.9rem;
+    font-size: 0.88rem;
+  }
+
+  .signalCard,
+  .recommendationCard {
+    padding: 0.85rem 0.95rem;
+  }
+
+  .recommendationContent {
+    font-size: 0.98rem;
+  }
+
+  .contextLayout {
+    margin-top: 1rem;
+  }
+
+  .choiceCard {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .choiceCard strong {
+    font-size: 0.92rem;
+  }
+
+  .choiceCard span {
+    font-size: 0.85rem;
+  }
+
+  .summaryStrip,
+  .contextTags {
+    margin-top: 0.85rem;
+    gap: 0.45rem;
+  }
+
+  .summaryStrip span,
+  .contextTags span {
+    font-size: 0.78rem;
+    padding: 0.4rem 0.75rem;
+    min-height: 2rem;
+  }
+
+  .tipCard,
+  .evidenceBox,
+  .excerptBox {
+    padding: 0.75rem 0.85rem;
+    border-radius: 0.75rem;
+  }
+
+  .hint {
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    padding: 0.7rem 0.85rem;
+  }
+
+  .demoBadge,
+  .topLink {
+    font-size: 0.72rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .title {
+    font-size: 1.4rem;
+  }
+
+  .stepIndex {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .stepItem strong {
+    font-size: 0.82rem;
+  }
+
+  .stepItem span {
+    font-size: 0.74rem;
+  }
+
+  .statCard strong {
+    font-size: 1.3rem;
   }
 }
