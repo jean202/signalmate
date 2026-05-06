@@ -6,9 +6,15 @@ type UsageEntry = {
   chainStep: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
   durationMs: number;
+  retryCount?: number;
+  timeoutMs?: number;
   success: boolean;
   errorMessage?: string;
+  fallbackStage?: string;
+  qualityWarnings?: string[];
 };
 
 /** Haiku / Sonnet 토큰당 비용 (USD) */
@@ -24,7 +30,10 @@ function estimateCostUsd(modelName: string, inputTokens: number, outputTokens: n
 }
 
 export async function trackUsage(entry: UsageEntry): Promise<void> {
-  const totalTokens = entry.inputTokens + entry.outputTokens;
+  const cacheReadInputTokens = entry.cacheReadInputTokens ?? 0;
+  const cacheCreationInputTokens = entry.cacheCreationInputTokens ?? 0;
+  const totalTokens =
+    entry.inputTokens + entry.outputTokens + cacheReadInputTokens + cacheCreationInputTokens;
   const costUsd = estimateCostUsd(entry.modelName, entry.inputTokens, entry.outputTokens);
 
   try {
@@ -35,11 +44,17 @@ export async function trackUsage(entry: UsageEntry): Promise<void> {
         chainStep: entry.chainStep,
         inputTokens: entry.inputTokens,
         outputTokens: entry.outputTokens,
+        cacheReadInputTokens,
+        cacheCreationInputTokens,
         totalTokens,
         costUsd,
         durationMs: entry.durationMs,
+        retryCount: entry.retryCount ?? 0,
+        timeoutMs: entry.timeoutMs,
         success: entry.success,
         errorMessage: entry.errorMessage,
+        fallbackStage: entry.fallbackStage,
+        qualityWarnings: entry.qualityWarnings,
       },
     });
   } catch (error) {

@@ -6,10 +6,12 @@ import type { Tool } from "@anthropic-ai/sdk/resources/messages";
  */
 export const submitEnhancedSignalsTool: Tool = {
   name: "submit_enhanced_signals",
+  strict: true,
   description:
     "규칙 기반 분석의 시그널들을 대화 맥락에 맞는 자연스러운 한국어로 개선한 결과를 제출합니다.",
   input_schema: {
     type: "object" as const,
+    additionalProperties: false,
     properties: {
       overallSummary: {
         type: "string",
@@ -20,6 +22,7 @@ export const submitEnhancedSignalsTool: Tool = {
         description: "강화된 시그널 목록 (원래 순서 유지)",
         items: {
           type: "object",
+          additionalProperties: false,
           properties: {
             signalType: {
               type: "string",
@@ -69,10 +72,12 @@ export const submitEnhancedSignalsTool: Tool = {
  */
 export const submitRecommendationsTool: Tool = {
   name: "submit_recommendations",
+  strict: true,
   description:
     "분석 결과를 바탕으로 사용자에게 보낼 추천 메시지 3종을 제출합니다.",
   input_schema: {
     type: "object" as const,
+    additionalProperties: false,
     properties: {
       recommendedActionReason: {
         type: "string",
@@ -83,6 +88,7 @@ export const submitRecommendationsTool: Tool = {
         description: "추천 3개 (next_message, tone_guide, avoid_phrase 순서)",
         items: {
           type: "object",
+          additionalProperties: false,
           properties: {
             recommendationType: {
               type: "string",
