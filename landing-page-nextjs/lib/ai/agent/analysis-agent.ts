@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { MessageParam, Tool } from "@anthropic-ai/sdk/resources/messages";
-import { getAnthropicClient, getModelName } from "@/lib/ai/anthropic-client";
+import {
+  buildInferenceOptions,
+  callWithRetry,
+  getAnthropicClient,
+  getInferenceTimeoutMs,
+  getModelName,
+  resolveMaxTokens,
+} from "@/lib/ai/anthropic-client";
 import { trackUsage } from "@/lib/ai/token-tracker";
 import { analyzeTimeline } from "@/lib/ai/agent/tools/timeline";
 import { detectToneShift } from "@/lib/ai/agent/tools/tone-shift";
@@ -55,7 +62,7 @@ const agentTools: Tool[] = [
   },
   {
     name: "check_quality",
-    description: "최종 분석 결과의 품질을 검증합니다. 유해 조언, 시그널-증거 일관성, 추천 액션 일관성을 체크합니다. submit_result 전에 반드시 호출하세요.",
+    description: "최종 분석 결과의 품질을 검증합니다. 유해 조언, 원문에 없는 증거 인용, 압박성/장문 추천, 관계 단계 대비 과몰입, 추천 액션 일관성을 체크합니다. submit_result 전에 반드시 호출하세요.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -196,6 +203,12 @@ const AGENT_SYSTEM_PROMPT = `당신은 한국의 연애 대화를 다각도로 �
 
 const MAX_ITERATIONS = 8;
 
+const cachedAgentTools: Tool[] = agentTools.map((tool, index) =>
+  index === agentTools.length - 1
+    ? { ...tool, cache_control: { type: "ephemeral" } }
+    : tool,
+);
+
 type AgentLog = {
   iteration: number;
   toolName: string;
@@ -212,6 +225,10 @@ export async function runAgentAnalysis(
 
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalCacheReadInputTokens = 0;
+  let totalCacheCreationInputTokens = 0;
+  let totalRetryCount = 0;
+  const iterationTimeoutMs = getInferenceTimeoutMs("agent_iteration");
 
   // 초기 메시지: 대화 정보 전달
   const initialPrompt = buildInitialPrompt(conversation);
@@ -222,16 +239,39 @@ export async function runAgentAnalysis(
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     const iterStart = Date.now();
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: 4000,
-      system: AGENT_SYSTEM_PROMPT,
-      tools: agentTools,
-      messages,
-    });
+    const response = await callWithRetry(
+      (requestOptions) =>
+        client.messages.create(
+          {
+            ...buildInferenceOptions(model, "agent_iteration"),
+            model,
+            max_tokens: resolveMaxTokens(4000, "agent_iteration", model),
+            system: [
+              {
+                type: "text",
+                text: AGENT_SYSTEM_PROMPT,
+                cache_control: { type: "ephemeral" },
+              },
+            ],
+            tools: cachedAgentTools,
+            messages,
+          },
+          requestOptions,
+        ),
+      {
+        label: "analysis_agent",
+        extraRetries: 0,
+        timeoutMs: iterationTimeoutMs,
+        onRetry: (info) => {
+          totalRetryCount += info.retryCount;
+        },
+      },
+    );
 
     totalInputTokens += response.usage.input_tokens;
     totalOutputTokens += response.usage.output_tokens;
+    totalCacheReadInputTokens += response.usage.cache_read_input_tokens ?? 0;
+    totalCacheCreationInputTokens += response.usage.cache_creation_input_tokens ?? 0;
 
     // assistant 메시지 추가
     messages.push({ role: "assistant", content: response.content });
@@ -309,8 +349,13 @@ export async function runAgentAnalysis(
     chainStep: "agent_loop",
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
+    cacheReadInputTokens: totalCacheReadInputTokens,
+    cacheCreationInputTokens: totalCacheCreationInputTokens,
     durationMs: totalDuration,
+    retryCount: totalRetryCount,
+    timeoutMs: iterationTimeoutMs * MAX_ITERATIONS,
     success: !!finalResult,
+    fallbackStage: finalResult ? undefined : "agent_no_submit",
   }).catch(() => {});
 
   console.log(
@@ -370,7 +415,11 @@ async function executeAgentTool(
         overallSummary: string;
         recommendedAction: string;
       };
-      return checkQuality({ ...params, rawText: conversation.rawText });
+      return checkQuality({
+        ...params,
+        rawText: conversation.rawText,
+        relationshipStage: conversation.relationshipStage,
+      });
     }
 
     case "submit_result":
