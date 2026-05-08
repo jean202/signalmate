@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseChatText } from "@/lib/chat-parser";
 import { PaymentButton } from "@/components/payment-button";
 import styles from "./analysis-experience.module.css";
@@ -397,6 +397,13 @@ export function AnalysisExperience() {
   const [streamingState, setStreamingState] = useState<StreamingState | null>(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [copiedRecommendationId, setCopiedRecommendationId] = useState<string | null>(null);
+  const [imageUpload, setImageUpload] = useState<
+    | { kind: "idle" }
+    | { kind: "uploading"; fileName: string }
+    | { kind: "success"; fileName: string; messageCount: number }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parsedMessages = parseConversationMessages(rawText);
   const excerptLines = rawText
@@ -437,6 +444,89 @@ export function AnalysisExperience() {
   function handleFillSample() {
     setRawText(sampleConversation);
     setErrorMessage(null);
+  }
+
+  async function handleImageFiles(files: FileList | File[]) {
+    const list = Array.from(files);
+    if (list.length === 0) return;
+
+    // 단일 이미지만 처리 (다중 업로드는 추후 확장)
+    const file = list[0];
+
+    if (!file.type.startsWith("image/")) {
+      setImageUpload({
+        kind: "error",
+        message: "이미지 파일만 올려주세요 (PNG, JPEG, WEBP, GIF).",
+      });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setImageUpload({
+        kind: "error",
+        message: "이미지가 너무 커요. 10MB 이하로 다시 시도해주세요.",
+      });
+      return;
+    }
+
+    setImageUpload({ kind: "uploading", fileName: file.name });
+    setErrorMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await fetch("/api/v1/conversations/extract-from-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const payload = (await response.json()) as {
+        success: boolean;
+        data: { rawText: string; messageCount: number; notes?: string } | null;
+        error: { message: string } | null;
+      };
+
+      if (!response.ok || !payload.success || !payload.data) {
+        setImageUpload({
+          kind: "error",
+          message:
+            payload.error?.message ||
+            "이미지에서 대화를 읽지 못했어요. 다시 시도해주세요.",
+        });
+        return;
+      }
+
+      const extracted = payload.data.rawText.trim();
+      if (!extracted) {
+        setImageUpload({
+          kind: "error",
+          message: "이미지에서 채팅을 찾지 못했어요. 다른 캡처로 시도해주세요.",
+        });
+        return;
+      }
+
+      // 기존 텍스트가 있으면 줄바꿈으로 이어붙임 (여러 캡처 합치기)
+      setRawText((current) =>
+        current.trim() ? `${current.trim()}\n${extracted}` : extracted,
+      );
+      setImageUpload({
+        kind: "success",
+        fileName: file.name,
+        messageCount: payload.data.messageCount,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setImageUpload({
+        kind: "error",
+        message: `네트워크 오류: ${message}`,
+      });
+    } finally {
+      // input 같은 파일 다시 선택할 수 있도록 reset
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   }
 
   function handleMoveToContext() {
@@ -736,10 +826,56 @@ export function AnalysisExperience() {
                 <p className={styles.kicker}>1단계</p>
                 <h2>분석하고 싶은 대화를 붙여넣어 주세요</h2>
               </div>
-              <button type="button" className={styles.ghostButton} onClick={handleFillSample}>
-                예시 보기
-              </button>
+              <div className={styles.headerActions}>
+                <button
+                  type="button"
+                  className={styles.ghostButton}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUpload.kind === "uploading"}
+                >
+                  {imageUpload.kind === "uploading" ? "사진 읽는 중..." : "📷 사진으로 올리기"}
+                </button>
+                <button type="button" className={styles.ghostButton} onClick={handleFillSample}>
+                  예시 보기
+                </button>
+              </div>
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              hidden
+              onChange={(event) => {
+                if (event.target.files) {
+                  handleImageFiles(event.target.files);
+                }
+              }}
+            />
+
+            {imageUpload.kind === "uploading" ? (
+              <div className={styles.uploadStatus}>
+                <span className={styles.uploadSpinner} aria-hidden="true" />
+                <p>
+                  <strong>{imageUpload.fileName}</strong>에서 대화를 읽고 있어요...
+                </p>
+              </div>
+            ) : null}
+
+            {imageUpload.kind === "success" ? (
+              <div className={`${styles.uploadStatus} ${styles.uploadStatusSuccess}`}>
+                <p>
+                  ✅ <strong>{imageUpload.fileName}</strong>에서 메시지 {imageUpload.messageCount}개를
+                  찾았어요. 아래에서 확인하고 필요하면 직접 수정해주세요.
+                </p>
+              </div>
+            ) : null}
+
+            {imageUpload.kind === "error" ? (
+              <div className={`${styles.uploadStatus} ${styles.uploadStatusError}`}>
+                <p>⚠️ {imageUpload.message}</p>
+              </div>
+            ) : null}
 
             <div className={styles.inputLayout}>
               <div className={styles.inputColumn}>
@@ -759,8 +895,8 @@ export function AnalysisExperience() {
                   <span>메시지 {parsedMessages.length}개 인식됨</span>
                 </div>
                 <p className={styles.hint}>
-                  각 줄 앞에 <code>나:</code>, <code>상대:</code> 같은 표시를 붙이면 더 잘 분석돼요.
-                  형식이 좀 다르더라도 괜찮으니 편하게 넣어주세요.
+                  카톡 캡처가 있다면 <strong>📷 사진으로 올리기</strong>가 제일 편해요.
+                  직접 입력할 때는 <code>나:</code>, <code>상대:</code> 표시를 붙이면 더 정확해요.
                 </p>
               </div>
 
