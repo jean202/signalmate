@@ -4,7 +4,10 @@ import {
   EMBEDDING_MODEL,
 } from "@/lib/ai/embeddings/openai-client";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
 import type { StoredConversation, StoredAnalysis } from "@/lib/analysis-store";
+
+const logger = createLogger("ai.embedding");
 
 /**
  * 대화를 구조화 요약 → 임베딩 벡터로 변환하여 DB에 저장합니다.
@@ -17,7 +20,10 @@ export async function embedConversation(
   analysis: StoredAnalysis,
 ): Promise<void> {
   if (!isOpenAIAvailable()) {
-    console.warn("[embed] OPENAI_API_KEY not set — skipping embedding");
+    logger.info("skipped_openai_unavailable", {
+      conversationId: conversation.id,
+      analysisId: analysis.id,
+    });
     return;
   }
 
@@ -27,7 +33,10 @@ export async function embedConversation(
     conversation.id,
   );
   if (existing[0] && Number(existing[0].count) > 0) {
-    console.log(`[embed] Embedding already exists for conversation ${conversation.id}`);
+    logger.info("already_exists", {
+      conversationId: conversation.id,
+      analysisId: analysis.id,
+    });
     return;
   }
 
@@ -57,11 +66,17 @@ export async function embedConversation(
       vectorStr,
     );
 
-    console.log(
-      `[embed] Saved embedding for conversation ${conversation.id} (${response.usage.total_tokens} tokens)`,
-    );
+    logger.info("saved", {
+      conversationId: conversation.id,
+      analysisId: analysis.id,
+      tokenCount: response.usage.total_tokens,
+    });
   } catch (error) {
-    console.error("[embed] Failed to create embedding:", error);
+    logger.error("failed", {
+      conversationId: conversation.id,
+      analysisId: analysis.id,
+      error,
+    });
   }
 }
 

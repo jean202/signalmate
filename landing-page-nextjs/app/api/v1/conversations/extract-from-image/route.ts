@@ -13,9 +13,11 @@ import {
   extractChatFromImage,
   isSupportedImageMimeType,
 } from "@/lib/ai/vision/extract-from-image";
+import { createLogger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const logger = createLogger("api.extract_from_image");
 
 // 이미지 1장당 최대 10MB. Claude Vision은 5MB까지 권장이지만,
 // 클라이언트 리사이즈를 거치지 않은 원본도 한 번은 받을 수 있게 여유.
@@ -108,7 +110,10 @@ export async function POST(request: Request) {
     return successResponse(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[extract-from-image] vision failed:", message);
+    logger.error("vision_extraction_failed", {
+      mimeType,
+      errorMessage: message,
+    });
     return errorResponse(
       502,
       "VISION_EXTRACTION_FAILED",

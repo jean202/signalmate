@@ -12,6 +12,7 @@ import {
 import { buildInsight, formatInsightForPrompt } from "@/lib/ai/embeddings/insight-builder";
 import { isOpenAIAvailable } from "@/lib/ai/embeddings/openai-client";
 import { trackUsage } from "@/lib/ai/token-tracker";
+import { createLogger } from "@/lib/logger";
 import type {
   StoredAnalysis,
   StoredConversation,
@@ -28,6 +29,8 @@ export type HybridFallbackStage =
   | "quality_gate"
   | "all_llm_stages"
   | "hybrid_pipeline";
+
+const logger = createLogger("ai.hybrid_runner");
 
 type AnalysisBuildOptions = {
   analysisVersion?: string;
@@ -78,7 +81,11 @@ export async function runAgentOrHybridAnalysis(
       return await runAgentAnalysis(conversation);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      console.error("[analysis-engine] Agent failed, falling back to hybrid:", errorMessage);
+      logger.error("agent_failed_fallback_to_hybrid", {
+        conversationId: conversation.id,
+        modelName,
+        errorMessage,
+      });
       await trackFallback("agent", errorMessage, true, "agent-v1");
     }
   }
@@ -98,10 +105,10 @@ export async function runHybridAnalysis(
   await options?.callbacks?.onRuleComplete?.(ruleResult);
 
   if (!isAnthropicAvailable()) {
-    const keyVal = process.env.ANTHROPIC_API_KEY;
-    console.warn(
-      `[hybrid-runner] ANTHROPIC_API_KEY not set - falling back to rule-based (type=${typeof keyVal}, len=${keyVal?.length ?? 0})`,
-    );
+    logger.warn("anthropic_unavailable_fallback_to_rule_based", {
+      conversationId: conversation.id,
+      fallbackStage: "no_anthropic_api_key",
+    });
     await trackUsage({
       modelName: "rule-based-dev",
       chainStep: "fallback",
@@ -208,7 +215,11 @@ export async function runHybridAnalysis(
     } catch (signalError) {
       const errorMessage = getErrorMessage(signalError);
       llmStageErrors.push(`signal_enhancer: ${errorMessage}`);
-      console.warn("[hybrid-runner] Signal enhancer failed, using rule signals:", errorMessage);
+      logger.warn("signal_enhancer_failed", {
+        conversationId: conversation.id,
+        fallbackStage: "signal_enhancer",
+        errorMessage,
+      });
       await trackFallback("signal_enhancer", errorMessage, true);
       await options?.callbacks?.onStageWarning?.({
         stage: "signal_enhancer",
@@ -270,7 +281,10 @@ export async function runHybridAnalysis(
       }
 
       if (quality.warnings.length > 0) {
-        console.warn("[hybrid-runner] Recommendation quality warnings:", quality.warnings);
+        logger.warn("recommendation_quality_warnings", {
+          conversationId: conversation.id,
+          warnings: quality.warnings,
+        });
         await trackUsage({
           modelName: "hybrid-v1",
           chainStep: "quality_gate",
@@ -295,10 +309,11 @@ export async function runHybridAnalysis(
     } catch (recommendationError) {
       const errorMessage = getErrorMessage(recommendationError);
       llmStageErrors.push(`recommendation_generator: ${errorMessage}`);
-      console.warn(
-        "[hybrid-runner] Recommendation generator failed, using rule recommendations:",
+      logger.warn("recommendation_generator_failed", {
+        conversationId: conversation.id,
+        fallbackStage: "recommendation_generator",
         errorMessage,
-      );
+      });
       await trackFallback("recommendation_generator", errorMessage, true);
       await options?.callbacks?.onStageWarning?.({
         stage: "recommendation_generator",
@@ -348,7 +363,11 @@ export async function runHybridAnalysis(
     };
   } catch (error) {
     const errorMessage = getErrorMessage(error);
-    console.error("[hybrid-runner] LLM chain failed, falling back to rule-based:", errorMessage);
+    logger.error("hybrid_pipeline_failed", {
+      conversationId: conversation.id,
+      fallbackStage: "hybrid_pipeline",
+      errorMessage,
+    });
     await trackFallback("hybrid_pipeline", errorMessage, false);
 
     return {
@@ -392,12 +411,17 @@ async function buildSimilarPatternContext(
     const insight = buildInsight(similarConversations);
     if (!insight) return undefined;
 
-    console.log(
-      `[hybrid-runner] RAG: found ${insight.totalFound} similar conversations (positive: ${insight.outcomeStats.positive_progress}, neutral: ${insight.outcomeStats.neutral}, negative: ${insight.outcomeStats.negative})`,
-    );
+    logger.info("rag_context_found", {
+      conversationId: conversation.id,
+      similarConversationCount: insight.totalFound,
+      outcomeStats: insight.outcomeStats,
+    });
     return formatInsightForPrompt(insight);
   } catch (error) {
-    console.warn("[hybrid-runner] RAG search failed, continuing without:", error);
+    logger.warn("rag_search_failed", {
+      conversationId: conversation.id,
+      error,
+    });
     return undefined;
   }
 }
@@ -436,9 +460,11 @@ function applyConfidenceCalibration(
   if (recommended !== "low") return current;
   if (current === "low") return current;
 
-  console.warn(
-    `[hybrid-runner] confidence calibration: ${current} → low (source=${source})`,
-  );
+  logger.warn("confidence_calibrated_down", {
+    from: current,
+    to: "low",
+    source,
+  });
   return "low";
 }
 

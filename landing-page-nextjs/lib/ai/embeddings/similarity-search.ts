@@ -4,6 +4,9 @@ import {
   EMBEDDING_MODEL,
 } from "@/lib/ai/embeddings/openai-client";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("ai.similarity_search");
 
 /**
  * 유사 대화 검색 결과 타입.
@@ -74,7 +77,11 @@ export async function findSimilarConversations(
       similarity: Math.round(Number(row.similarity) * 1000) / 1000,
     }));
   } catch (error) {
-    console.error("[similarity-search] Failed:", error);
+    logger.error("failed", {
+      excludeConversationId,
+      limit,
+      error,
+    });
     return [];
   }
 }

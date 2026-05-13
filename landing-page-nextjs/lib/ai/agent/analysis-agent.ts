@@ -14,6 +14,7 @@ import { detectToneShift } from "@/lib/ai/agent/tools/tone-shift";
 import { matchPatterns } from "@/lib/ai/agent/tools/pattern-matcher";
 import { searchSimilar } from "@/lib/ai/agent/tools/similar-search";
 import { checkQuality } from "@/lib/ai/agent/tools/quality-checker";
+import { createLogger } from "@/lib/logger";
 import type {
   StoredConversation,
   StoredAnalysis,
@@ -202,6 +203,7 @@ const AGENT_SYSTEM_PROMPT = `당신은 한국의 연애 대화를 다각도로 �
 // ─── 에이전트 실행 ─────────────────────────────────
 
 const MAX_ITERATIONS = 8;
+const logger = createLogger("ai.agent");
 
 const cachedAgentTools: Tool[] = agentTools.map((tool, index) =>
   index === agentTools.length - 1
@@ -281,7 +283,10 @@ export async function runAgentAnalysis(
 
     if (toolUseBlocks.length === 0) {
       // 도구 호출 없이 종료
-      console.log(`[agent] Iteration ${iteration}: no tool call, stopping`);
+      logger.info("iteration_no_tool_call", {
+        conversationId: conversation.id,
+        iteration,
+      });
       break;
     }
 
@@ -302,7 +307,12 @@ export async function runAgentAnalysis(
 
       const toolDuration = Date.now() - toolStart;
       logs.push({ iteration, toolName, durationMs: toolDuration });
-      console.log(`[agent] Iteration ${iteration}: ${toolName} (${toolDuration}ms)`);
+      logger.debug("tool_completed", {
+        conversationId: conversation.id,
+        iteration,
+        toolName,
+        durationMs: toolDuration,
+      });
 
       // submit_result인 경우 최종 결과 저장
       if (toolName === "submit_result") {
@@ -316,7 +326,11 @@ export async function runAgentAnalysis(
           signals: Array.isArray(raw.signals) ? raw.signals : [],
           recommendations: Array.isArray(raw.recommendations) ? raw.recommendations : [],
         } as SubmitResultInput;
-        console.log(`[agent] submit_result: ${finalResult.signals.length} signals, ${finalResult.recommendations.length} recommendations`);
+        logger.info("submit_result_received", {
+          conversationId: conversation.id,
+          signalCount: finalResult.signals.length,
+          recommendationCount: finalResult.recommendations.length,
+        });
       }
 
       (toolResults as unknown[]).push({
@@ -330,13 +344,19 @@ export async function runAgentAnalysis(
 
     // submit_result가 호출되었으면 종료
     if (finalResult) {
-      console.log(`[agent] Completed at iteration ${iteration}`);
+      logger.info("completed", {
+        conversationId: conversation.id,
+        iteration,
+      });
       break;
     }
 
     // stop_reason이 end_turn이면 종료
     if (response.stop_reason === "end_turn") {
-      console.log(`[agent] End turn at iteration ${iteration}`);
+      logger.info("end_turn", {
+        conversationId: conversation.id,
+        iteration,
+      });
       break;
     }
   }
@@ -358,13 +378,19 @@ export async function runAgentAnalysis(
     fallbackStage: finalResult ? undefined : "agent_no_submit",
   }).catch(() => {});
 
-  console.log(
-    `[agent] Total: ${totalDuration}ms, ${logs.length} tool calls, ${totalInputTokens + totalOutputTokens} tokens`,
-  );
+  logger.info("summary", {
+    conversationId: conversation.id,
+    durationMs: totalDuration,
+    toolCallCount: logs.length,
+    tokenCount: totalInputTokens + totalOutputTokens,
+    success: !!finalResult,
+  });
 
   // 결과가 없으면 fallback
   if (!finalResult) {
-    console.warn("[agent] No submit_result received, falling back to rule-based");
+    logger.warn("fallback_no_submit_result", {
+      conversationId: conversation.id,
+    });
     const { buildRuleBasedAnalysis } = await import("@/lib/rule-based-analysis");
     return buildRuleBasedAnalysis(conversation, { modelName: "rule-based-dev (fallback: agent-no-submit)" });
   }

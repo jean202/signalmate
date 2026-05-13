@@ -3,10 +3,13 @@ import { createAnalysis, getConversation } from "@/lib/store";
 import { runAnalysis } from "@/lib/ai/analysis-engine";
 import { runEvaluation } from "@/lib/ai/evaluation/comparator";
 import { embedConversation } from "@/lib/ai/embeddings/embed-conversation";
+import { createLogger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const logger = createLogger("api.analysis");
 
 type AnalysisCreateBody = {
   analysisVersion?: string;
@@ -76,7 +79,11 @@ export async function POST(request: Request, context: RouteContext) {
   // 분석 완료 후 비동기로 임베딩 저장 (Phase 3 RAG)
   // 실패해도 분석 결과에 영향 없음
   embedConversation(conversation, analysis).catch((err) => {
-    console.error("[route] Background embedding failed:", err);
+    logger.error("background_embedding_failed", {
+      conversationId,
+      analysisId: analysis.id,
+      error: err,
+    });
   });
 
   return successResponse(
