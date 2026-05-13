@@ -1,8 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { parseChatText } from "@/lib/chat-parser";
+import {
+  MAX_IMAGE_UPLOAD_FILES,
+  formatFileSize,
+  mergeExtractedChatText,
+  prepareImageForUpload,
+  validateImageFileSelection,
+} from "@/lib/image-upload";
 import { PaymentButton } from "@/components/payment-button";
 import styles from "./analysis-experience.module.css";
 
@@ -220,6 +234,49 @@ type ApiEnvelope<T> = {
   } | null;
 };
 
+type ImageUploadItemStatus =
+  | "queued"
+  | "preparing"
+  | "extracting"
+  | "success"
+  | "error";
+
+type ImageUploadItem = {
+  id: string;
+  fileName: string;
+  status: ImageUploadItemStatus;
+  messageCount?: number;
+  errorMessage?: string;
+  originalBytes?: number;
+  uploadBytes?: number;
+  wasCompressed?: boolean;
+};
+
+type ImageUploadState =
+  | { kind: "idle" }
+  | { kind: "uploading"; items: ImageUploadItem[] }
+  | {
+      kind: "success";
+      items: ImageUploadItem[];
+      fileCount: number;
+      messageCount: number;
+    }
+  | {
+      kind: "error";
+      message: string;
+      items?: ImageUploadItem[];
+      fileCount?: number;
+      messageCount?: number;
+    };
+
+const uploadStatusLabels: Record<ImageUploadItemStatus, string> = {
+  queued: "대기",
+  preparing: "준비 중",
+  extracting: "읽는 중",
+  success: "완료",
+  error: "실패",
+};
+
 const selfSpeakerTokens = ["나", "저", "me", "self", "mine"];
 const otherSpeakerTokens = ["상대", "상대방", "그분", "you", "other"];
 
@@ -331,6 +388,24 @@ function parseConversationMessages(rawText: string): ConversationMessageInput[] 
     .filter((message) => message.messageText.length > 0);
 }
 
+function createUploadItem(file: File, index: number): ImageUploadItem {
+  return {
+    id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+    fileName: file.name,
+    status: "queued",
+  };
+}
+
+function updateUploadItem(
+  items: ImageUploadItem[],
+  index: number,
+  patch: Partial<ImageUploadItem>,
+): ImageUploadItem[] {
+  return items.map((item, itemIndex) =>
+    itemIndex === index ? { ...item, ...patch } : item,
+  );
+}
+
 function getStepState(step: Step, currentStep: Step) {
   const order: Step[] = ["input", "context", "loading", "results"];
   const stepIndex = order.indexOf(step);
@@ -397,20 +472,23 @@ export function AnalysisExperience() {
   const [streamingState, setStreamingState] = useState<StreamingState | null>(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [copiedRecommendationId, setCopiedRecommendationId] = useState<string | null>(null);
-  const [imageUpload, setImageUpload] = useState<
-    | { kind: "idle" }
-    | { kind: "uploading"; fileName: string }
-    | { kind: "success"; fileName: string; messageCount: number }
-    | { kind: "error"; message: string }
-  >({ kind: "idle" });
+  const [imageUpload, setImageUpload] = useState<ImageUploadState>({ kind: "idle" });
+  const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
 
   const parsedMessages = parseConversationMessages(rawText);
+  const isImageUploading = imageUpload.kind === "uploading";
   const excerptLines = rawText
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, 4);
+  const uploadItems = imageUpload.kind === "idle" ? [] : imageUpload.items ?? [];
+  const completedUploadCount = uploadItems.filter((item) => item.status === "success").length;
+  const activeUploadItem = uploadItems.find((item) =>
+    item.status === "preparing" || item.status === "extracting",
+  );
 
   useEffect(() => {
     if (step !== "loading") {
@@ -446,75 +524,136 @@ export function AnalysisExperience() {
     setErrorMessage(null);
   }
 
+  function openImagePicker() {
+    if (!isImageUploading) {
+      fileInputRef.current?.click();
+    }
+  }
+
+  async function requestImageExtraction(file: File): Promise<{
+    rawText: string;
+    messageCount: number;
+    notes?: string;
+  }> {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await fetch("/api/v1/conversations/extract-from-image", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = (await response.json()) as {
+      success: boolean;
+      data: { rawText: string; messageCount: number; notes?: string } | null;
+      error: { message: string } | null;
+    };
+
+    if (!response.ok || !payload.success || !payload.data) {
+      throw new Error(
+        payload.error?.message ||
+          "이미지에서 대화를 읽지 못했어요. 다시 시도해주세요.",
+      );
+    }
+
+    return payload.data;
+  }
+
   async function handleImageFiles(files: FileList | File[]) {
     const list = Array.from(files);
     if (list.length === 0) return;
 
-    // 단일 이미지만 처리 (다중 업로드는 추후 확장)
-    const file = list[0];
+    if (isImageUploading) {
+      return;
+    }
 
-    if (!file.type.startsWith("image/")) {
+    const validation = validateImageFileSelection(list);
+    if (!validation.ok) {
       setImageUpload({
         kind: "error",
-        message: "이미지 파일만 올려주세요 (PNG, JPEG, WEBP, GIF).",
+        message: validation.fileName
+          ? `${validation.fileName}: ${validation.message}`
+          : validation.message,
       });
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setImageUpload({
-        kind: "error",
-        message: "이미지가 너무 커요. 10MB 이하로 다시 시도해주세요.",
-      });
-      return;
-    }
-
-    setImageUpload({ kind: "uploading", fileName: file.name });
     setErrorMessage(null);
 
+    let items = validation.files.map(createUploadItem);
+    const extractedTexts: string[] = [];
+    let totalMessageCount = 0;
+    setImageUpload({ kind: "uploading", items });
+
     try {
-      const formData = new FormData();
-      formData.append("image", file);
+      for (let index = 0; index < validation.files.length; index += 1) {
+        const file = validation.files[index];
 
-      const response = await fetch("/api/v1/conversations/extract-from-image", {
-        method: "POST",
-        body: formData,
-      });
+        try {
+          items = updateUploadItem(items, index, { status: "preparing" });
+          setImageUpload({ kind: "uploading", items });
 
-      const payload = (await response.json()) as {
-        success: boolean;
-        data: { rawText: string; messageCount: number; notes?: string } | null;
-        error: { message: string } | null;
-      };
+          const prepared = await prepareImageForUpload(file);
+          items = updateUploadItem(items, index, {
+            status: "extracting",
+            originalBytes: prepared.originalBytes,
+            uploadBytes: prepared.uploadBytes,
+            wasCompressed: prepared.wasCompressed,
+          });
+          setImageUpload({ kind: "uploading", items });
 
-      if (!response.ok || !payload.success || !payload.data) {
-        setImageUpload({
-          kind: "error",
-          message:
-            payload.error?.message ||
-            "이미지에서 대화를 읽지 못했어요. 다시 시도해주세요.",
-        });
-        return;
+          const result = await requestImageExtraction(prepared.file);
+          const extracted = result.rawText.trim();
+          if (!extracted) {
+            throw new Error("이미지에서 채팅을 찾지 못했어요. 다른 캡처로 시도해주세요.");
+          }
+
+          extractedTexts.push(extracted);
+          totalMessageCount += result.messageCount;
+          items = updateUploadItem(items, index, {
+            status: "success",
+            messageCount: result.messageCount,
+          });
+          setImageUpload({ kind: "uploading", items });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          items = updateUploadItem(items, index, {
+            status: "error",
+            errorMessage: message,
+          });
+          setImageUpload({ kind: "uploading", items });
+        }
       }
 
-      const extracted = payload.data.rawText.trim();
-      if (!extracted) {
-        setImageUpload({
-          kind: "error",
-          message: "이미지에서 채팅을 찾지 못했어요. 다른 캡처로 시도해주세요.",
-        });
-        return;
+      if (extractedTexts.length > 0) {
+        setRawText((current) => mergeExtractedChatText(current, extractedTexts));
       }
 
-      // 기존 텍스트가 있으면 줄바꿈으로 이어붙임 (여러 캡처 합치기)
-      setRawText((current) =>
-        current.trim() ? `${current.trim()}\n${extracted}` : extracted,
-      );
-      setImageUpload({
-        kind: "success",
-        fileName: file.name,
-        messageCount: payload.data.messageCount,
-      });
+      const successCount = items.filter((item) => item.status === "success").length;
+      const failedCount = items.filter((item) => item.status === "error").length;
+
+      if (successCount === 0) {
+        setImageUpload({
+          kind: "error",
+          message: "이미지에서 대화를 읽지 못했어요. 더 또렷한 캡처로 다시 시도해주세요.",
+          items,
+        });
+      } else if (failedCount > 0) {
+        setImageUpload({
+          kind: "error",
+          message: `${validation.files.length}장 중 ${successCount}장만 읽었어요. 실패한 파일은 다시 올려주세요.`,
+          items,
+          fileCount: successCount,
+          messageCount: totalMessageCount,
+        });
+      } else {
+        setImageUpload({
+          kind: "success",
+          items,
+          fileCount: successCount,
+          messageCount: totalMessageCount,
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setImageUpload({
@@ -527,6 +666,52 @@ export function AnalysisExperience() {
         fileInputRef.current.value = "";
       }
     }
+  }
+
+  function handleUploadDragEnter(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (isImageUploading) return;
+
+    dragDepthRef.current += 1;
+    setIsDraggingUpload(true);
+  }
+
+  function handleUploadDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function handleUploadDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDraggingUpload(false);
+    }
+  }
+
+  function handleUploadDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepthRef.current = 0;
+    setIsDraggingUpload(false);
+
+    if (!isImageUploading && event.dataTransfer.files.length > 0) {
+      handleImageFiles(event.dataTransfer.files);
+    }
+  }
+
+  function handleUploadKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openImagePicker();
+    }
+  }
+
+  function handleUploadButtonClick(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    openImagePicker();
   }
 
   function handleMoveToContext() {
@@ -830,10 +1015,10 @@ export function AnalysisExperience() {
                 <button
                   type="button"
                   className={styles.ghostButton}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={imageUpload.kind === "uploading"}
+                  onClick={handleUploadButtonClick}
+                  disabled={isImageUploading}
                 >
-                  {imageUpload.kind === "uploading" ? "사진 읽는 중..." : "📷 사진으로 올리기"}
+                  {isImageUploading ? "사진 읽는 중..." : "사진 선택"}
                 </button>
                 <button type="button" className={styles.ghostButton} onClick={handleFillSample}>
                   예시 보기
@@ -845,6 +1030,7 @@ export function AnalysisExperience() {
               ref={fileInputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
               hidden
               onChange={(event) => {
                 if (event.target.files) {
@@ -853,11 +1039,51 @@ export function AnalysisExperience() {
               }}
             />
 
+            <div
+              className={`${styles.uploadDropZone} ${
+                isDraggingUpload ? styles.uploadDropZoneActive : ""
+              } ${isImageUploading ? styles.uploadDropZoneDisabled : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-disabled={isImageUploading}
+              onClick={openImagePicker}
+              onKeyDown={handleUploadKeyDown}
+              onDragEnter={handleUploadDragEnter}
+              onDragOver={handleUploadDragOver}
+              onDragLeave={handleUploadDragLeave}
+              onDrop={handleUploadDrop}
+            >
+              <div className={styles.uploadDropIcon} aria-hidden="true">
+                IMG
+              </div>
+              <div className={styles.uploadDropCopy}>
+                <strong>캡처를 끌어오거나 여러 장을 한 번에 선택하세요</strong>
+                <span>
+                  PNG, JPEG, WEBP, GIF · 장당 최대 10MB · 최대 {MAX_IMAGE_UPLOAD_FILES}장
+                </span>
+              </div>
+              <button
+                type="button"
+                className={styles.uploadDropButton}
+                onClick={handleUploadButtonClick}
+                disabled={isImageUploading}
+              >
+                파일 선택
+              </button>
+            </div>
+
             {imageUpload.kind === "uploading" ? (
               <div className={styles.uploadStatus}>
                 <span className={styles.uploadSpinner} aria-hidden="true" />
                 <p>
-                  <strong>{imageUpload.fileName}</strong>에서 대화를 읽고 있어요...
+                  {activeUploadItem ? (
+                    <>
+                      <strong>{activeUploadItem.fileName}</strong> 처리 중 · {completedUploadCount}/
+                      {uploadItems.length}장 완료
+                    </>
+                  ) : (
+                    <>이미지를 준비하고 있어요.</>
+                  )}
                 </p>
               </div>
             ) : null}
@@ -865,15 +1091,40 @@ export function AnalysisExperience() {
             {imageUpload.kind === "success" ? (
               <div className={`${styles.uploadStatus} ${styles.uploadStatusSuccess}`}>
                 <p>
-                  ✅ <strong>{imageUpload.fileName}</strong>에서 메시지 {imageUpload.messageCount}개를
-                  찾았어요. 아래에서 확인하고 필요하면 직접 수정해주세요.
+                  <strong>{imageUpload.fileCount}장</strong>에서 메시지 {imageUpload.messageCount}개를
+                  찾았어요. 아래에서 순서와 내용을 확인하고 필요하면 직접 수정해주세요.
                 </p>
               </div>
             ) : null}
 
             {imageUpload.kind === "error" ? (
               <div className={`${styles.uploadStatus} ${styles.uploadStatusError}`}>
-                <p>⚠️ {imageUpload.message}</p>
+                <p>{imageUpload.message}</p>
+              </div>
+            ) : null}
+
+            {uploadItems.length > 0 ? (
+              <div className={styles.uploadQueue} aria-live="polite">
+                {uploadItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`${styles.uploadQueueItem} ${
+                      styles[`uploadQueueItem_${item.status}`]
+                    }`}
+                  >
+                    <div className={styles.uploadQueueMain}>
+                      <strong>{item.fileName}</strong>
+                      <span>
+                        {uploadStatusLabels[item.status]}
+                        {item.messageCount ? ` · 메시지 ${item.messageCount}개` : ""}
+                        {item.wasCompressed && item.originalBytes && item.uploadBytes
+                          ? ` · ${formatFileSize(item.originalBytes)} → ${formatFileSize(item.uploadBytes)}`
+                          : ""}
+                      </span>
+                      {item.errorMessage ? <p>{item.errorMessage}</p> : null}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : null}
 
