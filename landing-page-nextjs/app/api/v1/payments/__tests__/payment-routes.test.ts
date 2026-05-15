@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as checkoutPOST } from "../checkout/route";
 import { POST as confirmPOST } from "../confirm/route";
 
@@ -77,6 +77,49 @@ describe("POST /api/v1/payments/checkout", () => {
     routeMocks.generateOrderId.mockReturnValue("single_user_12345678_1");
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("creates a pending payment and returns Toss checkout metadata", async () => {
+    vi.stubEnv("TOSS_CLIENT_KEY", "test_ck_123");
+
+    const response = await checkoutPOST(
+      jsonRequest("/api/v1/payments/checkout", {
+        purchaseType: "single_analysis",
+        analysisId: "analysis_1",
+      }),
+    );
+    const payload = await readEnvelope<{
+      orderId: string;
+      orderName: string;
+      amount: number;
+      clientKey: string;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(payload.success).toBe(true);
+    if (payload.success) {
+      expect(payload.data).toEqual({
+        orderId: "single_user_12345678_1",
+        orderName: "시그널메이트 심화 분석",
+        amount: 3900,
+        clientKey: "test_ck_123",
+      });
+    }
+    expect(routeMocks.generateOrderId).toHaveBeenCalledWith(
+      "single_analysis",
+      "user_12345678",
+    );
+    expect(routeMocks.createPendingPayment).toHaveBeenCalledWith({
+      userId: "user_12345678",
+      orderId: "single_user_12345678_1",
+      purchaseType: "single_analysis",
+      amount: 3900,
+      analysisId: "analysis_1",
+    });
+  });
+
   it("returns 401 when the user is not authenticated", async () => {
     routeMocks.requireAuth.mockResolvedValueOnce({
       error: Response.json(
@@ -144,6 +187,58 @@ describe("POST /api/v1/payments/confirm", () => {
 
     routeMocks.confirmPayment.mockResolvedValue(undefined);
     routeMocks.failPayment.mockResolvedValue(undefined);
+  });
+
+  it("confirms Toss payment and marks the order paid", async () => {
+    routeMocks.confirmTossPayment.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        paymentKey: "payment_key",
+        orderId: "order_1",
+        orderName: "시그널메이트 심화 분석",
+        status: "DONE",
+        totalAmount: 3900,
+        method: "카드",
+        approvedAt: "2026-05-15T00:00:00+09:00",
+      },
+    });
+
+    const response = await confirmPOST(
+      jsonRequest("/api/v1/payments/confirm", {
+        paymentKey: "payment_key",
+        orderId: "order_1",
+        amount: 3900,
+      }),
+    );
+    const payload = await readEnvelope<{
+      paymentKey: string;
+      orderId: string;
+      amount: number;
+      approvedAt: string;
+      method: string;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(payload.success).toBe(true);
+    if (payload.success) {
+      expect(payload.data).toEqual({
+        paymentKey: "payment_key",
+        orderId: "order_1",
+        amount: 3900,
+        approvedAt: "2026-05-15T00:00:00+09:00",
+        method: "카드",
+      });
+    }
+    expect(routeMocks.confirmTossPayment).toHaveBeenCalledWith({
+      paymentKey: "payment_key",
+      orderId: "order_1",
+      amount: 3900,
+    });
+    expect(routeMocks.confirmPayment).toHaveBeenCalledWith({
+      orderId: "order_1",
+      paymentKey: "payment_key",
+    });
+    expect(routeMocks.failPayment).not.toHaveBeenCalled();
   });
 
   it("returns 400 for malformed JSON", async () => {

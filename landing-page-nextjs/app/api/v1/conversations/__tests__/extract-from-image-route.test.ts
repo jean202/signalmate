@@ -25,8 +25,18 @@ type ApiErrorEnvelope = {
   };
 };
 
+type ApiSuccessEnvelope<T> = {
+  success: true;
+  data: T;
+  error: null;
+};
+
 async function readError(response: Response): Promise<ApiErrorEnvelope> {
   return (await response.json()) as ApiErrorEnvelope;
+}
+
+async function readSuccess<T>(response: Response): Promise<ApiSuccessEnvelope<T>> {
+  return (await response.json()) as ApiSuccessEnvelope<T>;
 }
 
 function jsonRequest(body: unknown, contentType = "application/json"): Request {
@@ -34,6 +44,16 @@ function jsonRequest(body: unknown, contentType = "application/json"): Request {
     method: "POST",
     headers: { "Content-Type": contentType },
     body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+function multipartRequest(file: File): Request {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  return new Request("http://localhost/api/v1/conversations/extract-from-image", {
+    method: "POST",
+    body: formData,
   });
 }
 
@@ -47,6 +67,63 @@ describe("POST /api/v1/conversations/extract-from-image", () => {
     visionMocks.isSupportedImageMimeType.mockImplementation((mimeType: string) =>
       ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mimeType),
     );
+  });
+
+  it("returns extracted chat text for a valid JSON image payload", async () => {
+    visionMocks.extractChatFromImage.mockResolvedValueOnce({
+      rawText: "[오후 8:10] 나: 오늘 잘 들어갔어요?\n[오후 8:13] 상대: 네!",
+      messageCount: 2,
+      notes: "카카오톡 캡처",
+    });
+
+    const response = await POST(
+      jsonRequest({
+        imageBase64: "base64-image",
+        mimeType: "image/png",
+      }),
+    );
+    const payload = await readSuccess<{
+      rawText: string;
+      messageCount: number;
+      notes?: string;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      success: true,
+      data: {
+        rawText: "[오후 8:10] 나: 오늘 잘 들어갔어요?\n[오후 8:13] 상대: 네!",
+        messageCount: 2,
+        notes: "카카오톡 캡처",
+      },
+      error: null,
+    });
+    expect(visionMocks.extractChatFromImage).toHaveBeenCalledWith({
+      imageBase64: "base64-image",
+      mimeType: "image/png",
+    });
+  });
+
+  it("accepts a multipart image upload and sends base64 to Vision", async () => {
+    visionMocks.extractChatFromImage.mockResolvedValueOnce({
+      rawText: "나: 안녕\n상대: 안녕하세요",
+      messageCount: 2,
+    });
+
+    const response = await POST(
+      multipartRequest(new File(["hello-image"], "capture.png", { type: "image/png" })),
+    );
+    const payload = await readSuccess<{
+      rawText: string;
+      messageCount: number;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(payload.data.messageCount).toBe(2);
+    expect(visionMocks.extractChatFromImage).toHaveBeenCalledWith({
+      imageBase64: Buffer.from("hello-image").toString("base64"),
+      mimeType: "image/png",
+    });
   });
 
   it("returns 503 when Claude Vision is not configured", async () => {
