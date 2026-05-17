@@ -182,7 +182,7 @@ function scoreSchedulingCommitment(metrics: Pick<MessageMetrics,
   );
 }
 
-function buildMetrics(conversation: StoredConversation): MessageMetrics {
+function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig): MessageMetrics {
   const otherMessages = conversation.messages.filter((message) => message.senderRole === "other");
   const selfMessages = conversation.messages.filter((message) => message.senderRole === "self");
   const otherResponsePairs = conversation.messages.reduce((count, message, index, messages) => {
@@ -203,7 +203,7 @@ function buildMetrics(conversation: StoredConversation): MessageMetrics {
     otherMessages.length > 0 ? selfMessages.length / otherMessages.length : selfMessages.length > 0 ? Infinity : 0;
 
   const otherShortReplyCount = otherMessages.filter(
-    (message) => message.messageText.trim().length <= 5,
+    (message) => message.messageText.trim().length <= stageConfig.shortReplyMaxLength,
   ).length;
 
   const lastMessage = conversation.messages.at(-1);
@@ -221,7 +221,7 @@ function buildMetrics(conversation: StoredConversation): MessageMetrics {
     const secondHalf = otherMessages.slice(half);
     const firstHalfAvg = averageLength(firstHalf.map((m) => m.messageText));
     const secondHalfAvg = averageLength(secondHalf.map((m) => m.messageText));
-    toneDrop = secondHalfAvg < firstHalfAvg * 0.6;
+    toneDrop = secondHalfAvg < firstHalfAvg * stageConfig.toneDropThreshold;
   }
 
   const averageDelayMinutes = averageOtherResponseDelayMinutes(conversation.messages);
@@ -276,7 +276,8 @@ function buildMetrics(conversation: StoredConversation): MessageMetrics {
 }
 
 export function buildRuleBaselineScores(conversation: StoredConversation): RuleBaselineScores {
-  const metrics = buildMetrics(conversation);
+  const stageConfig = STAGE_CONFIGS[stageFromRelationshipStage(conversation.relationshipStage)];
+  const metrics = buildMetrics(conversation, stageConfig);
 
   return {
     otherInitiative: metrics.otherInitiativeScore,
@@ -607,7 +608,8 @@ export function buildRuleBasedAnalysis(
   conversation: StoredConversation,
   options?: AnalysisBuildOptions,
 ): Omit<StoredAnalysis, "id" | "createdAt" | "completedAt"> {
-  const metrics = buildMetrics(conversation);
+  const stageConfig = STAGE_CONFIGS[stageFromRelationshipStage(conversation.relationshipStage)];
+  const metrics = buildMetrics(conversation, stageConfig);
   const signalFactory = buildSignalFactory();
 
   if (metrics.otherResponsePairs >= 2 || (metrics.otherMessages >= 2 && metrics.otherResponsePairs >= 1)) {

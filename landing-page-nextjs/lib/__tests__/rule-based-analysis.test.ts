@@ -145,3 +145,37 @@ describe("stageFromRelationshipStage", () => {
     expect(stageFromRelationshipStage("unknown_stage")).toBe("pre_meeting");
   });
 });
+
+describe("stage-aware toneDrop threshold", () => {
+  function makeConvWithToneDrop(stage: string): StoredConversation {
+    // Test math:
+    // first half other messages: "안녕하세요 반가워요" (9자), "네 저도 반가워요" (8자) → avg 8.5자
+    // second half other messages: "그렇군요 ㅎ" (6자), "네 ㅎㅎ" (4자) → avg 5자
+    // 5/8.5 ≈ 0.588 → fires at 0.60 threshold (after_first) but NOT at 0.50 threshold (pre_meeting)
+    return makeConversation(
+      [
+        { role: "other", text: "안녕하세요 반가워요" },   // 9자
+        { role: "self",  text: "네 반갑습니다" },
+        { role: "other", text: "네 저도 반가워요" },      // 8자
+        { role: "self",  text: "저도요" },
+        { role: "other", text: "그렇군요 ㅎ" },           // 6자
+        { role: "self",  text: "그렇군요" },
+        { role: "other", text: "네 ㅎㅎ" },              // 4자
+        { role: "self",  text: "연락해요" },
+      ],
+      { relationshipStage: stage },
+    );
+  }
+
+  it("does NOT flag toneDrop for pre_meeting (threshold 0.50, drop ~59%)", () => {
+    const result = buildRuleBasedAnalysis(makeConvWithToneDrop("before_meeting"));
+    const signal = result.signals.find((s) => s.signalKey === "tone_drop");
+    expect(signal).toBeUndefined();
+  });
+
+  it("flags toneDrop for after_first_date (threshold 0.60, drop ~59%)", () => {
+    const result = buildRuleBasedAnalysis(makeConvWithToneDrop("after_first_date"));
+    const signal = result.signals.find((s) => s.signalKey === "tone_drop");
+    expect(signal).toBeDefined();
+  });
+});
