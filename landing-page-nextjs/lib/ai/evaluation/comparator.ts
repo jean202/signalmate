@@ -2,10 +2,12 @@ import { buildRuleBasedAnalysis } from "@/lib/rule-based-analysis";
 import { runAnalysis } from "@/lib/ai/analysis-engine";
 import {
   calculateMetrics,
-  formatMetricsLog,
   type EvaluationMetrics,
 } from "@/lib/ai/evaluation/metrics";
+import { createLogger } from "@/lib/logger";
 import type { StoredConversation, StoredAnalysis } from "@/lib/analysis-store";
+
+const logger = createLogger("ai.evaluation");
 
 /**
  * 평가 비교 결과 타입.
@@ -99,12 +101,13 @@ export async function runEvaluation(
     metrics,
   };
 
-  // 4) 콘솔 로그 출력
+  // 4) 평가 결과 로그 출력
   const durationMs = Date.now() - startTime;
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`[evaluation] Completed in ${durationMs}ms`);
-  console.log(formatMetricsLog(metrics));
-  console.log(`${"=".repeat(60)}\n`);
+  logger.info("completed", {
+    conversationId: conversation.id,
+    durationMs,
+    metrics,
+  });
 
   // 5) 하이브리드 결과에 평가 메타데이터 추가
   const analysisWithEval: Omit<StoredAnalysis, "id" | "createdAt" | "completedAt"> = {

@@ -367,7 +367,7 @@ lib/
 
 - Node.js 20+
 - Docker (for PostgreSQL + pgvector)
-- Anthropic API key
+- Anthropic API key (optional for rule-based demo, required for LLM enhancement and OCR upload)
 
 ### Setup
 
@@ -396,12 +396,54 @@ npm run dev
 
 ### Environment Variables
 
+Use `.env.example` as the source of truth for local and deployment settings.
+
+For production deployments, set at least:
+
 ```env
-DATABASE_URL="postgresql://signalmate:signalmate_local@localhost:5433/signalmate"
+DATABASE_URL="postgresql://..."
 USE_DB=true
-ANTHROPIC_API_KEY=sk-ant-...     # Required for hybrid/agent modes
-OPENAI_API_KEY=sk-...            # Optional, enables RAG (Phase 3)
+AUTH_SECRET="openssl-rand-base64-32-output"
+AUTH_URL="https://your-domain.example"
+ANTHROPIC_API_KEY="sk-ant-..."
 ```
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | Production | PostgreSQL connection string. Required when `USE_DB=true`. |
+| `USE_DB` | Yes | `true` uses PostgreSQL/Prisma. `false` uses local JSON files for demos. |
+| `EVAL_MODE` | No | Enables rule-based vs hybrid evaluation on analysis creation. Keep `false` in normal production. |
+| `LOG_LEVEL` | No | Structured server log threshold: `debug`, `info`, `warn`, `error`, or `silent`. Defaults to `info` in development, `warn` in production, `silent` in tests. |
+| `ANTHROPIC_API_KEY` | LLM/OCR | Enables hybrid/agent analysis and screenshot OCR. Empty key falls back to rule-based analysis. |
+| `ANTHROPIC_MODEL` | No | Overrides the analysis model. Default is `claude-sonnet-4-6` in production and `claude-haiku-4-5-20251001` in development. |
+| `ANTHROPIC_VISION_MODEL` | OCR | Overrides the screenshot OCR model. Defaults to `ANTHROPIC_MODEL`/runtime default if omitted. |
+| `OPENAI_API_KEY` | RAG | Enables embedding writes and pgvector similarity search. App still works without it. |
+| `TOSS_CLIENT_KEY` | Payments | Toss client key returned by `/api/v1/payments/checkout`. It is server-read, not `NEXT_PUBLIC_*`. |
+| `TOSS_SECRET_KEY` | Payments | Toss secret key used by `/api/v1/payments/confirm`. |
+| `AUTH_SECRET` | Auth | NextAuth secret. Generate with `openssl rand -base64 32`. |
+| `AUTH_URL` | Auth | Canonical app URL, e.g. `https://your-domain.example`. |
+| `AUTH_KAKAO_ID`, `AUTH_KAKAO_SECRET` | Kakao login | Kakao OAuth credentials. |
+| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Google login | Google OAuth credentials. |
+
+LLM tuning knobs:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ANTHROPIC_SIGNAL_TIMEOUT_MS` | `20000` | Signal enhancement timeout budget. |
+| `ANTHROPIC_RECOMMENDATION_TIMEOUT_MS` | `25000` | Recommendation generation timeout budget. |
+| `ANTHROPIC_AGENT_ITERATION_TIMEOUT_MS` | `8000` | Per-iteration agent timeout budget. |
+| `ANTHROPIC_RETRY_BASE_DELAY_MS` | `500` | Base backoff for app-level Anthropic retries. |
+| `ANTHROPIC_THINKING_MODE` | stage default | Global thinking mode: `off`, `enabled`, or `adaptive`. |
+| `ANTHROPIC_THINKING_SIGNAL_ENHANCER` | `off` | Stage override for signal enhancement. |
+| `ANTHROPIC_THINKING_RECOMMENDATION` | `enabled` | Stage override for recommendation generation. |
+| `ANTHROPIC_THINKING_AGENT` | `enabled` | Stage override for agent iterations. |
+
+Deployment notes:
+
+- Set `USE_DB=true` for Vercel/production. `USE_DB=false` local JSON storage is only for local demos.
+- Run `npx prisma migrate deploy` against the production database before the first release.
+- Leave `EVAL_MODE=false` unless you are intentionally collecting evaluation metrics.
+- Payment routes can deploy without Toss keys, but checkout/confirm will not complete until `TOSS_CLIENT_KEY` and `TOSS_SECRET_KEY` are set.
 
 ---
 

@@ -16,6 +16,7 @@ import {
 import { RECOMMENDATION_FEW_SHOT } from "@/lib/ai/prompts/few-shot-examples";
 import { submitRecommendationsTool } from "@/lib/ai/schemas/analysis-schema";
 import { trackUsage } from "@/lib/ai/token-tracker";
+import { createLogger } from "@/lib/logger";
 import type { RecommendationType, StoredSignal } from "@/lib/analysis-store";
 
 type RecommendationResult = {
@@ -28,6 +29,8 @@ type RecommendationResult = {
     toneLabel: string;
   }[];
 };
+
+const logger = createLogger("ai.recommendation_generator");
 
 export async function generateRecommendations(params: {
   analysisId?: string;
@@ -131,14 +134,15 @@ export async function generateRecommendations(params: {
       success: true,
     });
 
-    if (process.env.NODE_ENV !== "production") {
-      const cacheRead = response.usage.cache_read_input_tokens ?? 0;
-      const cacheCreate = response.usage.cache_creation_input_tokens ?? 0;
-      if (cacheRead > 0 || cacheCreate > 0) {
-        console.log(
-          `[recommendation_generator] cache: read=${cacheRead}, write=${cacheCreate}, fresh=${response.usage.input_tokens}`,
-        );
-      }
+    const cacheRead = response.usage.cache_read_input_tokens ?? 0;
+    const cacheCreate = response.usage.cache_creation_input_tokens ?? 0;
+    if (cacheRead > 0 || cacheCreate > 0) {
+      logger.debug("prompt_cache_usage", {
+        analysisId: params.analysisId,
+        cacheReadInputTokens: cacheRead,
+        cacheCreationInputTokens: cacheCreate,
+        freshInputTokens: response.usage.input_tokens,
+      });
     }
 
     return result;

@@ -6,10 +6,13 @@ import {
 import { trackUsage } from "@/lib/ai/token-tracker";
 import { embedConversation } from "@/lib/ai/embeddings/embed-conversation";
 import { createAnalysis, getConversation } from "@/lib/store";
+import { createLogger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const logger = createLogger("api.analysis_stream");
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
@@ -138,7 +141,10 @@ export async function POST(request: Request, context: RouteContext) {
         controller.close();
       } catch (err) {
         const errorMessage = getErrorMessage(err);
-        console.error("[analysis-stream] Pipeline failed:", errorMessage);
+        logger.error("pipeline_failed", {
+          conversationId,
+          errorMessage,
+        });
         await trackStreamFallback("stream_pipeline", errorMessage, false);
         emitError("분석 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
         controller.close();

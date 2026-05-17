@@ -1,4 +1,4 @@
-import { buildRuleBasedAnalysis } from "@/lib/rule-based-analysis";
+import { buildRuleBasedAnalysis, buildRuleBaselineScores } from "@/lib/rule-based-analysis";
 import type { StoredConversation } from "@/lib/analysis-store";
 
 /**
@@ -14,6 +14,13 @@ export type PatternMatchResult = {
     description: string;
     confidenceLevel: string;
   }[];
+  baselineScores: {
+    otherInitiative: number;
+    responseCadence: number;
+    questionReciprocity: number;
+    schedulingCommitment: number;
+    overall: number;
+  };
   recommendedAction: string;
   recommendedActionReason: string;
   confidenceLevel: string;
@@ -31,6 +38,7 @@ export function matchPatterns(conversation: StoredConversation): PatternMatchRes
       description: s.description,
       confidenceLevel: s.confidenceLevel,
     })),
+    baselineScores: buildRuleBaselineScores(conversation),
     recommendedAction: result.recommendedAction,
     recommendedActionReason: result.recommendedActionReason,
     confidenceLevel: result.confidenceLevel,

@@ -4,10 +4,13 @@ import type {
   MessageParam,
   ThinkingConfigParam,
 } from "@anthropic-ai/sdk/resources/messages";
+import { createLogger } from "@/lib/logger";
 
 const globalForAnthropic = globalThis as unknown as {
   anthropic: Anthropic | undefined;
 };
+
+const logger = createLogger("ai.anthropic_client");
 
 function createClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -330,9 +333,12 @@ export async function callWithRetry<T>(
       }
 
       const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
-      console.warn(
-        `[${label}] attempt ${attempt + 1}/${maxRetries + 1} failed: ${errorMsg}`,
-      );
+      logger.warn("attempt_failed", {
+        label,
+        attempt: attempt + 1,
+        maxAttempts: maxRetries + 1,
+        errorMessage: errorMsg,
+      });
 
       if (attempt < maxRetries) {
         // 지수 backoff: 500ms → 1s → 2s ...

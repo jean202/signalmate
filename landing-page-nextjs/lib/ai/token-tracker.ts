@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
 
 type UsageEntry = {
   analysisId?: string;
@@ -23,6 +24,8 @@ const COST_TABLE: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-6": { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
   "claude-sonnet-4-20250514": { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
 };
+
+const logger = createLogger("ai.token_tracker");
 
 function estimateCostUsd(modelName: string, inputTokens: number, outputTokens: number): number {
   const rates = COST_TABLE[modelName] ?? COST_TABLE["claude-haiku-4-5-20251001"];
@@ -58,6 +61,11 @@ export async function trackUsage(entry: UsageEntry): Promise<void> {
       },
     });
   } catch (error) {
-    console.error("[token-tracker] Failed to log usage:", error);
+    logger.error("failed_to_log_usage", {
+      analysisId: entry.analysisId,
+      modelName: entry.modelName,
+      chainStep: entry.chainStep,
+      error,
+    });
   }
 }

@@ -96,7 +96,8 @@ signalmate/
 cd landing-page-nextjs
 npm install
 cp .env.example .env.local
-# Claude API 키 없이도 동작합니다 (USE_DB=false)
+# Claude API 키 없이도 규칙 기반으로 동작합니다 (USE_DB=false)
+# 배포용 환경변수 전체 목록은 landing-page-nextjs/README.md 참고
 
 npm run dev
 # → http://localhost:3000/analyze

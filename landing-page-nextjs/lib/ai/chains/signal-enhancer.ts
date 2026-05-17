@@ -16,6 +16,7 @@ import {
 import { SIGNAL_ENHANCER_FEW_SHOT } from "@/lib/ai/prompts/few-shot-examples";
 import { submitEnhancedSignalsTool } from "@/lib/ai/schemas/analysis-schema";
 import { trackUsage } from "@/lib/ai/token-tracker";
+import { createLogger } from "@/lib/logger";
 import type { StoredSignal } from "@/lib/analysis-store";
 
 type EnhancedSignalResult = {
@@ -29,6 +30,8 @@ type EnhancedSignalResult = {
     confidenceLevel: string;
   }[];
 };
+
+const logger = createLogger("ai.signal_enhancer");
 
 export async function enhanceSignals(params: {
   analysisId?: string;
@@ -136,15 +139,15 @@ export async function enhanceSignals(params: {
       success: true,
     });
 
-    // 캐시 히트율 모니터링 (개발 중 디버깅용)
-    if (process.env.NODE_ENV !== "production") {
-      const cacheRead = response.usage.cache_read_input_tokens ?? 0;
-      const cacheCreate = response.usage.cache_creation_input_tokens ?? 0;
-      if (cacheRead > 0 || cacheCreate > 0) {
-        console.log(
-          `[signal_enhancer] cache: read=${cacheRead}, write=${cacheCreate}, fresh=${response.usage.input_tokens}`,
-        );
-      }
+    const cacheRead = response.usage.cache_read_input_tokens ?? 0;
+    const cacheCreate = response.usage.cache_creation_input_tokens ?? 0;
+    if (cacheRead > 0 || cacheCreate > 0) {
+      logger.debug("prompt_cache_usage", {
+        analysisId: params.analysisId,
+        cacheReadInputTokens: cacheRead,
+        cacheCreationInputTokens: cacheCreate,
+        freshInputTokens: response.usage.input_tokens,
+      });
     }
 
     return result;
