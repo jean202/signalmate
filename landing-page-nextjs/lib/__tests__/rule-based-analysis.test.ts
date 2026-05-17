@@ -293,4 +293,22 @@ describe("emoji_drop signal", () => {
     const signal = result.signals.find((s) => s.signalKey === "emoji_drop");
     expect(signal).toBeUndefined();
   });
+
+  it("does NOT fire when drop is not sharp enough (secondHalf >= firstHalf × 0.6)", () => {
+    const conv = makeConversation([
+      { role: "self",  text: "안녕!" },
+      { role: "other", text: "안녕 ㅎㅎ" },     // firstHalf warm ✓
+      { role: "self",  text: "어때?" },
+      { role: "other", text: "그냥 그래" },       // firstHalf no warm ✗ → firstHalf density 1/2 = 0.5 (≥ 0.3)
+      { role: "self",  text: "뭐 해?" },
+      { role: "other", text: "집에 있어 ㅎ" },   // secondHalf warm ✓
+      { role: "self",  text: "심심하겠다" },
+      { role: "other", text: "뭐 그래" },         // secondHalf no warm ✗ → secondHalf density 1/2 = 0.5 (≥ 0.5 × 0.6 = 0.3)
+    ]);
+    // firstHalf density: 1/2 = 0.5 (≥ 0.3 ✓)
+    // secondHalf density: 1/2 = 0.5 (≥ 0.5 × 0.6 = 0.3 → NOT a sharp drop, should NOT fire)
+    const result = buildRuleBasedAnalysis(conv);
+    const signal = result.signals.find((s) => s.signalKey === "emoji_drop");
+    expect(signal).toBeUndefined();
+  });
 });

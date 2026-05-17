@@ -49,6 +49,8 @@ type MessageMetrics = {
   baselineScore: number;
   otherWarmDensity: number;
   otherWarmDropDetected: boolean;
+  otherWarmFirstHalfPct: number;   // 0–100, 0 if otherMessages < 4
+  otherWarmSecondHalfPct: number;  // 0–100, 0 if otherMessages < 4
 };
 
 // ── 단계별 설정 ──────────────────────────────────────────────────────────────
@@ -270,6 +272,8 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
     otherMessages.length > 0 ? partialMetrics.otherWarmCount / otherMessages.length : 0;
 
   let otherWarmDropDetected = false;
+  let otherWarmFirstHalfPct = 0;
+  let otherWarmSecondHalfPct = 0;
   if (otherMessages.length >= 4) {
     const half = Math.floor(otherMessages.length / 2);
     const firstHalfMsgs = otherMessages.slice(0, half);
@@ -280,6 +284,8 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
       secondHalfMsgs.filter((m) => warmPattern.test(m.messageText)).length / secondHalfMsgs.length;
     otherWarmDropDetected =
       firstHalfWarmDensity >= 0.3 && secondHalfWarmDensity < firstHalfWarmDensity * 0.6;
+    otherWarmFirstHalfPct = Math.round(firstHalfWarmDensity * 100);
+    otherWarmSecondHalfPct = Math.round(secondHalfWarmDensity * 100);
   }
 
   return {
@@ -292,6 +298,8 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
     baselineScore,
     otherWarmDensity,
     otherWarmDropDetected,
+    otherWarmFirstHalfPct,
+    otherWarmSecondHalfPct,
   };
 }
 
@@ -853,7 +861,7 @@ export function buildRuleBasedAnalysis(
       "emoji_drop",
       "대화 후반으로 갈수록 반응 표현이 줄고 있어요",
       "처음엔 이모지나 감탄 표현이 있었는데 후반부에서 눈에 띄게 줄었어요. 피로도가 올라가거나 관심이 옅어지는 구간일 수 있어요.",
-      "대화 전반부에 비해 후반부에서 감정 표현이 크게 줄었습니다.",
+      `전반부 감정 표현 비율이 ${metrics.otherWarmFirstHalfPct}%였는데 후반부에서 ${metrics.otherWarmSecondHalfPct}%로 줄었습니다.`,
       "medium",
     );
   }
