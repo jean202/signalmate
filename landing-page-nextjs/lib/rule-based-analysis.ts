@@ -54,7 +54,7 @@ type MessageMetrics = {
 type RelationshipStageKey = "pre_meeting" | "after_first" | "after_few" | "established";
 
 type StageConfig = {
-  /** toneDrop 감지: 후반부 평균이 전반부 대비 이 비율 미만이면 감지 (낮을수록 더 예민) */
+  /** toneDrop 감지: 후반부 평균이 전반부 대비 이 비율 미만이면 감지 (높을수록 더 예민) */
   toneDropThreshold: number;
   /** 단답 기준: 이 글자 수 이하면 short reply로 집계 */
   shortReplyMaxLength: number;
@@ -64,9 +64,9 @@ type StageConfig = {
 
 const STAGE_CONFIGS: Record<RelationshipStageKey, StageConfig> = {
   pre_meeting:  { toneDropThreshold: 0.50, shortReplyMaxLength: 5,  questionWarningType: "ambiguous" },
-  after_first:  { toneDropThreshold: 0.40, shortReplyMaxLength: 8,  questionWarningType: "ambiguous" },
-  after_few:    { toneDropThreshold: 0.35, shortReplyMaxLength: 10, questionWarningType: "caution"   },
-  established:  { toneDropThreshold: 0.30, shortReplyMaxLength: 10, questionWarningType: "caution"   },
+  after_first:  { toneDropThreshold: 0.60, shortReplyMaxLength: 8,  questionWarningType: "ambiguous" },
+  after_few:    { toneDropThreshold: 0.65, shortReplyMaxLength: 10, questionWarningType: "caution"   },
+  established:  { toneDropThreshold: 0.70, shortReplyMaxLength: 10, questionWarningType: "caution"   },
 };
 
 export function stageFromRelationshipStage(stage?: string): RelationshipStageKey {
