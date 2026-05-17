@@ -722,7 +722,7 @@ export function buildRuleBasedAnalysis(
 
   if (metrics.otherQuestionCount === 0 && metrics.otherMessages > 0) {
     signalFactory.add(
-      "ambiguous",
+      stageConfig.questionWarningType,
       "question_balance",
       "질문을 되돌려주는 비율은 낮아요",
       "응답은 하지만 대화를 주도적으로 확장하는 패턴은 아직 약합니다.",

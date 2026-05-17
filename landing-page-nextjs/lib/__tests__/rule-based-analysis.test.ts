@@ -179,3 +179,43 @@ describe("stage-aware toneDrop threshold", () => {
     expect(signal).toBeDefined();
   });
 });
+
+describe("stage-aware question_balance signal type", () => {
+  function makeConvNoQuestions(stage: string): StoredConversation {
+    return makeConversation(
+      [
+        { role: "self",  text: "오늘 어떻게 지냈어요?" },
+        { role: "other", text: "바빴어요" },
+        { role: "self",  text: "힘들었겠다" },
+        { role: "other", text: "네 그랬어요" },
+        { role: "self",  text: "이번 주말은요?" },
+        { role: "other", text: "아직 모르겠어요" },
+      ],
+      { relationshipStage: stage },
+    );
+  }
+
+  it("question_balance is ambiguous for before_meeting", () => {
+    const result = buildRuleBasedAnalysis(makeConvNoQuestions("before_meeting"));
+    const signal = result.signals.find((s) => s.signalKey === "question_balance");
+    expect(signal?.signalType).toBe("ambiguous");
+  });
+
+  it("question_balance is ambiguous for after_first_date", () => {
+    const result = buildRuleBasedAnalysis(makeConvNoQuestions("after_first_date"));
+    const signal = result.signals.find((s) => s.signalKey === "question_balance");
+    expect(signal?.signalType).toBe("ambiguous");
+  });
+
+  it("question_balance is caution for after_second_date", () => {
+    const result = buildRuleBasedAnalysis(makeConvNoQuestions("after_second_date"));
+    const signal = result.signals.find((s) => s.signalKey === "question_balance");
+    expect(signal?.signalType).toBe("caution");
+  });
+
+  it("question_balance is caution for cooling_down", () => {
+    const result = buildRuleBasedAnalysis(makeConvNoQuestions("cooling_down"));
+    const signal = result.signals.find((s) => s.signalKey === "question_balance");
+    expect(signal?.signalType).toBe("caution");
+  });
+});
