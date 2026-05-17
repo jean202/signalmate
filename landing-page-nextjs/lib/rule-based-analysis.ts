@@ -686,7 +686,7 @@ export function buildRuleBasedAnalysis(
     );
   }
 
-  if (metrics.otherWarmCount > 0 || metrics.otherAverageLength >= 18) {
+  if ((metrics.otherWarmCount > 0 || metrics.otherAverageLength >= 18) && metrics.otherWarmDensity < 0.5) {
     const warmthEvidence =
       metrics.otherWarmCount > 0
         ? `상대 메시지 평균 길이는 ${Math.round(metrics.otherAverageLength)}자이고, 온도감 있는 표현이 ${metrics.otherWarmCount}회 보였습니다.`
