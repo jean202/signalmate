@@ -715,7 +715,7 @@ export function buildRuleBasedAnalysis(
 
   // ── emoji_engagement: 이모지/리액션 밀도 높음 ──
   if (metrics.otherWarmDensity >= 0.5 && metrics.otherMessages >= 3) {
-    const warmMessageCount = Math.round(metrics.otherWarmDensity * metrics.otherMessages);
+    const warmMessageCount = metrics.otherWarmCount;
     const warmRatioPct = Math.round(metrics.otherWarmDensity * 100);
     signalFactory.add(
       "positive",
