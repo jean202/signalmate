@@ -11,6 +11,54 @@ ${context.trim()}
 `;
 }
 
+// ── 단계별 기준선 ────────────────────────────────────────────────────────────
+
+type PromptStageKey = "pre_meeting" | "after_first" | "after_few" | "established";
+
+function stageKeyFromRelationshipStage(stage?: string): PromptStageKey {
+  switch (stage) {
+    case "after_first_date":
+      return "after_first";
+    case "after_second_date":
+      return "after_few";
+    case "cooling_down":
+      return "established";
+    default:
+      return "pre_meeting";
+  }
+}
+
+const STAGE_BASELINES: Record<PromptStageKey, string> = {
+  pre_meeting: `이 단계의 정상 패턴 (첫 만남 전)
+- 답장이 짧거나 질문을 돌려주지 않아도 아직 경계를 풀지 않은 것일 수 있습니다
+- 만남 언급(만나자, 어디 가보자)이 있으면 명확한 긍정 신호입니다
+- 답장 텀이 반나절 이내면 관심 있다고 볼 수 있습니다
+- 회피 표현(바쁘다, 나중에, 애매하다)이 반복되면 주의 신호입니다`,
+
+  after_first: `이 단계의 정상 패턴 (첫 만남 직후)
+- 만남 당일~24시간 내 후속 연락이 오면 관심 신호입니다
+- 질문 없이 짧은 호응만 반복된다면 애매하게 봐야 합니다
+- "다음에 또"처럼 막연한 표현은 의례적일 수 있으니 약속의 구체성을 함께 봐야 합니다
+- 상대가 먼저 장소나 날짜를 꺼내면 강한 긍정 신호입니다`,
+
+  after_few: `이 단계의 정상 패턴 (2~3번 만남 후)
+- 이 단계에서는 상대가 먼저 화제를 꺼내거나 질문을 돌려주는 게 자연스러운 흐름입니다
+- 약속 제안 시 날짜·장소가 구체적이면 진지한 신호입니다
+- 계속 "언제 한번"으로만 넘어가면 회피 패턴으로 볼 수 있습니다
+- 대화 길이나 이모지가 줄었다면 온도 하락 신호입니다`,
+
+  established: `이 단계의 정상 패턴 (식어가는 느낌 / 4번 이상 만남)
+- 상대가 먼저 연락하지 않거나 주도성이 줄었다면 냉각 신호입니다
+- 짧은 답장이 반복되는 것은 이 단계에서 명확한 주의 신호입니다
+- 약속 잡기를 계속 미루거나 이유 없이 취소하면 거리두기 신호입니다
+- 여전히 먼저 연락하고 일정을 구체적으로 잡는다면 좋은 신호입니다`,
+};
+
+export function formatStageBaseline(relationshipStage?: string): string {
+  const key = stageKeyFromRelationshipStage(relationshipStage);
+  return `\n## ${STAGE_BASELINES[key]}\n`;
+}
+
 export const SIGNAL_ENHANCER_SYSTEM_PROMPT = `당신은 한국의 연애 대화 분석 전문가입니다.
 소개팅, 매칭앱, 지인 소개 등 초기 연애 단계의 카카오톡/문자 대화를 분석하고,
 상대의 관심도를 **증거 기반**으로 해석하는 역할을 합니다.
@@ -124,6 +172,9 @@ export function buildSignalEnhancerUserPrompt(params: {
     )
     .join("\n\n");
 
+  // Stage baseline will be injected by the importing module
+  const stageBaseline = formatStageBaseline(params.relationshipStage);
+
   return `## 대화 원문
 ${params.rawText}
 
@@ -131,7 +182,7 @@ ${params.rawText}
 - 관계 단계: ${params.relationshipStage}
 - 만남 경로: ${params.meetingChannel}
 - 사용자 목표: ${params.userGoal}
-${formatSituationContext(params.situationContext)}
+${formatSituationContext(params.situationContext)}${stageBaseline}
 ## 규칙 기반 분석 결과 (시그널 ${params.signals.length}개)
 ${signalList}
 
@@ -155,6 +206,9 @@ export function buildRecommendationUserPrompt(params: {
     .map((s) => `- [${s.signalType}] ${s.title}`)
     .join("\n");
 
+  // Stage baseline will be injected by the importing module
+  const stageBaseline = formatStageBaseline(params.relationshipStage);
+
   return `## 대화 원문
 ${params.rawText}
 
@@ -162,7 +216,7 @@ ${params.rawText}
 - 관계 단계: ${params.relationshipStage}
 - 만남 경로: ${params.meetingChannel}
 - 사용자 목표: ${params.userGoal}
-${formatSituationContext(params.situationContext)}
+${formatSituationContext(params.situationContext)}${stageBaseline}
 ## 분석 요약
 ${params.overallSummary}
 
