@@ -219,3 +219,40 @@ describe("stage-aware question_balance signal type", () => {
     expect(signal?.signalType).toBe("caution");
   });
 });
+
+describe("emoji_engagement signal", () => {
+  it("fires positive signal when warm expression density >= 50% with >= 3 other messages", () => {
+    const conv = makeConversation([
+      { role: "self",  text: "안녕!" },
+      { role: "other", text: "안녕 ㅎㅎ" },           // warm: ㅎ ✓
+      { role: "self",  text: "오늘 어땠어?" },
+      { role: "other", text: "좋았어! 너무 재밌었음" }, // warm: ! ✓
+      { role: "self",  text: "나도" },
+      { role: "other", text: "ㅋㅋ 진짜로?" },          // warm: ㅋ ✓
+      { role: "self",  text: "응응" },
+      { role: "other", text: "다음에 또 가자" },         // no warm ✗
+    ]);
+    // other 4개, warm 포함 3개 → 75% ≥ 50%
+    const result = buildRuleBasedAnalysis(conv);
+    const signal = result.signals.find((s) => s.signalKey === "emoji_engagement");
+    expect(signal).toBeDefined();
+    expect(signal?.signalType).toBe("positive");
+  });
+
+  it("does NOT fire when warm density < 50%", () => {
+    const conv = makeConversation([
+      { role: "self",  text: "안녕" },
+      { role: "other", text: "응" },
+      { role: "self",  text: "오늘 어때?" },
+      { role: "other", text: "그냥 그래" },
+      { role: "self",  text: "뭐 했어?" },
+      { role: "other", text: "집에 있었어" },
+      { role: "self",  text: "그렇구나" },
+      { role: "other", text: "응 뭐" },
+    ]);
+    // other 4개, warm 0개 → 0% < 50%
+    const result = buildRuleBasedAnalysis(conv);
+    const signal = result.signals.find((s) => s.signalKey === "emoji_engagement");
+    expect(signal).toBeUndefined();
+  });
+});

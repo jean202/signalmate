@@ -47,6 +47,8 @@ type MessageMetrics = {
   questionReciprocityScore: number;
   schedulingCommitmentScore: number;
   baselineScore: number;
+  otherWarmDensity: number;
+  otherWarmDropDetected: boolean;
 };
 
 // ── 단계별 설정 ──────────────────────────────────────────────────────────────
@@ -264,6 +266,22 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
       schedulingCommitmentScore * 0.3,
   );
 
+  const otherWarmDensity =
+    otherMessages.length > 0 ? partialMetrics.otherWarmCount / otherMessages.length : 0;
+
+  let otherWarmDropDetected = false;
+  if (otherMessages.length >= 4) {
+    const half = Math.floor(otherMessages.length / 2);
+    const firstHalfMsgs = otherMessages.slice(0, half);
+    const secondHalfMsgs = otherMessages.slice(half);
+    const firstHalfWarmDensity =
+      firstHalfMsgs.filter((m) => warmPattern.test(m.messageText)).length / firstHalfMsgs.length;
+    const secondHalfWarmDensity =
+      secondHalfMsgs.filter((m) => warmPattern.test(m.messageText)).length / secondHalfMsgs.length;
+    otherWarmDropDetected =
+      firstHalfWarmDensity >= 0.3 && secondHalfWarmDensity < firstHalfWarmDensity * 0.6;
+  }
+
   return {
     ...partialMetrics,
     otherResponsePairs,
@@ -272,6 +290,8 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
     questionReciprocityScore,
     schedulingCommitmentScore,
     baselineScore,
+    otherWarmDensity,
+    otherWarmDropDetected,
   };
 }
 
@@ -691,6 +711,20 @@ export function buildRuleBasedAnalysis(
         lengthRatio >= 1.0 ? "high" : "medium",
       );
     }
+  }
+
+  // ── emoji_engagement: 이모지/리액션 밀도 높음 ──
+  if (metrics.otherWarmDensity >= 0.5 && metrics.otherMessages >= 3) {
+    const warmMessageCount = Math.round(metrics.otherWarmDensity * metrics.otherMessages);
+    const warmRatioPct = Math.round(metrics.otherWarmDensity * 100);
+    signalFactory.add(
+      "positive",
+      "emoji_engagement",
+      "감정 표현을 자주 섞어서 답해요",
+      "상대가 이모지나 감탄 표현을 메시지마다 꽤 자주 쓰고 있어서, 딱딱하게 닫힌 톤은 아닙니다.",
+      `상대 메시지 ${metrics.otherMessages}개 중 감정 표현이 포함된 답장이 ${warmMessageCount}개(${warmRatioPct}%)입니다.`,
+      metrics.otherWarmDensity >= 0.7 ? "high" : "medium",
+    );
   }
 
   // ── #13: 일방적 대화 ──
