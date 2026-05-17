@@ -178,8 +178,8 @@ export const ruleAnalysisCases: RuleAnalysisCase[] = [
       confidenceLevel: "low",
       counts: {
         positive: 1,
-        ambiguous: 1,
-        caution: 1,
+        ambiguous: 0,
+        caution: 2,
       },
       includeSignalKeys: ["reply_continuity", "question_balance", "hedged_replies"],
       excludeSignalKeys: ["future_reference", "date_specificity"],
@@ -205,8 +205,8 @@ export const ruleAnalysisCases: RuleAnalysisCase[] = [
       confidenceLevel: "low",
       counts: {
         positive: 0,
-        ambiguous: 1,
-        caution: 2,
+        ambiguous: 0,
+        caution: 3,
       },
       includeSignalKeys: ["question_balance", "awaiting_reply", "closing_without_follow_up"],
       excludeSignalKeys: ["reply_continuity", "future_reference", "date_specificity"],
@@ -268,12 +268,12 @@ export const ruleAnalysisCases: RuleAnalysisCase[] = [
       ],
     },
     expect: {
-      recommendedAction: "slow_down",
+      recommendedAction: "consider_stopping",
       confidenceLevel: "medium",
       counts: {
         positive: 0,
-        ambiguous: 2,
-        caution: 1,
+        ambiguous: 1,
+        caution: 2,
       },
       includeSignalKeys: ["one_sided_conversation", "question_balance", "awaiting_reply"],
       excludeSignalKeys: ["reply_continuity", "future_reference", "short_replies"],
@@ -351,8 +351,8 @@ export const ruleAnalysisCases: RuleAnalysisCase[] = [
       confidenceLevel: "high",
       counts: {
         positive: 1,
-        ambiguous: 1,
-        caution: 1,
+        ambiguous: 0,
+        caution: 2,
       },
       includeSignalKeys: ["reply_continuity", "question_balance", "tone_drop"],
       excludeSignalKeys: ["future_reference", "date_specificity", "hedged_replies"],
