@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildRuleBasedAnalysis } from "../rule-based-analysis";
+import { buildRuleBasedAnalysis, stageFromRelationshipStage } from "../rule-based-analysis";
 import type { StoredConversation } from "../analysis-store";
 
 function makeConversation(
@@ -129,5 +129,19 @@ describe("buildRuleBasedAnalysis", () => {
       expect(rec.content).toBeTruthy();
       expect(rec.rationale).toBeTruthy();
     });
+  });
+});
+
+describe("stageFromRelationshipStage", () => {
+  it("maps known values correctly", () => {
+    expect(stageFromRelationshipStage("before_meeting")).toBe("pre_meeting");
+    expect(stageFromRelationshipStage("after_first_date")).toBe("after_first");
+    expect(stageFromRelationshipStage("after_second_date")).toBe("after_few");
+    expect(stageFromRelationshipStage("cooling_down")).toBe("established");
+  });
+
+  it("falls back to pre_meeting for unknown values", () => {
+    expect(stageFromRelationshipStage(undefined)).toBe("pre_meeting");
+    expect(stageFromRelationshipStage("unknown_stage")).toBe("pre_meeting");
   });
 });

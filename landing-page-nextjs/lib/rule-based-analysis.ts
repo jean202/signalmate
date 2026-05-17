@@ -13,11 +13,20 @@ type AnalysisBuildOptions = {
   modelName?: string;
 };
 
+export type RuleBaselineScores = {
+  otherInitiative: number;
+  responseCadence: number;
+  questionReciprocity: number;
+  schedulingCommitment: number;
+  overall: number;
+};
+
 type MessageMetrics = {
   totalMessages: number;
   selfMessages: number;
   otherMessages: number;
   otherResponsePairs: number;
+  selfQuestionCount: number;
   otherQuestionCount: number;
   selfSchedulingAskCount: number;
   otherFutureMentionCount: number;
@@ -32,7 +41,42 @@ type MessageMetrics = {
   otherShortReplyCount: number;
   hasClosingWithoutFollowUp: boolean;
   toneDrop: boolean;
+  averageOtherResponseDelayMinutes: number | null;
+  otherInitiativeScore: number;
+  responseCadenceScore: number;
+  questionReciprocityScore: number;
+  schedulingCommitmentScore: number;
+  baselineScore: number;
 };
+
+// ── 단계별 설정 ──────────────────────────────────────────────────────────────
+
+type RelationshipStageKey = "pre_meeting" | "after_first" | "after_few" | "established";
+
+type StageConfig = {
+  /** toneDrop 감지: 후반부 평균이 전반부 대비 이 비율 미만이면 감지 (낮을수록 더 예민) */
+  toneDropThreshold: number;
+  /** 단답 기준: 이 글자 수 이하면 short reply로 집계 */
+  shortReplyMaxLength: number;
+  /** question_balance 신호 타입: pre_meeting/after_first는 ambiguous, 이후는 caution */
+  questionWarningType: "caution" | "ambiguous";
+};
+
+const STAGE_CONFIGS: Record<RelationshipStageKey, StageConfig> = {
+  pre_meeting:  { toneDropThreshold: 0.50, shortReplyMaxLength: 5,  questionWarningType: "ambiguous" },
+  after_first:  { toneDropThreshold: 0.40, shortReplyMaxLength: 8,  questionWarningType: "ambiguous" },
+  after_few:    { toneDropThreshold: 0.35, shortReplyMaxLength: 10, questionWarningType: "caution"   },
+  established:  { toneDropThreshold: 0.30, shortReplyMaxLength: 10, questionWarningType: "caution"   },
+};
+
+export function stageFromRelationshipStage(stage?: string): RelationshipStageKey {
+  switch (stage) {
+    case "after_first_date":  return "after_first";
+    case "after_second_date": return "after_few";
+    case "cooling_down":      return "established";
+    default:                  return "pre_meeting";
+  }
+}
 
 const futurePattern =
   /(다음|또|같이|보자|가자|볼까요|가볼까요|주말|다음 주|이번 주|시간|약속|커피|전시|식사|산책)/i;
@@ -54,6 +98,90 @@ function averageLength(messages: string[]) {
   return totalLength / messages.length;
 }
 
+function clampScore(score: number): number {
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function parseSentAt(sentAt: string | null): number | null {
+  if (!sentAt) return null;
+
+  const timestamp = Date.parse(sentAt);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function averageOtherResponseDelayMinutes(messages: StoredConversation["messages"]): number | null {
+  const delays: number[] = [];
+
+  for (let index = 0; index < messages.length - 1; index++) {
+    const current = messages[index];
+    const next = messages[index + 1];
+    if (current.senderRole !== "self" || next.senderRole !== "other") continue;
+
+    const currentTime = parseSentAt(current.sentAt);
+    const nextTime = parseSentAt(next.sentAt);
+    if (currentTime === null || nextTime === null || nextTime < currentTime) continue;
+
+    delays.push((nextTime - currentTime) / 60_000);
+  }
+
+  if (delays.length === 0) return null;
+  return delays.reduce((sum, delay) => sum + delay, 0) / delays.length;
+}
+
+function scoreOtherInitiative(metrics: Pick<MessageMetrics,
+  | "firstSenderRole"
+  | "otherMessages"
+  | "selfMessages"
+  | "otherQuestionCount"
+  | "otherFutureMentionCount"
+  | "otherAverageLength"
+>): number {
+  if (metrics.otherMessages === 0) return 0;
+
+  const startScore = metrics.firstSenderRole === "other" ? 25 : 0;
+  const balanceScore =
+    metrics.selfMessages > 0
+      ? Math.min(metrics.otherMessages / metrics.selfMessages, 1) * 25
+      : 25;
+  const questionScore = Math.min(metrics.otherQuestionCount / Math.max(metrics.otherMessages, 1), 0.5) * 50;
+  const futureScore = Math.min(metrics.otherFutureMentionCount, 2) * 10;
+  const lengthScore = metrics.otherAverageLength >= 18 ? 10 : 0;
+
+  return clampScore(startScore + balanceScore + questionScore + futureScore + lengthScore);
+}
+
+function scoreResponseCadence(delayMinutes: number | null): number {
+  if (delayMinutes === null) return 50;
+  if (delayMinutes <= 15) return 100;
+  if (delayMinutes <= 60) return 85;
+  if (delayMinutes <= 360) return 65;
+  if (delayMinutes <= 1_440) return 40;
+  return 15;
+}
+
+function scoreQuestionReciprocity(selfQuestionCount: number, otherQuestionCount: number): number {
+  if (selfQuestionCount === 0 && otherQuestionCount === 0) return 50;
+  if (selfQuestionCount === 0) return otherQuestionCount > 0 ? 100 : 50;
+
+  return clampScore((otherQuestionCount / selfQuestionCount) * 100);
+}
+
+function scoreSchedulingCommitment(metrics: Pick<MessageMetrics,
+  | "selfSchedulingAskCount"
+  | "otherFutureMentionCount"
+  | "otherHedgeCount"
+  | "otherDefinitePlanCount"
+>): number {
+  if (metrics.selfSchedulingAskCount === 0 && metrics.otherFutureMentionCount === 0) return 50;
+
+  return clampScore(
+    45 +
+      metrics.otherFutureMentionCount * 15 +
+      metrics.otherDefinitePlanCount * 25 -
+      metrics.otherHedgeCount * 20,
+  );
+}
+
 function buildMetrics(conversation: StoredConversation): MessageMetrics {
   const otherMessages = conversation.messages.filter((message) => message.senderRole === "other");
   const selfMessages = conversation.messages.filter((message) => message.senderRole === "self");
@@ -69,6 +197,8 @@ function buildMetrics(conversation: StoredConversation): MessageMetrics {
 
   const selfAvgLen = averageLength(selfMessages.map((message) => message.messageText));
   const otherAvgLen = averageLength(otherMessages.map((message) => message.messageText));
+  const selfQuestionCount = selfMessages.filter((message) => questionPattern.test(message.messageText)).length;
+  const otherQuestionCount = otherMessages.filter((message) => questionPattern.test(message.messageText)).length;
   const selfToOtherRatio =
     otherMessages.length > 0 ? selfMessages.length / otherMessages.length : selfMessages.length > 0 ? Infinity : 0;
 
@@ -94,12 +224,14 @@ function buildMetrics(conversation: StoredConversation): MessageMetrics {
     toneDrop = secondHalfAvg < firstHalfAvg * 0.6;
   }
 
-  return {
+  const averageDelayMinutes = averageOtherResponseDelayMinutes(conversation.messages);
+  const partialMetrics = {
     totalMessages: conversation.messages.length,
     selfMessages: selfMessages.length,
     otherMessages: otherMessages.length,
     otherResponsePairs,
-    otherQuestionCount: otherMessages.filter((message) => questionPattern.test(message.messageText)).length,
+    selfQuestionCount,
+    otherQuestionCount,
     selfSchedulingAskCount: selfMessages.filter((message) =>
       schedulingAskPattern.test(message.messageText),
     ).length,
@@ -119,6 +251,39 @@ function buildMetrics(conversation: StoredConversation): MessageMetrics {
     otherShortReplyCount,
     hasClosingWithoutFollowUp,
     toneDrop,
+    averageOtherResponseDelayMinutes: averageDelayMinutes,
+  };
+  const otherInitiativeScore = scoreOtherInitiative(partialMetrics);
+  const responseCadenceScore = scoreResponseCadence(averageDelayMinutes);
+  const questionReciprocityScore = scoreQuestionReciprocity(selfQuestionCount, otherQuestionCount);
+  const schedulingCommitmentScore = scoreSchedulingCommitment(partialMetrics);
+  const baselineScore = clampScore(
+    otherInitiativeScore * 0.3 +
+      responseCadenceScore * 0.2 +
+      questionReciprocityScore * 0.2 +
+      schedulingCommitmentScore * 0.3,
+  );
+
+  return {
+    ...partialMetrics,
+    otherResponsePairs,
+    otherInitiativeScore,
+    responseCadenceScore,
+    questionReciprocityScore,
+    schedulingCommitmentScore,
+    baselineScore,
+  };
+}
+
+export function buildRuleBaselineScores(conversation: StoredConversation): RuleBaselineScores {
+  const metrics = buildMetrics(conversation);
+
+  return {
+    otherInitiative: metrics.otherInitiativeScore,
+    responseCadence: metrics.responseCadenceScore,
+    questionReciprocity: metrics.questionReciprocityScore,
+    schedulingCommitment: metrics.schedulingCommitmentScore,
+    overall: metrics.baselineScore,
   };
 }
 
@@ -603,6 +768,21 @@ export function buildRuleBasedAnalysis(
       "거절은 아니지만, 분명한 확답보다는 여지를 남기는 문장이 반복됩니다.",
       `상대 메시지에서 일정 회피성 표현이 ${metrics.otherHedgeCount}회 확인됐습니다.`,
       "medium",
+    );
+  }
+
+  if (
+    metrics.averageOtherResponseDelayMinutes !== null &&
+    metrics.averageOtherResponseDelayMinutes > 1_440 &&
+    metrics.otherResponsePairs >= 2
+  ) {
+    signalFactory.add(
+      "caution",
+      "slow_response_cadence",
+      "답장 간격이 길게 벌어지고 있어요",
+      "상대가 응답은 하고 있지만 평균 답장 간격이 하루를 넘어, 즉각적인 관심 신호로 보기는 어렵습니다.",
+      `내 메시지 이후 상대 답장까지 평균 ${Math.round(metrics.averageOtherResponseDelayMinutes / 60)}시간이 걸렸습니다.`,
+      metrics.averageOtherResponseDelayMinutes > 2_880 ? "high" : "medium",
     );
   }
 
