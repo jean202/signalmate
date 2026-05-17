@@ -256,3 +256,41 @@ describe("emoji_engagement signal", () => {
     expect(signal).toBeUndefined();
   });
 });
+
+describe("emoji_drop signal", () => {
+  it("fires caution signal when warm density drops sharply from first to second half", () => {
+    const conv = makeConversation([
+      { role: "self",  text: "안녕!" },
+      { role: "other", text: "안녕 ㅎㅎ" },     // firstHalf warm ✓
+      { role: "self",  text: "어때?" },
+      { role: "other", text: "좋아 ㅋㅋ" },     // firstHalf warm ✓
+      { role: "self",  text: "뭐 해?" },
+      { role: "other", text: "그냥 있어" },      // secondHalf no warm ✗
+      { role: "self",  text: "심심하겠다" },
+      { role: "other", text: "뭐 그래" },        // secondHalf no warm ✗
+    ]);
+    // firstHalf density: 2/2 = 1.0 (≥ 0.3)
+    // secondHalf density: 0/2 = 0.0 (< 1.0 × 0.6 = 0.6) → fires
+    const result = buildRuleBasedAnalysis(conv);
+    const signal = result.signals.find((s) => s.signalKey === "emoji_drop");
+    expect(signal).toBeDefined();
+    expect(signal?.signalType).toBe("caution");
+  });
+
+  it("does NOT fire when firstHalf warm density < 0.3", () => {
+    const conv = makeConversation([
+      { role: "self",  text: "안녕" },
+      { role: "other", text: "응" },       // firstHalf no warm ✗
+      { role: "self",  text: "어때?" },
+      { role: "other", text: "그냥" },     // firstHalf no warm ✗
+      { role: "self",  text: "뭐해?" },
+      { role: "other", text: "집" },       // secondHalf no warm ✗
+      { role: "self",  text: "그래" },
+      { role: "other", text: "응" },       // secondHalf no warm ✗
+    ]);
+    // firstHalf density: 0/2 = 0.0 (< 0.3) → no fire
+    const result = buildRuleBasedAnalysis(conv);
+    const signal = result.signals.find((s) => s.signalKey === "emoji_drop");
+    expect(signal).toBeUndefined();
+  });
+});
