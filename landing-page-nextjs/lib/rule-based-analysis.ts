@@ -714,7 +714,7 @@ export function buildRuleBasedAnalysis(
       "ambiguous",
       "short_replies",
       "상대 답장이 대부분 짧아요",
-      "5자 이하의 단답이 절반 이상이라서, 대화에 깊이 참여하고 있다고 보기 어렵습니다.",
+      `${stageConfig.shortReplyMaxLength}자 이하의 단답이 절반 이상이라서, 대화에 깊이 참여하고 있다고 보기 어렵습니다.`,
       `상대 메시지 ${metrics.otherMessages}개 중 ${metrics.otherShortReplyCount}개가 ${stageConfig.shortReplyMaxLength}자 이하입니다.`,
       "medium",
     );
