@@ -14,6 +14,7 @@ import { detectToneShift } from "@/lib/ai/agent/tools/tone-shift";
 import { matchPatterns } from "@/lib/ai/agent/tools/pattern-matcher";
 import { searchSimilar } from "@/lib/ai/agent/tools/similar-search";
 import { checkQuality } from "@/lib/ai/agent/tools/quality-checker";
+import { buildRuleBasedAnalysis } from "@/lib/rule-based-analysis";
 import { createLogger } from "@/lib/logger";
 import type {
   StoredConversation,
@@ -45,7 +46,7 @@ const agentTools: Tool[] = [
   },
   {
     name: "match_patterns",
-    description: "규칙 기반 엔진으로 시그널을 감지합니다. 응답 연속성, 미래 언급, 질문 균형 등 16가지 패턴을 매칭합니다.",
+    description: "규칙 기반 엔진으로 시그널을 감지하고 기준선 점수를 계산합니다. 응답 연속성, 미래 언급, 질문 균형, 응답 지연, 일정 확정도 등을 매칭합니다.",
     input_schema: {
       type: "object" as const,
       properties: {},
@@ -203,6 +204,16 @@ const AGENT_SYSTEM_PROMPT = `당신은 한국의 연애 대화를 다각도로 �
 // ─── 에이전트 실행 ─────────────────────────────────
 
 const MAX_ITERATIONS = 8;
+const VALID_CONFIDENCE_LEVELS = new Set(["low", "medium", "high"]);
+const VALID_RECOMMENDED_ACTIONS = new Set([
+  "keep_light",
+  "suggest_date",
+  "slow_down",
+  "wait_for_response",
+  "consider_stopping",
+]);
+const VALID_SIGNAL_TYPES = new Set(["positive", "ambiguous", "caution"]);
+const REQUIRED_RECOMMENDATION_TYPES = ["next_message", "tone_guide", "avoid_phrase"] as const;
 const logger = createLogger("ai.agent");
 
 const cachedAgentTools: Tool[] = agentTools.map((tool, index) =>
@@ -391,11 +402,53 @@ export async function runAgentAnalysis(
     logger.warn("fallback_no_submit_result", {
       conversationId: conversation.id,
     });
-    const { buildRuleBasedAnalysis } = await import("@/lib/rule-based-analysis");
     return buildRuleBasedAnalysis(conversation, { modelName: "rule-based-dev (fallback: agent-no-submit)" });
   }
 
-  return buildStoredAnalysis(conversation, finalResult, logs);
+  const finalValidation = validateFinalResult(conversation, finalResult);
+  if (!finalValidation.passed) {
+    logger.warn("fallback_final_quality_gate", {
+      conversationId: conversation.id,
+      summary: finalValidation.summary,
+      issues: finalValidation.issues,
+      warnings: finalValidation.warnings,
+    });
+
+    await trackUsage({
+      modelName: model,
+      chainStep: "quality_gate",
+      inputTokens: 0,
+      outputTokens: 0,
+      durationMs: 0,
+      success: false,
+      errorMessage: finalValidation.summary,
+      fallbackStage: "agent_quality_gate",
+      qualityWarnings: finalValidation.warnings,
+    }).catch(() => {});
+
+    return buildRuleBasedAnalysis(conversation, {
+      modelName: "rule-based-dev (fallback: agent-quality-gate)",
+    });
+  }
+
+  if (finalValidation.warnings.length > 0 || finalValidation.recommendedConfidence === "low") {
+    await trackUsage({
+      modelName: model,
+      chainStep: "quality_gate",
+      inputTokens: 0,
+      outputTokens: 0,
+      durationMs: 0,
+      success: true,
+      qualityWarnings: finalValidation.warnings,
+    }).catch(() => {});
+  }
+
+  const calibratedResult =
+    finalValidation.recommendedConfidence === "low"
+      ? { ...finalResult, confidenceLevel: "low" }
+      : finalResult;
+
+  return buildStoredAnalysis(conversation, calibratedResult, logs);
 }
 
 // ─── 도구 실행 라우터 ────────────────────────────────
@@ -499,6 +552,85 @@ type SubmitResultInput = {
     toneLabel: string;
   }[];
 };
+
+type FinalValidationResult = {
+  passed: boolean;
+  issues: string[];
+  warnings: string[];
+  summary: string;
+  recommendedConfidence: "low" | null;
+};
+
+function validateFinalResult(
+  conversation: StoredConversation,
+  result: SubmitResultInput,
+): FinalValidationResult {
+  const issues: string[] = [];
+
+  if (!VALID_CONFIDENCE_LEVELS.has(result.confidenceLevel)) {
+    issues.push(`invalid confidenceLevel: ${result.confidenceLevel}`);
+  }
+
+  if (!VALID_RECOMMENDED_ACTIONS.has(result.recommendedAction)) {
+    issues.push(`invalid recommendedAction: ${result.recommendedAction}`);
+  }
+
+  if (!Array.isArray(result.signals) || result.signals.length === 0) {
+    issues.push("signals must be a non-empty array");
+  } else {
+    result.signals.forEach((signal, index) => {
+      if (!VALID_SIGNAL_TYPES.has(signal.signalType)) {
+        issues.push(`signals[${index}].signalType is invalid: ${signal.signalType}`);
+      }
+      if (!signal.signalKey || !signal.title || !signal.description || !signal.evidenceText) {
+        issues.push(`signals[${index}] has empty required fields`);
+      }
+      if (!VALID_CONFIDENCE_LEVELS.has(signal.confidenceLevel)) {
+        issues.push(`signals[${index}].confidenceLevel is invalid: ${signal.confidenceLevel}`);
+      }
+    });
+  }
+
+  const recommendationTypes = result.recommendations.map((rec) => rec.recommendationType);
+  if (result.recommendations.length !== REQUIRED_RECOMMENDATION_TYPES.length) {
+    issues.push(
+      `recommendations must contain ${REQUIRED_RECOMMENDATION_TYPES.length} items, got ${result.recommendations.length}`,
+    );
+  }
+
+  for (const type of REQUIRED_RECOMMENDATION_TYPES) {
+    const count = recommendationTypes.filter((candidate) => candidate === type).length;
+    if (count !== 1) {
+      issues.push(`recommendations must contain exactly one ${type}, got ${count}`);
+    }
+  }
+
+  result.recommendations.forEach((recommendation, index) => {
+    if (!recommendation.title || !recommendation.content || !recommendation.rationale) {
+      issues.push(`recommendations[${index}] has empty required fields`);
+    }
+  });
+
+  const quality = checkQuality({
+    signals: result.signals,
+    recommendations: result.recommendations,
+    overallSummary: result.overallSummary,
+    recommendedAction: result.recommendedAction,
+    rawText: conversation.rawText,
+    relationshipStage: conversation.relationshipStage,
+  });
+
+  return {
+    passed: issues.length === 0 && quality.passed,
+    issues: [...issues, ...quality.issues],
+    warnings: quality.warnings,
+    summary:
+      issues.length === 0
+        ? quality.summary
+        : `최종 결과 계약 검증 실패: ${issues.join("; ")} ${quality.summary}`,
+    recommendedConfidence: quality.recommendedConfidence,
+  };
+}
 
 function buildStoredAnalysis(
   conversation: StoredConversation,
