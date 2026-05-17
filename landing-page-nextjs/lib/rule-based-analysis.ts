@@ -741,7 +741,7 @@ export function buildRuleBasedAnalysis(
       "ambiguous",
       "one_sided_conversation",
       "대화 비율이 한쪽으로 쏠려 있어요",
-      "내가 보낸 메시지 수가 상대보다 훨씬 많아서, 대화 주도권이 한쪽에 치우쳐 있습니다.",
+      "내가 보낸 메시지 수가 상대보다 훨씬 많은 편이에요. 내가 대화를 이끌고 있는 구간일 수 있어요.",
       `내가 ${metrics.selfMessages}개, 상대가 ${metrics.otherMessages}개로 ${metrics.selfToOtherRatio.toFixed(1)}배 차이가 납니다.`,
       "medium",
     );
@@ -756,7 +756,7 @@ export function buildRuleBasedAnalysis(
       "ambiguous",
       "short_replies",
       "상대 답장이 대부분 짧아요",
-      `${stageConfig.shortReplyMaxLength}자 이하의 단답이 절반 이상이라서, 대화에 깊이 참여하고 있다고 보기 어렵습니다.`,
+      `${stageConfig.shortReplyMaxLength}자 이하 단답이 절반 이상이에요. 바쁜 상황일 수도 있고, 대화 참여도를 판단하려면 더 많은 대화가 필요해요.`,
       `상대 메시지 ${metrics.otherMessages}개 중 ${metrics.otherShortReplyCount}개가 ${stageConfig.shortReplyMaxLength}자 이하입니다.`,
       "medium",
     );
@@ -767,8 +767,8 @@ export function buildRuleBasedAnalysis(
       stageConfig.questionWarningType,
       "question_balance",
       "질문을 되돌려주는 비율은 낮아요",
-      "응답은 하지만 대화를 주도적으로 확장하는 패턴은 아직 약합니다.",
-      "상대 메시지에 되묻기 질문이 거의 없어서, 관심 표현이 적극적이라고 보긴 어렵습니다.",
+      "응답은 하지만 질문을 되돌려주는 패턴은 아직 약한 편이에요. 대화 스타일이 수동적일 수 있어요.",
+      `상대 메시지 ${metrics.otherMessages}개 중 질문이 ${metrics.otherQuestionCount}개 확인됐습니다.`,
       "medium",
     );
   } else if (metrics.totalMessages < 6) {
@@ -791,7 +791,7 @@ export function buildRuleBasedAnalysis(
       "caution",
       "date_specificity",
       "약속 구체화는 아직 약합니다",
-      "일정 관련 반응은 있으나, 시간이나 날짜 수준의 확정은 나오지 않았습니다.",
+      "일정 관련 반응은 나왔지만, 시간이나 날짜까지 확정하는 단계는 아직 아니에요.",
       `일정 제안 뒤 상대의 완곡 표현이 ${metrics.otherHedgeCount}회 있었고, 구체적 날짜/시간 표현은 확인되지 않았습니다.`,
       "medium",
     );
@@ -809,7 +809,7 @@ export function buildRuleBasedAnalysis(
       "caution",
       "hedged_replies",
       "반응에 완곡한 표현이 섞여 있습니다",
-      "거절은 아니지만, 분명한 확답보다는 여지를 남기는 문장이 반복됩니다.",
+      "거절은 아니지만, 확답보다는 여지를 남기는 표현이 반복되는 편이에요.",
       `상대 메시지에서 일정 회피성 표현이 ${metrics.otherHedgeCount}회 확인됐습니다.`,
       "medium",
     );
@@ -824,7 +824,7 @@ export function buildRuleBasedAnalysis(
       "caution",
       "slow_response_cadence",
       "답장 간격이 길게 벌어지고 있어요",
-      "상대가 응답은 하고 있지만 평균 답장 간격이 하루를 넘어, 즉각적인 관심 신호로 보기는 어렵습니다.",
+      "상대가 응답은 하고 있지만 평균 답장 간격이 하루를 넘어, 적극적인 관심 신호로 읽기엔 아직 이른 편이에요.",
       `내 메시지 이후 상대 답장까지 평균 ${Math.round(metrics.averageOtherResponseDelayMinutes / 60)}시간이 걸렸습니다.`,
       metrics.averageOtherResponseDelayMinutes > 2_880 ? "high" : "medium",
     );
@@ -848,7 +848,7 @@ export function buildRuleBasedAnalysis(
       "caution",
       "tone_drop",
       "대화 후반으로 갈수록 답장이 짧아지고 있어요",
-      "상대 메시지 길이가 전반부 대비 후반부에서 크게 줄었습니다. 흥미가 줄었을 가능성이 있습니다.",
+      "상대 메시지 길이가 전반부 대비 후반부에서 눈에 띄게 줄었어요. 흥미가 다소 옅어졌을 수도 있어요.",
       `대화 후반부 평균 메시지 길이가 전반부의 ${Math.round(stageConfig.toneDropThreshold * 100)}% 미만으로 떨어졌습니다.`,
       "medium",
     );
