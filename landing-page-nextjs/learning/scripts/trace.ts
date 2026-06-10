@@ -1,7 +1,9 @@
 /**
  * Phase 1 해부용 CLI — 캡쳐 1개를 오프라인 룰 엔진에 흘려 trace markdown 생성.
+ * ANTHROPIC_API_KEY가 있을 때만 LLM 시그널 보정 단계도 관찰.
  */
 
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { matchPatterns } from "@/lib/ai/agent/tools/pattern-matcher";
@@ -42,6 +44,29 @@ async function main() {
   await writeFile(outPath, md, "utf8");
   console.log(`Wrote ${outPath}`);
   console.log(md);
+
+  // 선택 단계: ANTHROPIC_API_KEY가 있을 때만 LLM 시그널 보정을 추가로 관찰
+  if (process.env.ANTHROPIC_API_KEY) {
+    const { enhanceSignals } = await import("@/lib/ai/chains/signal-enhancer");
+    const enhanced = await enhanceSignals({
+      rawText: conversation.rawText,
+      relationshipStage: conversation.relationshipStage,
+      meetingChannel: conversation.meetingChannel,
+      userGoal: conversation.userGoal,
+      situationContext: conversation.situationContext,
+      signals: ruleSignals.signals.map((s, index) => ({
+        id: randomUUID(),
+        signalType: s.signalType as "positive" | "ambiguous" | "caution",
+        signalKey: s.signalKey,
+        title: s.title,
+        description: s.description,
+        evidenceText: "",
+        confidenceLevel: s.confidenceLevel as "low" | "medium" | "high",
+        displayOrder: index,
+      })),
+    });
+    console.log("LLM enhanced signals:", JSON.stringify(enhanced, null, 2));
+  }
 }
 
 main().catch((error) => {
