@@ -1,0 +1,18 @@
+{
+  "id": "example-0000",
+  "source": "합성 예시 (실데이터 아님)",
+  "context": {
+    "job": "대기업 / 사무직",
+    "residence": "수도권 번화가",
+    "age_band": "20대 후반"
+  },
+  "relationshipStage": "after_first_date",
+  "meetingChannel": "dating_app",
+  "userGoal": "build_rapport",
+  "messages": [
+    { "sender": "me", "text": "어제 즐거웠어요 ㅎㅎ 잘 들어갔어요?" },
+    { "sender": "them", "text": "네 덕분에 잘 들어갔어요! 저도 재밌었어요 ㅋㅋ" },
+    { "sender": "me", "text": "다음에 [지명] 쪽 전시 같이 보러 갈래요?" },
+    { "sender": "them", "text": "오 좋아요 언제 시간 돼요?" }
+  ]
+}
