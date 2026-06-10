@@ -15,11 +15,19 @@ async function main() {
 
   const captures = raw
     .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as Capture);
+    .map((line, index) => ({ line: line.trim(), lineNo: index + 1 }))
+    .filter(({ line }) => line.length > 0)
+    .flatMap(({ line, lineNo }) => {
+      try {
+        return [JSON.parse(line) as Capture];
+      } catch (error) {
+        console.warn(`skip line ${lineNo}: JSON parse error — ${(error as Error).message}`);
+        return [];
+      }
+    });
 
   const rows: EvalRow[] = [];
+  const seenIds = new Set<string>();
   for (const capture of captures) {
     if (!capture.id || !Array.isArray(capture.messages)) {
       console.warn(`skip invalid capture (id/messages missing)`);
@@ -29,6 +37,10 @@ async function main() {
       console.warn(`skip ${capture.id}: no myLabel`);
       continue;
     }
+    if (seenIds.has(capture.id)) {
+      console.warn(`warn: duplicate captureId "${capture.id}"`);
+    }
+    seenIds.add(capture.id);
     const result = matchPatterns(captureToConversation(capture));
     const systemTemp = deriveTemperature(result.baselineScores.overall);
     rows.push({ captureId: capture.id, myTemp: capture.myLabel.temperature, systemTemp });
