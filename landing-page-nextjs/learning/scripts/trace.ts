@@ -2,7 +2,7 @@
  * Phase 1 해부용 CLI — 캡쳐 1개를 오프라인 룰 엔진에 흘려 trace markdown 생성.
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { matchPatterns } from "@/lib/ai/agent/tools/pattern-matcher";
 import { captureToConversation, type Capture } from "../lib/capture";
@@ -19,6 +19,12 @@ async function main() {
   const capturePath = path.resolve(process.cwd(), arg);
   const capture = JSON.parse(await readFile(capturePath, "utf8")) as Capture;
 
+  // Validate minimal capture shape
+  if (!capture.id || !Array.isArray(capture.messages)) {
+    console.error(`Invalid capture file: ${capturePath} — "id" and "messages" are required`);
+    process.exit(1);
+  }
+
   const conversation = captureToConversation(capture);
   const ruleSignals = matchPatterns(conversation);
 
@@ -32,6 +38,7 @@ async function main() {
   });
 
   const outPath = path.resolve(process.cwd(), "learning/traces", `${capture.id}.trace.md`);
+  await mkdir(path.dirname(outPath), { recursive: true });
   await writeFile(outPath, md, "utf8");
   console.log(`Wrote ${outPath}`);
   console.log(md);
