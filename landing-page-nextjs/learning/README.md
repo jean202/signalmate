@@ -5,7 +5,7 @@
 ## 캡쳐 등록 (서있는 원칙)
 1. 이미지 원본 저장 금지 — 텍스트로 옮겨 `captures/NNNN.json`.
 2. **마스킹 = 일반화.** 식별어는 본문에서 `[직장]`·`[지명]` 토큰으로, 사회적 범주는 `context` 블록에 넓게 기록. 범주를 좁혀 재식별 가능하게 만들지 말 것.
-3. `captures/`·`traces/`·`dataset.jsonl` 은 .gitignore. git에는 집계 노트만.
+3. `captures/`·`traces/`·`experiments/*.jsonl` 은 .gitignore. git에는 집계 노트(실험 카드)만. **주의:** `example-0000.json`만 예외로 추적되므로 실데이터 파일명에 `example-` 접두사를 쓰지 말 것.
 4. 포맷은 `captures/example-0000.json`(합성 예시) 참고.
 
 ## Phase 1 — 해부

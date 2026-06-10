@@ -6,9 +6,10 @@ data/*.json
 .vercel
 
 # 학습 트랙: 실데이터(마스킹했어도 제3자 데이터)는 커밋하지 않음
+# 주의: example-0000.json 단 한 파일만 추적(합성 데이터). 실데이터에 example- 접두사 금지.
 learning/captures/*
 !learning/captures/.gitkeep
-!learning/captures/example-*.json
+!learning/captures/example-0000.json
 learning/traces/*
 !learning/traces/.gitkeep
-learning/experiments/dataset.jsonl
+learning/experiments/*.jsonl
