@@ -4,3 +4,11 @@ data/*.json
 .env.local
 .env*.local
 .vercel
+
+# 학습 트랙: 실데이터(마스킹했어도 제3자 데이터)는 커밋하지 않음
+learning/captures/*
+!learning/captures/.gitkeep
+!learning/captures/example-*.json
+learning/traces/*
+!learning/traces/.gitkeep
+learning/experiments/dataset.jsonl
