@@ -40,4 +40,10 @@ describe("captureToConversation", () => {
     const convo = captureToConversation({ id: "x", relationshipStage: "unknown", messages: [] });
     expect(convo.situationContext).toBeNull();
   });
+
+  it("keeps the capture's own id and uses source as title", () => {
+    const convo = captureToConversation(baseCapture);
+    expect(convo.id).toBe("0001");
+    expect(convo.title).toBe("데이팅앱 A");
+  });
 });
