@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "learn:trace": "tsx learning/scripts/trace.ts",
-    "learn:eval": "tsx learning/scripts/eval.ts"
+    "learn:eval": "tsx learning/scripts/eval.ts",
+    "learn:mask": "tsx learning/scripts/mask.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
