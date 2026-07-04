@@ -38,7 +38,7 @@ npm run learn:mask -- --id 0004 --image /Users/jean325/portfolio/projects/signal
 npm run learn:mask -- --image-dir /Users/jean325/portfolio/projects/signalmate/captures/gangho --id-prefix gangho
 ```
 
-폴더 모드는 지원 이미지 파일을 파일명 순서로 읽고 `learning/captures/gangho-0001.json`, `gangho-0002.json`처럼 저장한다. 이미지 입력은 Claude Vision을 사용하므로 `ANTHROPIC_API_KEY`가 터미널 환경에 있어야 한다.
+폴더 모드는 지원 이미지 파일을 파일명 순서로 읽고 `learning/captures/gangho-0001.json`, `gangho-0002.json`처럼 저장한다. 공통 치환 규칙과 context는 처음 한 번만 입력하고 모든 이미지에 재사용한다. 이미지별로는 추출 텍스트와 저장될 JSON 미리보기를 확인한 뒤 `저장`을 입력한다. 이미지 입력은 Claude Vision을 사용하므로 `ANTHROPIC_API_KEY`가 터미널 환경에 있어야 한다.
 
 CLI 흐름:
 

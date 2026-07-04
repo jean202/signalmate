@@ -36,6 +36,15 @@ type PromptReader = {
   close(): void;
 };
 
+type MaskSessionDefaults = {
+  manualRules: ManualReplacementRule[];
+  invalidReplacementLines: string[];
+  context: Record<string, string>;
+  relationshipStage: string;
+  meetingChannel: string;
+  userGoal: string;
+};
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
@@ -68,6 +77,9 @@ async function main() {
       return;
     }
 
+    const sharedDefaults =
+      imageInputs.length > 1 ? await readSharedDefaults(rl) : undefined;
+
     for (const [index, imagePath] of imageInputs.entries()) {
       const captureId = buildCaptureId({
         id: imageInputs.length === 1 ? options.id : undefined,
@@ -85,6 +97,7 @@ async function main() {
         rawText,
         defaultSource: path.basename(imagePath),
         outputPath: resolveOutputPath(options, captureId),
+        sharedDefaults,
       });
     }
   } finally {
@@ -226,44 +239,38 @@ async function processCapture(params: {
   rawText: string;
   defaultSource: string;
   outputPath: string;
+  sharedDefaults?: MaskSessionDefaults;
 }) {
   if (!params.options.force && (await exists(params.outputPath))) {
     throw new Error(`${params.outputPath} already exists. 덮어쓰려면 --force를 사용하세요.`);
   }
 
-  const replacementLines = await readUntilBlank(
-    params.rl,
-    "추가 치환 규칙을 입력하세요. 예: 삼성전자=[직장]. 빈 줄이면 종료.",
-  );
-  const { rules, invalidLines } = parseManualReplacementRules(replacementLines);
-  const context = parseKeyValueLines(
-    await readUntilBlank(
-      params.rl,
-      "context를 key=value로 입력하세요. 예: job=대기업 / 사무직. 빈 줄이면 종료.",
-    ),
-  );
+  const defaults =
+    params.sharedDefaults ??
+    (await readCaptureDefaults(params.rl, {
+      relationshipStage: "unknown",
+      meetingChannel: "dating_app",
+      userGoal: "build_rapport",
+    }));
 
   const source = await questionWithDefault(params.rl, "source", params.defaultSource);
-  const relationshipStage = await questionWithDefault(params.rl, "relationshipStage", "unknown");
-  const meetingChannel = await questionWithDefault(params.rl, "meetingChannel", "dating_app");
-  const userGoal = await questionWithDefault(params.rl, "userGoal", "build_rapport");
 
   const result = buildMaskedCapture({
     id: params.captureId,
     rawText: params.rawText,
     source,
-    relationshipStage,
-    meetingChannel,
-    userGoal,
-    context,
-    manualRules: rules,
+    relationshipStage: defaults.relationshipStage,
+    meetingChannel: defaults.meetingChannel,
+    userGoal: defaults.userGoal,
+    context: defaults.context,
+    manualRules: defaults.manualRules,
   });
 
   if (result.capture.messages.length === 0) {
     throw new Error("파싱된 메시지가 없습니다. '나:' 또는 '상대:' 형식인지 확인하세요.");
   }
 
-  printWarnings(invalidLines, result.skippedLines, rules);
+  printWarnings(defaults.invalidReplacementLines, result.skippedLines, defaults.manualRules);
   const json = `${JSON.stringify(result.capture, null, 2)}\n`;
   console.log("\n--- 저장될 JSON 미리보기 ---");
   console.log(json);
@@ -277,6 +284,50 @@ async function processCapture(params: {
   await writeFile(params.outputPath, json, "utf8");
   console.log(`저장 완료: ${path.relative(process.cwd(), params.outputPath)}`);
   console.log("시스템 결과를 보기 전에 myLabel을 직접 채운 뒤 learn:eval에 넣으세요.");
+}
+
+async function readSharedDefaults(rl: PromptReader): Promise<MaskSessionDefaults> {
+  console.log("\n=== 폴더 공통 마스킹 설정 ===");
+  console.log("아래 치환 규칙과 context는 이번 폴더의 모든 이미지에 재사용됩니다.");
+  return readCaptureDefaults(rl, {
+    relationshipStage: "early_chat",
+    meetingChannel: "acquaintance_intro",
+    userGoal: "build_rapport",
+  });
+}
+
+async function readCaptureDefaults(
+  rl: PromptReader,
+  defaultValues: {
+    relationshipStage: string;
+    meetingChannel: string;
+    userGoal: string;
+  },
+): Promise<MaskSessionDefaults> {
+  const replacementLines = await readUntilBlank(
+    rl,
+    "추가 치환 규칙을 입력하세요. 예: 삼성전자=[직장]. 빈 줄이면 종료.",
+  );
+  const { rules, invalidLines } = parseManualReplacementRules(replacementLines);
+  const context = parseKeyValueLines(
+    await readUntilBlank(
+      rl,
+      "context를 key=value로 입력하세요. 예: job=대기업 / 사무직. 빈 줄이면 종료.",
+    ),
+  );
+
+  return {
+    manualRules: rules,
+    invalidReplacementLines: invalidLines,
+    context,
+    relationshipStage: await questionWithDefault(
+      rl,
+      "relationshipStage",
+      defaultValues.relationshipStage,
+    ),
+    meetingChannel: await questionWithDefault(rl, "meetingChannel", defaultValues.meetingChannel),
+    userGoal: await questionWithDefault(rl, "userGoal", defaultValues.userGoal),
+  };
 }
 
 async function readMultiline(
