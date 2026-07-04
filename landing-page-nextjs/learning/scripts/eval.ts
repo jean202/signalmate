@@ -6,7 +6,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { matchPatterns } from "@/lib/ai/agent/tools/pattern-matcher";
 import { captureToConversation, type Capture } from "../lib/capture";
-import { aggregateEval, deriveTemperature, type EvalRow } from "../lib/eval-core";
+import {
+  aggregateEval,
+  createEvalRow,
+  deriveTemperature,
+  type EvalRow,
+  type TemperatureDistance,
+} from "../lib/eval-core";
 
 async function main() {
   const arg = process.argv[2] ?? "learning/experiments/dataset.jsonl";
@@ -43,25 +49,42 @@ async function main() {
     seenIds.add(capture.id);
     const result = matchPatterns(captureToConversation(capture));
     const systemTemp = deriveTemperature(result.baselineScores.overall);
-    rows.push({ captureId: capture.id, myTemp: capture.myLabel.temperature, systemTemp });
+    rows.push(
+      createEvalRow({
+        captureId: capture.id,
+        myTemp: capture.myLabel.temperature,
+        systemTemp,
+      }),
+    );
   }
 
-  console.log("captureId | 내 라벨 | 시스템 | 일치");
-  console.log("----------|---------|--------|-----");
+  console.log("captureId | 내 라벨 | 시스템 | 거리 | 일치");
+  console.log("----------|---------|--------|------|-----");
   for (const row of rows) {
-    const match = row.myTemp === row.systemTemp ? "O" : "X";
-    console.log(`${row.captureId} | ${row.myTemp} | ${row.systemTemp} | ${match}`);
+    const match = row.tempDistance === 0 ? "O" : "X";
+    console.log(
+      `${row.captureId} | ${row.myTemp} | ${row.systemTemp} | ${formatDistance(row.tempDistance)} | ${match}`,
+    );
   }
 
   const summary = aggregateEval(rows);
   console.log("");
   console.log(`일치율: ${summary.agreements}/${summary.total} = ${(summary.agreementRate * 100).toFixed(1)}%`);
+  console.log(
+    `거리 요약: 한 단계 차이 ${summary.oneStepDisagreements}건, 두 단계 이상 차이 ${summary.majorDisagreements}건`,
+  );
   if (summary.disagreements.length > 0) {
     console.log("불일치(→ Phase 3 개선 후보):");
     for (const d of summary.disagreements) {
-      console.log(`  - ${d.captureId}: 나=${d.myTemp} / 시스템=${d.systemTemp}`);
+      console.log(
+        `  - ${d.captureId}: 나=${d.myTemp} / 시스템=${d.systemTemp} / 거리=${formatDistance(d.tempDistance)}`,
+      );
     }
   }
+}
+
+function formatDistance(distance: TemperatureDistance): string {
+  return distance === 0 ? "0" : `${distance}단계`;
 }
 
 main().catch((error) => {
