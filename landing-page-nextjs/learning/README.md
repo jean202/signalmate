@@ -4,7 +4,7 @@
 
 ## 캡쳐 등록 (서있는 원칙)
 
-1. 이미지 원본 저장 금지 — 기존 캡쳐 추출 API/UI로 텍스트만 얻고, 원본 이미지는 repo·DB·로그·학습 폴더에 남기지 않는다.
+1. 이미지 원본 저장 금지 — `learn:mask -- --image` 또는 `--image-dir`로 이미지를 읽을 수는 있지만, 원본 이미지는 repo·DB·로그·학습 폴더에 복사하거나 저장하지 않는다.
 2. **마스킹 = 일반화.** 식별어는 본문에서 `[직장]`·`[지명]` 토큰으로, 사회적 범주는 `context` 블록에 넓게 기록. 범주를 좁혀 재식별 가능하게 만들지 말 것.
 3. `captures/`·`traces/`·`experiments/*.jsonl` 은 .gitignore. git에는 집계 노트(실험 카드)만. **주의:** `example-0000.json`만 예외로 추적되므로 실데이터 파일명에 `example-` 접두사를 쓰지 말 것.
 4. 포맷은 `captures/example-0000.json`(합성 예시) 참고.
@@ -26,9 +26,23 @@
 npm run learn:mask -- --id 0004
 ```
 
+이미지 파일을 바로 넣을 때:
+
+```bash
+npm run learn:mask -- --id 0004 --image /Users/jean325/portfolio/projects/signalmate/captures/gangho/IMG_3244.PNG
+```
+
+이미지 폴더를 순서대로 처리할 때:
+
+```bash
+npm run learn:mask -- --image-dir /Users/jean325/portfolio/projects/signalmate/captures/gangho --id-prefix gangho
+```
+
+폴더 모드는 지원 이미지 파일을 파일명 순서로 읽고 `learning/captures/gangho-0001.json`, `gangho-0002.json`처럼 저장한다. 이미지 입력은 Claude Vision을 사용하므로 `ANTHROPIC_API_KEY`가 터미널 환경에 있어야 한다.
+
 CLI 흐름:
 
-1. 기존 캡쳐 추출 API/UI에서 얻은 텍스트를 붙여넣고 마지막 줄에 `__END__`를 입력한다.
+1. 텍스트 모드에서는 추출 텍스트를 붙여넣고 마지막 줄에 `__END__`를 입력한다. 이미지 모드에서는 Vision이 추출한 텍스트를 먼저 보여준다.
 2. 추가 치환 규칙을 `원문=[토큰]` 형식으로 입력한다. 예: `삼성전자=[직장]`, `강남=[지명]`.
 3. context를 `key=value` 형식으로 입력한다. 예: `job=대기업 / 사무직`.
 4. 저장될 JSON 미리보기를 직접 검수한다.
