@@ -29,3 +29,6 @@ npm-debug.log*
 
 # 실데이터 캡쳐 이미지 원본 (제3자 데이터 — 절대 커밋 금지)
 captures/
+
+# Local git worktrees
+.worktrees/
