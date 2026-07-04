@@ -33,6 +33,10 @@ function estimateCostUsd(modelName: string, inputTokens: number, outputTokens: n
 }
 
 export async function trackUsage(entry: UsageEntry): Promise<void> {
+  if (process.env.SIGNALMATE_DISABLE_AI_USAGE_LOG === "1") {
+    return;
+  }
+
   const cacheReadInputTokens = entry.cacheReadInputTokens ?? 0;
   const cacheCreationInputTokens = entry.cacheCreationInputTokens ?? 0;
   const totalTokens =

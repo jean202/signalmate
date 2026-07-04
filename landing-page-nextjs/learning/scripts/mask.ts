@@ -57,6 +57,9 @@ async function main() {
   if (imageInputs.length > 0 && !isAnthropicAvailable()) {
     throw new Error("이미지 입력에는 ANTHROPIC_API_KEY가 필요합니다.");
   }
+  if (imageInputs.length > 0) {
+    process.env.SIGNALMATE_DISABLE_AI_USAGE_LOG = "1";
+  }
 
   const rl = await createPromptReader();
   try {
@@ -86,6 +89,13 @@ async function main() {
         idPrefix: options.idPrefix,
         index,
       });
+      const outputPath = resolveOutputPath(options, captureId);
+      if (imageInputs.length > 1 && !options.force && (await exists(outputPath))) {
+        console.log(`\n=== 이미지 ${index + 1}/${imageInputs.length}: ${imagePath} ===`);
+        console.log(`이미 저장됨: ${path.relative(process.cwd(), outputPath)} — 건너뜁니다.`);
+        continue;
+      }
+
       console.log(`\n=== 이미지 ${index + 1}/${imageInputs.length}: ${imagePath} ===`);
       const rawText = await extractTextFromImageFile(imagePath);
       console.log("\n--- 이미지에서 추출한 텍스트 ---");
@@ -96,7 +106,7 @@ async function main() {
         captureId,
         rawText,
         defaultSource: path.basename(imagePath),
-        outputPath: resolveOutputPath(options, captureId),
+        outputPath,
         sharedDefaults,
       });
     }
@@ -253,12 +263,10 @@ async function processCapture(params: {
       userGoal: "build_rapport",
     }));
 
-  const source = await questionWithDefault(params.rl, "source", params.defaultSource);
-
   const result = buildMaskedCapture({
     id: params.captureId,
     rawText: params.rawText,
-    source,
+    source: params.defaultSource,
     relationshipStage: defaults.relationshipStage,
     meetingChannel: defaults.meetingChannel,
     userGoal: defaults.userGoal,
@@ -267,8 +275,14 @@ async function processCapture(params: {
   });
 
   if (result.capture.messages.length === 0) {
+    if (params.options.imageDir) {
+      console.warn("파싱된 메시지가 없어 이 이미지는 건너뜁니다. 지도 공유/카드만 있는 캡쳐일 수 있습니다.");
+      return;
+    }
     throw new Error("파싱된 메시지가 없습니다. '나:' 또는 '상대:' 형식인지 확인하세요.");
   }
+
+  result.capture.source = await questionWithDefault(params.rl, "source", params.defaultSource);
 
   printWarnings(defaults.invalidReplacementLines, result.skippedLines, defaults.manualRules);
   const json = `${JSON.stringify(result.capture, null, 2)}\n`;
