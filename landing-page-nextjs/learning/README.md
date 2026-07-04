@@ -13,8 +13,8 @@
 
 1. 앱에서 실제 캡쳐를 읽어 추출 텍스트를 얻는다. 원본 이미지는 저장하지 않는다.
 2. `npm run learn:mask -- --id NNNN`으로 추출 텍스트를 붙여넣고, 식별정보를 넓은 범주로 마스킹해 `captures/NNNN.json`을 만든다.
-3. 시스템 결과를 보기 전에 `myLabel.temperature`, `myLabel.topSignal`, `myLabel.nextMove`를 먼저 적는다.
-4. 라벨을 단 캡쳐를 한 줄 JSON으로 `experiments/dataset.jsonl`에 추가한다.
+3. 시스템 결과를 보기 전에 `npm run learn:label -- --prefix NNNN_PREFIX`로 `myLabel.temperature`, `myLabel.topSignal`, `myLabel.nextMove`를 먼저 적는다.
+4. `learn:label`이 라벨 단 캡쳐를 `experiments/dataset.jsonl`에 자동으로 모은다.
 5. `npm run learn:eval`을 실행해 내 라벨과 시스템 temperature를 비교한다.
 6. `거리`가 `1단계`인 케이스와 `2단계` 이상인 케이스를 나눠 본다. 먼저 `2단계` 이상 불일치부터 개선 후보로 삼는다.
 7. 반복되는 불일치 패턴 하나를 골라 실험 카드에 기록한다.
@@ -56,6 +56,20 @@ CLI 흐름:
 - SNS 핸들 → `[SNS]`
 
 자동 치환은 보조 장치다. 저장 전 미리보기에서 이름, 상세 지명, 회사/학교, 고유 사건이 남아 있지 않은지 직접 확인한다.
+
+## 라벨링 CLI
+
+```bash
+npm run learn:label -- --prefix gangho
+```
+
+CLI가 `learning/captures/gangho-*.json`을 파일명 순서로 보여준다. 시스템 결과를 보기 전에 직접 아래 세 가지를 입력한다.
+
+- `temperature`: `cold`, `neutral`, `warm`, `hot` 중 하나
+- `topSignal`: 내가 본 가장 강한 관계 신호
+- `nextMove`: 다음 액션/메시지 방향
+
+저장 후 `learning/experiments/dataset.jsonl`을 자동 갱신한다. 이미 `myLabel`이 있는 캡쳐는 기본적으로 건너뛰고, 다시 라벨링하려면 `--all`을 붙인다.
 
 ## Phase 1 — 해부
 
