@@ -13,6 +13,15 @@ export type AnalysisInputMessage = {
   sequenceNo: number;
 };
 
+export type AnalysisInputState = {
+  messages: AnalysisInputMessage[];
+  guidedAnswers: GuidedAnswers;
+  recognizedMessageCount: number;
+  hasMeaningfulSituationText: boolean;
+  isSituationOnlyInput: boolean;
+  canProceed: boolean;
+};
+
 type BuildAnalysisRequestInputParams = {
   rawText: string;
   inputFocus: SituationInputFocus;
@@ -200,6 +209,32 @@ export function buildAnalysisRequestInput({
       ...guidedAnswers,
       freeText: mergeSituationFreeText(guidedAnswers.freeText, fallbackSituationText),
     },
+  };
+}
+
+export function deriveAnalysisInputState({
+  rawText,
+  inputFocus,
+  guidedAnswers,
+  selfName = "나",
+}: BuildAnalysisRequestInputParams): AnalysisInputState {
+  const analysisInput = buildAnalysisRequestInput({
+    rawText,
+    inputFocus,
+    guidedAnswers,
+    selfName,
+  });
+  const recognizedMessageCount = analysisInput.messages.length;
+  const hasMeaningfulSituationText =
+    (analysisInput.guidedAnswers.freeText?.trim().length ?? 0) >= 20;
+
+  return {
+    ...analysisInput,
+    recognizedMessageCount,
+    hasMeaningfulSituationText,
+    isSituationOnlyInput: rawText.trim().length > 0 && recognizedMessageCount === 0,
+    canProceed:
+      recognizedMessageCount >= 2 || (inputFocus !== "chat" && hasMeaningfulSituationText),
   };
 }
 

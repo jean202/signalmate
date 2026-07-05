@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAnalysisRequestInput,
   buildCreateConversationRequestBody,
+  deriveAnalysisInputState,
   parseConversationMessages,
   resolveMessagesForAnalysisInput,
   shouldSendParsedMessages,
@@ -271,6 +272,42 @@ describe("analysis input message contract", () => {
     expect("situationContext" in result).toBe(false);
   });
 
+  it("routes compound label-style situation notes to freeText in mixed input", () => {
+    const rawText = [
+      "진하: 오늘 즐거웠어요.",
+      "수연: 저도요.",
+      "추가 메모: 소개팅 분위기는 좋았는데 집에 가서는 답장이 느려졌어요.",
+      "만남 후기: 웃는 분위기는 좋았지만 애프터 이야기는 없었어요.",
+    ].join("\n");
+
+    const result = buildMixedRequest(rawText);
+
+    expect(result.messages).toEqual([
+      {
+        senderRole: "self",
+        messageText: "오늘 즐거웠어요.",
+        sentAt: null,
+        sequenceNo: 1,
+      },
+      {
+        senderRole: "other",
+        messageText: "저도요.",
+        sentAt: null,
+        sequenceNo: 2,
+      },
+    ]);
+    expect(result.guidedAnswers.freeText).toBe(
+      [
+        "추가 메모: 소개팅 분위기는 좋았는데 집에 가서는 답장이 느려졌어요.",
+        "만남 후기: 웃는 분위기는 좋았지만 애프터 이야기는 없었어요.",
+      ].join("\n"),
+    );
+    expect(result.messages[1]?.messageText).toBe("저도요.");
+    expect(result.messages.some((message) => message.messageText.includes("추가 메모:"))).toBe(false);
+    expect(result.messages.some((message) => message.messageText.includes("만남 후기:"))).toBe(false);
+    expect("situationContext" in result).toBe(false);
+  });
+
   it("keeps situation-only meeting notes as free-text evidence without messages", () => {
     const result = buildAnalysisRequestInput({
       rawText: "소개팅 분위기는 좋았는데 헤어진 뒤로 연락이 조금 뜸해졌어요.",
@@ -361,5 +398,25 @@ describe("analysis input message contract", () => {
     );
     expect(result.guidedAnswers.freeText).toBeUndefined();
     expect("situationContext" in result).toBe(false);
+  });
+
+  it("derives proceed state from the same mixed analysis input helper", () => {
+    const rawText = "좋았어요.\n어떡하죠?";
+
+    expect(parseConversationMessages(rawText)).toHaveLength(2);
+
+    const result = deriveAnalysisInputState({
+      rawText,
+      inputFocus: "mixed",
+      guidedAnswers: {
+        inputFocus: "mixed",
+      },
+    });
+
+    expect(result.messages).toEqual([]);
+    expect(result.guidedAnswers.freeText).toBe(rawText);
+    expect(result.recognizedMessageCount).toBe(0);
+    expect(result.isSituationOnlyInput).toBe(true);
+    expect(result.canProceed).toBe(false);
   });
 });

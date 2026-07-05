@@ -11,8 +11,7 @@ import {
 } from "react";
 import {
   buildCreateConversationRequestBody,
-  parseConversationMessages,
-  shouldSendParsedMessages,
+  deriveAnalysisInputState,
 } from "@/lib/analysis-input";
 import { groupSignalsByContext } from "@/lib/signal-groups";
 import {
@@ -528,11 +527,6 @@ export function AnalysisExperience() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
 
-  const parsedMessages = parseConversationMessages(rawText);
-  const hasMeaningfulSituationText =
-    rawText.trim().length >= 20 || situationFreeText.trim().length >= 20;
-  const canProceedFromInput =
-    parsedMessages.length >= 2 || (inputFocus !== "chat" && hasMeaningfulSituationText);
   const guidedAnswers: GuidedAnswers = {
     inputFocus,
     meetingVibe,
@@ -541,8 +535,15 @@ export function AnalysisExperience() {
     desiredHelp,
     freeText: situationFreeText,
   };
-  const shouldUseParsedMessages = shouldSendParsedMessages(parsedMessages, inputFocus);
-  const isSituationOnlyInput = rawText.trim().length > 0 && !shouldUseParsedMessages;
+  const analysisInputState = deriveAnalysisInputState({
+    rawText,
+    inputFocus,
+    guidedAnswers,
+    selfName: "나",
+  });
+  const recognizedMessages = analysisInputState.messages;
+  const canProceedFromInput = analysisInputState.canProceed;
+  const isSituationOnlyInput = analysisInputState.isSituationOnlyInput;
   const groupedSignals = streamingState ? groupSignalsByContext(streamingState.signals) : null;
   const isImageUploading = imageUpload.kind === "uploading";
   const excerptLines = rawText
@@ -1219,7 +1220,7 @@ export function AnalysisExperience() {
                   <span>
                     {isSituationOnlyInput
                       ? "상황 메모로 인식됨"
-                      : `메시지 ${parsedMessages.length}개 인식됨`}
+                      : `메시지 ${analysisInputState.recognizedMessageCount}개 인식됨`}
                   </span>
                 </div>
                 <p className={styles.hint}>
@@ -1233,7 +1234,7 @@ export function AnalysisExperience() {
                 <h3>이렇게 인식되고 있어요</h3>
                 {!isSituationOnlyInput ? (
                   <ul className={styles.previewList}>
-                    {parsedMessages.slice(0, 4).map((message) => (
+                    {recognizedMessages.slice(0, 4).map((message) => (
                       <li key={message.sequenceNo}>
                         <span className={styles.previewRole}>
                           {message.senderRole === "self"
@@ -1245,14 +1246,15 @@ export function AnalysisExperience() {
                         <p>{message.messageText}</p>
                       </li>
                     ))}
-                    {parsedMessages.length === 0 ? (
+                    {recognizedMessages.length === 0 ? (
                       <li className={styles.previewEmpty}>
                         아직 입력된 게 없어요. 채팅이나 만남 후기를 적어주세요.
                       </li>
                     ) : null}
                   </ul>
                 ) : null}
-                {isSituationOnlyInput || (parsedMessages.length === 0 && rawText.trim().length > 0) ? (
+                {isSituationOnlyInput ||
+                (recognizedMessages.length === 0 && rawText.trim().length > 0) ? (
                   <div className={styles.situationPreview}>
                     <strong>상황 메모로 분석할게요</strong>
                     <p>{rawText.trim().slice(0, 180)}</p>

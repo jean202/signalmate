@@ -53,13 +53,33 @@ const GENERIC_TIME_NAME =
 // "김진하: 메시지" or "Name: message"
 const SIMPLE_NAME_MSG = /^(.+?)[:：]\s+(.+)$/;
 const SITUATION_NOTE_LABELS = ["상황", "메모", "후기", "느낌", "추가"] as const;
+const MAX_COMPOUND_SITUATION_NOTE_LABEL_LENGTH = 12;
 
 function isSimpleNameCandidate(candidateName: string): boolean {
   return candidateName.length <= 20 && !candidateName.includes("http") && !candidateName.includes("/");
 }
 
 export function isSituationNoteLabel(rawLabel: string): boolean {
-  return SITUATION_NOTE_LABELS.includes(rawLabel.trim() as (typeof SITUATION_NOTE_LABELS)[number]);
+  const normalizedLabel = rawLabel.trim().replace(/\s+/g, " ");
+
+  if (
+    SITUATION_NOTE_LABELS.includes(
+      normalizedLabel as (typeof SITUATION_NOTE_LABELS)[number],
+    )
+  ) {
+    return true;
+  }
+
+  const compactLabel = normalizedLabel.replace(/\s+/g, "");
+
+  if (
+    compactLabel.length === 0 ||
+    compactLabel.length > MAX_COMPOUND_SITUATION_NOTE_LABEL_LENGTH
+  ) {
+    return false;
+  }
+
+  return SITUATION_NOTE_LABELS.some((token) => compactLabel.includes(token));
 }
 
 export function classifyChatTranscriptLine(rawLine: string): ChatTranscriptLineKind {
