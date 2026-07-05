@@ -4,25 +4,7 @@
  * 결과는 situationContext 컬럼에 저장됩니다 (DB 스키마 변경 없음).
  */
 
-// ─── 타입 ─────────────────────────────────────────────
-
-export type GuidedAnswers = {
-  /** 오프라인 만남 횟수 */
-  meetingCount?: "none" | "once" | "2_3_times" | "4_plus";
-  /** 만났을 때 분위기 (meetingCount가 none이 아닌 경우) */
-  meetingVibe?: "awkward" | "normal" | "good" | "great";
-  /** 상대 커뮤니케이션 스타일 (복수 선택) */
-  otherStyle?: (
-    | "fast_reply"
-    | "slow_reply"
-    | "short_messages"
-    | "long_messages"
-    | "uses_emoji"
-    | "unknown"
-  )[];
-  /** 자유 입력 (최대 500자) */
-  freeText?: string;
-};
+import type { GuidedAnswers } from "@/lib/situation-input";
 
 // ─── 레이블 매핑 ──────────────────────────────────────
 
@@ -49,6 +31,36 @@ const OTHER_STYLE_LABELS: Record<string, string> = {
   unknown: "메시지 스타일을 잘 모르겠음",
 };
 
+const INPUT_FOCUS_LABELS: Record<string, string> = {
+  chat: "입력은 채팅 대화 중심입니다",
+  meeting_note: "입력은 실제 만남 후기 중심입니다",
+  mixed: "입력은 채팅과 실제 만남 후기가 섞여 있습니다",
+  follow_up: "입력은 만남 뒤 연락 흐름 중심입니다",
+};
+
+const OTHER_INITIATIVE_LABELS: Record<string, string> = {
+  low: "상대 적극성은 낮아 보였습니다",
+  medium: "상대 적극성은 보통으로 보였습니다",
+  high: "상대 적극성은 높아 보였습니다",
+  unknown: "상대 적극성은 아직 판단하기 어렵습니다",
+};
+
+const AFTER_MEETING_CONTACT_LABELS: Record<string, string> = {
+  none: "만남 뒤 아직 연락이 없습니다",
+  self_first: "만남 뒤에는 내가 먼저 연락했습니다",
+  other_first: "만남 뒤에는 상대가 먼저 연락했습니다",
+  slower: "만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다",
+  ongoing: "만남 뒤 연락이 이어지고 있습니다",
+  not_applicable: "만남 뒤 연락 흐름은 아직 해당 없습니다",
+};
+
+const DESIRED_HELP_LABELS: Record<string, string> = {
+  next_message: "사용자는 다음 메시지를 어떻게 보낼지 알고 싶어합니다",
+  ask_for_date: "사용자는 애프터나 다음 만남을 제안해도 되는지 알고 싶어합니다",
+  wait_or_send: "사용자는 연락을 더 할지 기다릴지 판단하고 싶어합니다",
+  decide_to_stop: "사용자는 관계를 정리할지 판단하고 싶어합니다",
+};
+
 // ─── 조합 함수 ────────────────────────────────────────
 
 /**
@@ -58,6 +70,10 @@ const OTHER_STYLE_LABELS: Record<string, string> = {
  */
 export function buildGuidedSituationContext(answers: GuidedAnswers): string | null {
   const sentences: string[] = [];
+
+  if (answers.inputFocus && INPUT_FOCUS_LABELS[answers.inputFocus]) {
+    sentences.push(INPUT_FOCUS_LABELS[answers.inputFocus]);
+  }
 
   // Q1: 오프라인 만남 횟수
   if (answers.meetingCount && MEETING_COUNT_LABELS[answers.meetingCount]) {
@@ -72,6 +88,18 @@ export function buildGuidedSituationContext(answers: GuidedAnswers): string | nu
     MEETING_VIBE_LABELS[answers.meetingVibe]
   ) {
     sentences.push(MEETING_VIBE_LABELS[answers.meetingVibe]);
+  }
+
+  if (answers.otherInitiative && OTHER_INITIATIVE_LABELS[answers.otherInitiative]) {
+    sentences.push(OTHER_INITIATIVE_LABELS[answers.otherInitiative]);
+  }
+
+  if (answers.afterMeetingContact && AFTER_MEETING_CONTACT_LABELS[answers.afterMeetingContact]) {
+    sentences.push(AFTER_MEETING_CONTACT_LABELS[answers.afterMeetingContact]);
+  }
+
+  if (answers.desiredHelp && DESIRED_HELP_LABELS[answers.desiredHelp]) {
+    sentences.push(DESIRED_HELP_LABELS[answers.desiredHelp]);
   }
 
   // Q3: 상대 커뮤니케이션 스타일
@@ -92,7 +120,7 @@ export function buildGuidedSituationContext(answers: GuidedAnswers): string | nu
 
   if (sentences.length === 0) return null;
 
-  return sentences.join(". ").replace(/\.\./g, ".") + ".";
+  return sentences.map((sentence) => sentence.replace(/\.+$/g, "")).join(". ") + ".";
 }
 
 /**
@@ -116,3 +144,5 @@ export function mergeSituationContext(
 
   return (guidedText || trimmedFree)?.slice(0, 2000) ?? null;
 }
+
+export type { GuidedAnswers } from "@/lib/situation-input";

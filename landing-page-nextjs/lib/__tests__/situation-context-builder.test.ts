@@ -1,0 +1,65 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildGuidedSituationContext,
+  mergeSituationContext,
+} from "../situation-context-builder";
+import { hasEnoughSituationInput, isSituationFirstFocus } from "../situation-input";
+
+describe("buildGuidedSituationContext", () => {
+  it("builds Korean context for meeting-note focused input", () => {
+    expect(
+      buildGuidedSituationContext({
+        inputFocus: "meeting_note",
+        meetingCount: "once",
+        meetingVibe: "good",
+        otherInitiative: "low",
+        afterMeetingContact: "self_first",
+        desiredHelp: "wait_or_send",
+        freeText: "상대가 웃으면서 듣긴 했지만 다음 약속 이야기는 없었습니다.",
+      }),
+    ).toBe(
+      "입력은 실제 만남 후기 중심입니다. 직접 1번 만났습니다. 만났을 때 분위기는 좋았습니다. 상대 적극성은 낮아 보였습니다. 만남 뒤에는 내가 먼저 연락했습니다. 사용자는 연락을 더 할지 기다릴지 판단하고 싶어합니다. 상대가 웃으면서 듣긴 했지만 다음 약속 이야기는 없었습니다.",
+    );
+  });
+
+  it("merges guided answers and free situation context without exceeding 2000 chars", () => {
+    const result = mergeSituationContext("추가로 상대 답장이 짧아졌습니다.", {
+      inputFocus: "follow_up",
+      afterMeetingContact: "slower",
+      desiredHelp: "next_message",
+    });
+
+    expect(result).toBe(
+      "입력은 만남 뒤 연락 흐름 중심입니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다. 사용자는 다음 메시지를 어떻게 보낼지 알고 싶어합니다. 추가로 상대 답장이 짧아졌습니다.",
+    );
+    expect(result?.length).toBeLessThanOrEqual(2000);
+  });
+});
+
+describe("situation input helpers", () => {
+  it("treats non-chat focus as situation-first", () => {
+    expect(isSituationFirstFocus("chat")).toBe(false);
+    expect(isSituationFirstFocus("meeting_note")).toBe(true);
+    expect(isSituationFirstFocus("mixed")).toBe(true);
+    expect(isSituationFirstFocus("follow_up")).toBe(true);
+    expect(isSituationFirstFocus(undefined)).toBe(false);
+  });
+
+  it("allows analysis when situation text is meaningful even without parsed messages", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText: "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다.",
+        guidedAnswers: { inputFocus: "meeting_note" },
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects very short non-chat input", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText: "만났어",
+        guidedAnswers: { inputFocus: "meeting_note" },
+      }),
+    ).toBe(false);
+  });
+});
