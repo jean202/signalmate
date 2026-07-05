@@ -108,7 +108,7 @@ export function buildGuidedSituationContext(answers: GuidedAnswers): string | nu
   }
 
   // Q4: 자유 입력
-  const freeText = answers.freeText?.trim().slice(0, 500);
+  const freeText = answers.freeText?.trim();
   if (freeText) {
     sentences.push(freeText);
   }

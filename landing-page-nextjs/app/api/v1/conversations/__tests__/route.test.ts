@@ -247,6 +247,26 @@ describe("POST /api/v1/conversations", () => {
     expect(createConversationMock).not.toHaveBeenCalled();
   });
 
+  it("rejects overlong guided freeText instead of truncating it before validation", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        guidedAnswers: {
+          inputFocus: "follow_up",
+          afterMeetingContact: "slower",
+          freeText: "가".repeat(2100),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
   it("keeps rejecting completely empty input", async () => {
     const { POST } = await import("../route");
     const response = await POST(

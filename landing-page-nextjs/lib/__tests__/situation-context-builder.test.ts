@@ -60,6 +60,20 @@ describe("buildGuidedSituationContext", () => {
     );
     expect(result?.length).toBeGreaterThan(2000);
   });
+
+  it("preserves long guided freeText for downstream route validation", () => {
+    const freeText = "가".repeat(2100);
+
+    expect(
+      buildGuidedSituationContext({
+        inputFocus: "follow_up",
+        afterMeetingContact: "slower",
+        freeText,
+      }),
+    ).toBe(
+      `입력은 만남 뒤 연락 흐름 중심입니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다. ${freeText}.`,
+    );
+  });
 });
 
 describe("situation input helpers", () => {
