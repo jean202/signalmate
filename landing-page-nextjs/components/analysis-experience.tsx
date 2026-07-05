@@ -9,8 +9,11 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import { parseChatText } from "@/lib/chat-parser";
-import { resolveMessagesForAnalysisInput, shouldSendParsedMessages } from "@/lib/analysis-input";
+import {
+  buildAnalysisRequestInput,
+  parseConversationMessages,
+  shouldSendParsedMessages,
+} from "@/lib/analysis-input";
 import { groupSignalsByContext } from "@/lib/signal-groups";
 import {
   MAX_IMAGE_UPLOAD_FILES,
@@ -325,9 +328,6 @@ const uploadStatusLabels: Record<ImageUploadItemStatus, string> = {
   error: "실패",
 };
 
-const selfSpeakerTokens = ["나", "저", "me", "self", "mine"];
-const otherSpeakerTokens = ["상대", "상대방", "그분", "you", "other"];
-
 const confidenceLabels: Record<ConfidenceLevel, string> = {
   low: "Low confidence",
   medium: "Medium confidence",
@@ -351,15 +351,17 @@ const signalLabels: Record<SignalType, string> = {
 function SignalSection({
   title,
   signals,
+  emptyMessage = "해당 신호는 아직 없습니다.",
 }: {
   title: string;
   signals: SignalRecord[];
+  emptyMessage?: string;
 }) {
   return (
     <section className={styles.signalSection}>
       <h4>{title}</h4>
       {signals.length === 0 ? (
-        <p className={styles.signalSectionEmpty}>해당 신호는 아직 없습니다.</p>
+        <p className={styles.signalSectionEmpty}>{emptyMessage}</p>
       ) : (
         <div className={styles.signalList}>
           {signals.map((signal, index) => (
@@ -428,51 +430,6 @@ async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   }
 
   return payload.data;
-}
-
-function inferSenderRole(token: string | undefined): SenderRole {
-  if (!token) {
-    return "unknown";
-  }
-
-  const normalized = token.trim().toLowerCase();
-
-  if (selfSpeakerTokens.includes(normalized)) {
-    return "self";
-  }
-
-  if (otherSpeakerTokens.includes(normalized)) {
-    return "other";
-  }
-
-  return "unknown";
-}
-
-function parseConversationMessages(rawText: string): ConversationMessageInput[] {
-  const result = parseChatText(rawText, "나");
-  if (result.messages.length > 0) {
-    return result.messages;
-  }
-
-  // Fallback: simple line-by-line parsing for minimal input
-  return rawText
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const timestampMatch = line.match(/^\[(.*?)\]\s*(.*)$/);
-      const body = timestampMatch ? timestampMatch[2].trim() : line;
-      const speakerMatch = body.match(/^(나|저|me|self|mine|상대|상대방|그분|you|other)\s*[:：]\s*(.+)$/i);
-      const messageText = (speakerMatch?.[2] ?? body).trim();
-
-      return {
-        senderRole: inferSenderRole(speakerMatch?.[1]),
-        messageText,
-        sentAt: null,
-        sequenceNo: index + 1,
-      };
-    })
-    .filter((message) => message.messageText.length > 0);
 }
 
 function createUploadItem(file: File, index: number): ImageUploadItem {
@@ -836,8 +793,12 @@ export function AnalysisExperience() {
   }
 
   async function handleRunAnalysis() {
-    const parsedInputMessages = parseConversationMessages(rawText);
-    const messages = resolveMessagesForAnalysisInput(parsedInputMessages, inputFocus);
+    const analysisInput = buildAnalysisRequestInput({
+      rawText,
+      inputFocus,
+      guidedAnswers,
+    });
+    const messages = analysisInput.messages;
 
     if (messages.length < 2 && !canProceedFromInput) {
       setStep("input");
@@ -878,7 +839,7 @@ export function AnalysisExperience() {
             userGoal,
             saveMode,
             rawText,
-            guidedAnswers,
+            guidedAnswers: analysisInput.guidedAnswers,
             selfName: "나",
             messages,
           }),
@@ -1554,7 +1515,15 @@ export function AnalysisExperience() {
                           : ""
                       }`}
                     >
-                      <SignalSection title="채팅 신호" signals={groupedSignals?.chat ?? []} />
+                      <SignalSection
+                        title="채팅 신호"
+                        signals={groupedSignals?.chat ?? []}
+                        emptyMessage={
+                          streamingState.messageCount === 0
+                            ? "채팅 입력 없음"
+                            : "해당 신호는 아직 없습니다."
+                        }
+                      />
                       <SignalSection title="실제 만남 신호" signals={groupedSignals?.meeting ?? []} />
                       <SignalSection
                         title="만남 뒤 연락 신호"

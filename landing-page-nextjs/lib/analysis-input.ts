@@ -1,4 +1,5 @@
-import type { SituationInputFocus } from "@/lib/situation-input";
+import { parseChatText } from "@/lib/chat-parser";
+import type { GuidedAnswers, SituationInputFocus } from "@/lib/situation-input";
 
 export type AnalysisInputMessage = {
   senderRole: "self" | "other" | "unknown";
@@ -7,10 +8,112 @@ export type AnalysisInputMessage = {
   sequenceNo: number;
 };
 
+type BuildAnalysisRequestInputParams = {
+  rawText: string;
+  inputFocus: SituationInputFocus;
+  guidedAnswers: GuidedAnswers;
+  selfName?: string;
+};
+
+const SELF_SPEAKER_PATTERN = "나|저|me|self|mine";
+const OTHER_SPEAKER_PATTERN = "상대|상대방|그분|you|other";
+const EXPLICIT_SPEAKER_LINE = new RegExp(
+  `^(?:(?:\\[[^\\]]+\\]|\\d{1,2}:\\d{2}(?::\\d{2})?)\\s*)*(?:${SELF_SPEAKER_PATTERN}|${OTHER_SPEAKER_PATTERN})\\s*[:：]\\s*\\S`,
+  "i",
+);
+
 export function hasRecognizableSpeakers(messages: AnalysisInputMessage[]): boolean {
   return messages.some(
     (message) => message.senderRole === "self" || message.senderRole === "other",
   );
+}
+
+function inferSenderRole(token: string | undefined): AnalysisInputMessage["senderRole"] {
+  if (!token) {
+    return "unknown";
+  }
+
+  const normalized = token.trim().toLowerCase();
+
+  if (["나", "저", "me", "self", "mine"].includes(normalized)) {
+    return "self";
+  }
+
+  if (["상대", "상대방", "그분", "you", "other"].includes(normalized)) {
+    return "other";
+  }
+
+  return "unknown";
+}
+
+function fallbackParseConversationMessages(rawText: string): AnalysisInputMessage[] {
+  return rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const timestampMatch = line.match(/^\[(.*?)\]\s*(.*)$/);
+      const body = timestampMatch ? timestampMatch[2].trim() : line;
+      const speakerMatch = body.match(
+        /^(나|저|me|self|mine|상대|상대방|그분|you|other)\s*[:：]\s*(.+)$/i,
+      );
+      const messageText = (speakerMatch?.[2] ?? body).trim();
+
+      return {
+        senderRole: inferSenderRole(speakerMatch?.[1]),
+        messageText,
+        sentAt: null,
+        sequenceNo: index + 1,
+      };
+    })
+    .filter((message) => message.messageText.length > 0);
+}
+
+function mergeSituationFreeText(existingFreeText: string | undefined, extractedSituationText: string) {
+  const parts = [existingFreeText?.trim() ?? "", extractedSituationText.trim()].filter(Boolean);
+
+  return parts.length > 0 ? parts.join("\n\n") : undefined;
+}
+
+function splitSituationAwareRawText(rawText: string) {
+  const chatLines: string[] = [];
+  const situationLines: string[] = [];
+
+  for (const line of rawText.split(/\r?\n/)) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) {
+      continue;
+    }
+
+    if (EXPLICIT_SPEAKER_LINE.test(trimmedLine)) {
+      chatLines.push(trimmedLine);
+      continue;
+    }
+
+    situationLines.push(trimmedLine);
+  }
+
+  return {
+    chatText: chatLines.join("\n"),
+    situationText: situationLines.join("\n"),
+  };
+}
+
+export function parseConversationMessages(
+  rawText: string,
+  selfName = "나",
+): AnalysisInputMessage[] {
+  const result = parseChatText(rawText, selfName);
+  if (result.messages.length > 0) {
+    return result.messages.map((message) => ({
+      senderRole: message.senderRole,
+      messageText: message.messageText,
+      sentAt: message.sentAt,
+      sequenceNo: message.sequenceNo,
+    }));
+  }
+
+  return fallbackParseConversationMessages(rawText);
 }
 
 export function shouldSendParsedMessages(
@@ -33,4 +136,38 @@ export function resolveMessagesForAnalysisInput(
   inputFocus: SituationInputFocus,
 ): AnalysisInputMessage[] {
   return shouldSendParsedMessages(messages, inputFocus) ? messages : [];
+}
+
+export function buildAnalysisRequestInput({
+  rawText,
+  inputFocus,
+  guidedAnswers,
+  selfName = "나",
+}: BuildAnalysisRequestInputParams): {
+  messages: AnalysisInputMessage[];
+  guidedAnswers: GuidedAnswers;
+} {
+  if (inputFocus === "chat") {
+    return {
+      messages: resolveMessagesForAnalysisInput(
+        parseConversationMessages(rawText, selfName),
+        inputFocus,
+      ),
+      guidedAnswers,
+    };
+  }
+
+  const { chatText, situationText } = splitSituationAwareRawText(rawText);
+  const messages = resolveMessagesForAnalysisInput(
+    parseConversationMessages(chatText, selfName),
+    inputFocus,
+  );
+
+  return {
+    messages,
+    guidedAnswers: {
+      ...guidedAnswers,
+      freeText: mergeSituationFreeText(guidedAnswers.freeText, situationText),
+    },
+  };
 }
