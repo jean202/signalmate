@@ -505,6 +505,10 @@ describe("situation-first analysis", () => {
       "분위기는 괜찮지  않았어요.",
       "분위기가 괜찮진  않았어요.",
       "솔직히 좋진  않았어요.",
+      "분위기는 좋지는 않았어요.",
+      "분위기는 좋지도 않았어요.",
+      "분위기는 괜찮지는 않았어요.",
+      "분위기는 괜찮지도 않았어요.",
     ];
 
     for (const note of variants) {
@@ -520,5 +524,19 @@ describe("situation-first analysis", () => {
 
       expect(signalKeys).not.toContain("meeting_positive_vibe");
     }
+  });
+
+  it("still keeps truly positive meeting notes as positive vibe", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "어제 만났는데 분위기는 괜찮았어요. 대화도 편하게 이어졌어요.",
+      situationContext: "입력은 실제 만남 후기 중심입니다. 분위기는 괜찮았어요. 대화도 편하게 이어졌어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("meeting_positive_vibe");
   });
 });

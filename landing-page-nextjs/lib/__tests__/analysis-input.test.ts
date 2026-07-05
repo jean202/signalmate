@@ -18,6 +18,23 @@ function message(senderRole: AnalysisInputMessage["senderRole"]): AnalysisInputM
 }
 
 describe("analysis input message contract", () => {
+  function buildMixedRequest(rawText: string) {
+    return buildCreateConversationRequestBody({
+      title: "직접 붙여넣은 대화",
+      sourceType: "manual",
+      relationshipStage: "after_first_date",
+      meetingChannel: "blind_date",
+      userGoal: "continue_chat",
+      saveMode: "temporary",
+      rawText,
+      inputFocus: "mixed",
+      guidedAnswers: {
+        inputFocus: "mixed",
+      },
+      selfName: "진하",
+    });
+  }
+
   it("does not send all-unknown parsed messages for meeting notes", () => {
     const messages = [message("unknown"), { ...message("unknown"), sequenceNo: 2 }];
 
@@ -124,6 +141,102 @@ describe("analysis input message contract", () => {
         freeText: "이미 적어둔 메모\n\n카페에서는 분위기가 좋았는데 집에 가서는 답장이 느려졌어요.",
       },
     });
+    expect("situationContext" in result).toBe(false);
+  });
+
+  it("keeps simple name chat lines in mixed request bodies and routes unmarked notes to freeText", () => {
+    const rawText = "진하: 오늘 즐거웠어요.\n수연: 저도요.\n카페에서는 분위기가 좋았는데 집에 가서는 답장이 느려졌어요.";
+
+    const result = buildMixedRequest(rawText);
+
+    expect(result.messages).toEqual([
+      {
+        senderRole: "self",
+        messageText: "오늘 즐거웠어요.",
+        sentAt: null,
+        sequenceNo: 1,
+      },
+      {
+        senderRole: "other",
+        messageText: "저도요.",
+        sentAt: null,
+        sequenceNo: 2,
+      },
+    ]);
+    expect(result.guidedAnswers.freeText).toBe(
+      "카페에서는 분위기가 좋았는데 집에 가서는 답장이 느려졌어요.",
+    );
+    expect(result.messages[1]?.messageText).toBe("저도요.");
+    expect("situationContext" in result).toBe(false);
+  });
+
+  it("keeps generic [time] name chat lines in mixed request bodies and preserves notes separately", () => {
+    const rawText = "[14:30] 진하: 오늘 즐거웠어요.\n[14:31] 수연: 저도요.\n상대가 애프터 이야기는 안 꺼냈어요.";
+
+    const result = buildMixedRequest(rawText);
+
+    expect(result.messages).toEqual([
+      {
+        senderRole: "self",
+        messageText: "오늘 즐거웠어요.",
+        sentAt: null,
+        sequenceNo: 1,
+      },
+      {
+        senderRole: "other",
+        messageText: "저도요.",
+        sentAt: null,
+        sequenceNo: 2,
+      },
+    ]);
+    expect(result.guidedAnswers.freeText).toBe("상대가 애프터 이야기는 안 꺼냈어요.");
+    expect(result.messages[1]?.messageText).toBe("저도요.");
+    expect("situationContext" in result).toBe(false);
+  });
+
+  it("keeps Kakao Korean export chat lines in mixed request bodies without leaking date headers into freeText", () => {
+    const rawText = [
+      "--------------- 2026년 3월 15일 토요일 ---------------",
+      "2026년 3월 15일 오후 2:30, 진하 : 안녕하세요",
+      "2026년 3월 15일 오후 2:31, 수연 : 안녕!",
+      "만나고 나서 답장이 조금 느려졌어요.",
+    ].join("\n");
+
+    const result = buildMixedRequest(rawText);
+
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0]?.messageText).toBe("안녕하세요");
+    expect(result.messages[1]?.messageText).toBe("안녕!");
+    expect(result.guidedAnswers.freeText).toBe("만나고 나서 답장이 조금 느려졌어요.");
+    expect(result.guidedAnswers.freeText).not.toContain("2026년 3월 15일");
+    expect("situationContext" in result).toBe(false);
+  });
+
+  it("keeps Kakao bracket export chat lines in mixed request bodies without leaking date headers into freeText", () => {
+    const rawText = [
+      "--------------- 2026년 3월 15일 토요일 ---------------",
+      "[진하] [오후 2:30] 안녕하세요",
+      "[수연] [오후 2:31] 안녕!",
+      "만남 뒤에는 제가 먼저 연락했어요.",
+    ].join("\n");
+
+    const result = buildMixedRequest(rawText);
+
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0]?.messageText).toBe("안녕하세요");
+    expect(result.messages[1]?.messageText).toBe("안녕!");
+    expect(result.guidedAnswers.freeText).toBe("만남 뒤에는 제가 먼저 연락했어요.");
+    expect(result.guidedAnswers.freeText).not.toContain("2026년 3월 15일");
+    expect("situationContext" in result).toBe(false);
+  });
+
+  it("keeps colon-style situation notes as freeText when they do not form recognizable chat", () => {
+    const rawText = "상황: 소개팅 분위기는 좋았는데 애프터 이야기는 없었어요.";
+
+    const result = buildMixedRequest(rawText);
+
+    expect(result.messages).toEqual([]);
+    expect(result.guidedAnswers.freeText).toBe("상황: 소개팅 분위기는 좋았는데 애프터 이야기는 없었어요.");
     expect("situationContext" in result).toBe(false);
   });
 

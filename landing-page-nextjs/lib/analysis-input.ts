@@ -1,4 +1,4 @@
-import { parseChatText } from "@/lib/chat-parser";
+import { classifyChatTranscriptLine, parseChatText } from "@/lib/chat-parser";
 import type { GuidedAnswers, SituationInputFocus } from "@/lib/situation-input";
 import type { SaveMode } from "@/lib/store";
 
@@ -37,13 +37,6 @@ export type CreateConversationRequestBody = {
   guidedAnswers: GuidedAnswers;
   messages: AnalysisInputMessage[];
 };
-
-const SELF_SPEAKER_PATTERN = "나|저|me|self|mine";
-const OTHER_SPEAKER_PATTERN = "상대|상대방|그분|you|other";
-const EXPLICIT_SPEAKER_LINE = new RegExp(
-  `^(?:(?:\\[[^\\]]+\\]|\\d{1,2}:\\d{2}(?::\\d{2})?)\\s*)*(?:${SELF_SPEAKER_PATTERN}|${OTHER_SPEAKER_PATTERN})\\s*[:：]\\s*\\S`,
-  "i",
-);
 
 export function hasRecognizableSpeakers(messages: AnalysisInputMessage[]): boolean {
   return messages.some(
@@ -104,11 +97,13 @@ function splitSituationAwareRawText(rawText: string) {
 
   for (const line of rawText.split(/\r?\n/)) {
     const trimmedLine = line.trim();
-    if (!trimmedLine) {
+    const lineKind = classifyChatTranscriptLine(trimmedLine);
+
+    if (lineKind === "empty" || lineKind === "metadata") {
       continue;
     }
 
-    if (EXPLICIT_SPEAKER_LINE.test(trimmedLine)) {
+    if (lineKind === "message") {
       chatLines.push(trimmedLine);
       continue;
     }
@@ -181,16 +176,18 @@ export function buildAnalysisRequestInput({
   }
 
   const { chatText, situationText } = splitSituationAwareRawText(rawText);
-  const messages = resolveMessagesForAnalysisInput(
-    parseConversationMessages(chatText, selfName),
-    inputFocus,
-  );
+  const parsedMessages = parseConversationMessages(chatText, selfName);
+  const messages = resolveMessagesForAnalysisInput(parsedMessages, inputFocus);
+  const fallbackSituationText =
+    messages.length === 0 && chatText.trim().length > 0
+      ? [chatText.trim(), situationText].filter(Boolean).join("\n")
+      : situationText;
 
   return {
     messages,
     guidedAnswers: {
       ...guidedAnswers,
-      freeText: mergeSituationFreeText(guidedAnswers.freeText, situationText),
+      freeText: mergeSituationFreeText(guidedAnswers.freeText, fallbackSituationText),
     },
   };
 }
