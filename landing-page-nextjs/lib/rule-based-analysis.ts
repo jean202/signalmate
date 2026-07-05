@@ -139,7 +139,10 @@ function averageLength(messages: string[]) {
 }
 
 function getSituationText(conversation: StoredConversation): string {
-  return [conversation.rawText, conversation.situationContext]
+  const situationOnlyRawText =
+    conversation.messages.length === 0 ? conversation.rawText : null;
+
+  return [conversation.situationContext, situationOnlyRawText]
     .map((value) => value?.trim() ?? "")
     .filter(Boolean)
     .join("\n");
@@ -1054,7 +1057,9 @@ export function buildRuleBasedAnalysis(
   const ambiguousSignalCount = signals.filter((signal) => signal.signalType === "ambiguous").length;
   const cautionSignalCount = signals.filter((signal) => signal.signalType === "caution").length;
   const confidenceLevel = buildConfidenceLevel(metrics, signals.length);
-  const situationOnly = metrics.totalMessages <= 1 && hasSituationEvidence(conversation);
+  const situationOnly =
+    hasSituationEvidence(conversation) &&
+    (metrics.totalMessages <= 2 || metrics.otherMessages <= 1);
   const situationAction =
     situationOnly && situationFlags.hasFollowUpCaution
       ? {

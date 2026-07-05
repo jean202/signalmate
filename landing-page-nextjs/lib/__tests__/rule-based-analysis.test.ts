@@ -354,6 +354,29 @@ describe("emoji_drop signal", () => {
 });
 
 describe("situation-first analysis", () => {
+  it("does not create situation signals from general chat rawText when parsed messages exist", () => {
+    const conversation = makeConversation(
+      [
+        { role: "self", text: "오늘 얘기 재밌었어요" },
+        { role: "other", text: "저도요 ㅎㅎ 다음에 또 봐요" },
+      ],
+      {
+        relationshipStage: "before_first_date",
+        rawText:
+          "분위기 좋네요. 다음에 또 얘기해요. 상대가 웃으면서 잘 들어줬고 만남 뒤 내가 먼저 연락했어요.",
+        situationContext: null,
+      },
+    );
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("meeting_positive_vibe");
+    expect(signalKeys).not.toContain("meeting_low_reciprocity");
+    expect(signalKeys).not.toContain("post_meeting_followup_positive");
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+  });
+
   it("creates meeting and follow-up signals when there are no parsed chat messages", () => {
     const conversation = makeConversation([], {
       relationshipStage: "after_first_date",
@@ -394,5 +417,35 @@ describe("situation-first analysis", () => {
 
     expect(signalKeys).toContain("post_meeting_followup_positive");
     expect(result.recommendedAction).toBe("keep_light");
+  });
+
+  it("uses situation-based caution summary and action for sparse chats with strong follow-up evidence", () => {
+    const conversation = makeConversation(
+      [
+        { role: "self", text: "오늘 만나서 좋았어요" },
+        { role: "other", text: "저도요" },
+      ],
+      {
+        relationshipStage: "after_first_date",
+        rawText:
+          "짧게 연락은 오갔지만 아직 채팅 기록은 많지 않습니다.",
+        situationContext:
+          "입력은 만남 후기와 후속 연락 판단입니다. 만났을 때 분위기는 좋았습니다. 상대 적극성은 낮아 보였습니다. 다음 약속 이야기는 없었습니다. 만남 뒤에는 내가 먼저 연락했습니다. 답장은 짧았습니다.",
+      },
+    );
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toEqual(
+      expect.arrayContaining([
+        "meeting_positive_vibe",
+        "meeting_low_reciprocity",
+        "post_meeting_followup_caution",
+      ]),
+    );
+    expect(result.overallSummary).toContain("만남");
+    expect(result.recommendedAction).toBe("slow_down");
+    expect(result.recommendedActionReason).toContain("만남 뒤 연락 온도");
   });
 });
