@@ -474,6 +474,25 @@ function parseConversationMessages(rawText: string): ConversationMessageInput[] 
     .filter((message) => message.messageText.length > 0);
 }
 
+function hasRecognizableSpeakers(messages: ConversationMessageInput[]) {
+  return messages.some((message) => message.senderRole === "self" || message.senderRole === "other");
+}
+
+function shouldSendParsedMessages(
+  messages: ConversationMessageInput[],
+  inputFocus: SituationInputFocus,
+) {
+  if (messages.length === 0) {
+    return false;
+  }
+
+  if (inputFocus === "chat") {
+    return true;
+  }
+
+  return hasRecognizableSpeakers(messages);
+}
+
 function createUploadItem(file: File, index: number): ImageUploadItem {
   return {
     id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
@@ -583,14 +602,8 @@ export function AnalysisExperience() {
     desiredHelp,
     freeText: situationFreeText,
   };
-  const hasRecognizableSpeakers = parsedMessages.some(
-    (message) => message.senderRole === "self" || message.senderRole === "other",
-  );
-  const isSituationOnlyInput =
-    rawText.trim().length > 0 &&
-    inputFocus !== "chat" &&
-    parsedMessages.length > 0 &&
-    parsedMessages.every((message) => message.senderRole === "unknown");
+  const shouldUseParsedMessages = shouldSendParsedMessages(parsedMessages, inputFocus);
+  const isSituationOnlyInput = rawText.trim().length > 0 && !shouldUseParsedMessages;
   const groupedSignals = streamingState ? groupSignalsByContext(streamingState.signals) : null;
   const isImageUploading = imageUpload.kind === "uploading";
   const excerptLines = rawText
@@ -842,11 +855,9 @@ export function AnalysisExperience() {
 
   async function handleRunAnalysis() {
     const parsedInputMessages = parseConversationMessages(rawText);
-    const shouldSendParsedMessages =
-      parsedInputMessages.length >= 2 ||
-      (inputFocus === "chat" && parsedInputMessages.length > 0) ||
-      hasRecognizableSpeakers;
-    const messages = shouldSendParsedMessages ? parsedInputMessages : [];
+    const messages = shouldSendParsedMessages(parsedInputMessages, inputFocus)
+      ? parsedInputMessages
+      : [];
 
     if (messages.length < 2 && !canProceedFromInput) {
       setStep("input");
