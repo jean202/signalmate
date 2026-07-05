@@ -240,6 +240,37 @@ describe("analysis input message contract", () => {
     expect("situationContext" in result).toBe(false);
   });
 
+  it("routes label-style situation notes to freeText in mixed input without leaking into chat messages", () => {
+    const rawText = [
+      "진하: 오늘 즐거웠어요.",
+      "수연: 저도요.",
+      "상황: 소개팅 분위기는 좋았는데 집에 가서는 답장이 느려졌어요.",
+    ].join("\n");
+
+    const result = buildMixedRequest(rawText);
+
+    expect(result.messages).toEqual([
+      {
+        senderRole: "self",
+        messageText: "오늘 즐거웠어요.",
+        sentAt: null,
+        sequenceNo: 1,
+      },
+      {
+        senderRole: "other",
+        messageText: "저도요.",
+        sentAt: null,
+        sequenceNo: 2,
+      },
+    ]);
+    expect(result.guidedAnswers.freeText).toBe(
+      "상황: 소개팅 분위기는 좋았는데 집에 가서는 답장이 느려졌어요.",
+    );
+    expect(result.messages[1]?.messageText).toBe("저도요.");
+    expect(result.messages.some((message) => message.messageText.includes("상황:"))).toBe(false);
+    expect("situationContext" in result).toBe(false);
+  });
+
   it("keeps situation-only meeting notes as free-text evidence without messages", () => {
     const result = buildAnalysisRequestInput({
       rawText: "소개팅 분위기는 좋았는데 헤어진 뒤로 연락이 조금 뜸해졌어요.",

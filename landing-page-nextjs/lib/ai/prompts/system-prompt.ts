@@ -6,7 +6,7 @@ export function formatSituationContext(context: string | null | undefined): stri
   if (!context?.trim()) return "";
   return `
 ## 사용자가 제공한 상황 설명
-(이 정보는 대화 텍스트에 나타나지 않는 배경 맥락입니다. 분석 시 참고하되, 대화 텍스트의 증거가 우선합니다.)
+(이 블록은 만남 메모, 만남 뒤 연락, 또는 배경 맥락을 담을 수 있습니다. 채팅 텍스트가 없거나 적으면 이 블록도 분석 근거입니다.)
 ${context.trim()}
 `;
 }

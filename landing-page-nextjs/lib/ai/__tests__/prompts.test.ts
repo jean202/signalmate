@@ -69,6 +69,8 @@ describe("situation-first prompt wording", () => {
     expect(prompt).toContain("## 상황 원문");
     expect(prompt).toContain("채팅이 없거나 적어도");
     expect(prompt).toContain("입력은 실제 만남 후기 중심입니다.");
+    expect(prompt).toContain("만남 메모, 만남 뒤 연락, 또는 배경 맥락");
+    expect(prompt).toContain("채팅 텍스트가 없거나 적으면 이 블록도 분석 근거입니다.");
   });
 
   it("asks recommendation generation to use meeting and follow-up context", () => {

@@ -1,4 +1,8 @@
-import { classifyChatTranscriptLine, parseChatText } from "@/lib/chat-parser";
+import {
+  classifyChatTranscriptLine,
+  isSituationNoteLabel,
+  parseChatText,
+} from "@/lib/chat-parser";
 import type { GuidedAnswers, SituationInputFocus } from "@/lib/situation-input";
 import type { SaveMode } from "@/lib/store";
 
@@ -97,6 +101,13 @@ function splitSituationAwareRawText(rawText: string) {
 
   for (const line of rawText.split(/\r?\n/)) {
     const trimmedLine = line.trim();
+    const labelMatch = trimmedLine.match(/^([^:：]+)\s*[:：]\s*(.+)$/);
+
+    if (labelMatch && isSituationNoteLabel(labelMatch[1])) {
+      situationLines.push(trimmedLine);
+      continue;
+    }
+
     const lineKind = classifyChatTranscriptLine(trimmedLine);
 
     if (lineKind === "empty" || lineKind === "metadata") {

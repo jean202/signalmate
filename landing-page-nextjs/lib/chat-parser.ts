@@ -52,9 +52,14 @@ const GENERIC_TIME_NAME =
 
 // "김진하: 메시지" or "Name: message"
 const SIMPLE_NAME_MSG = /^(.+?)[:：]\s+(.+)$/;
+const SITUATION_NOTE_LABELS = ["상황", "메모", "후기", "느낌", "추가"] as const;
 
 function isSimpleNameCandidate(candidateName: string): boolean {
   return candidateName.length <= 20 && !candidateName.includes("http") && !candidateName.includes("/");
+}
+
+export function isSituationNoteLabel(rawLabel: string): boolean {
+  return SITUATION_NOTE_LABELS.includes(rawLabel.trim() as (typeof SITUATION_NOTE_LABELS)[number]);
 }
 
 export function classifyChatTranscriptLine(rawLine: string): ChatTranscriptLineKind {
