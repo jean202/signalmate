@@ -10,6 +10,7 @@ import {
   type MouseEvent,
 } from "react";
 import { parseChatText } from "@/lib/chat-parser";
+import { groupSignalsByContext } from "@/lib/signal-groups";
 import {
   MAX_IMAGE_UPLOAD_FILES,
   formatFileSize,
@@ -17,6 +18,14 @@ import {
   prepareImageForUpload,
   validateImageFileSelection,
 } from "@/lib/image-upload";
+import type {
+  AfterMeetingContact,
+  DesiredHelp,
+  GuidedAnswers,
+  MeetingVibe,
+  OtherInitiative,
+  SituationInputFocus,
+} from "@/lib/situation-input";
 import { PaymentButton } from "@/components/payment-button";
 import styles from "./analysis-experience.module.css";
 
@@ -61,6 +70,44 @@ const relationshipStageOptions = [
     label: "식어가는 느낌",
     description: "분위기가 예전 같지 않아요. 어떻게 해야 할지 모르겠어요.",
   },
+] as const;
+
+const inputFocusOptions = [
+  { value: "chat", label: "채팅 중심", description: "카톡이나 문자 흐름을 주로 보고 싶어요." },
+  { value: "meeting_note", label: "만남 후기 중심", description: "실제로 만났을 때 느낌을 먼저 보고 싶어요." },
+  { value: "mixed", label: "채팅 + 만남", description: "대화와 실제 만남 느낌을 함께 보고 싶어요." },
+  { value: "follow_up", label: "만남 뒤 연락", description: "만난 뒤 연락 흐름이 헷갈려요." },
+] as const;
+
+const meetingVibeOptions = [
+  { value: "none", label: "해당 없음", description: "아직 직접 만나지 않았어요." },
+  { value: "awkward", label: "어색함", description: "대화가 잘 이어지지 않았어요." },
+  { value: "normal", label: "보통", description: "나쁘진 않았지만 확신은 없어요." },
+  { value: "good", label: "좋음", description: "대화가 편했고 분위기가 괜찮았어요." },
+  { value: "great", label: "아주 좋음", description: "상대도 다음 만남을 언급했어요." },
+] as const;
+
+const otherInitiativeOptions = [
+  { value: "unknown", label: "잘 모르겠음", description: "아직 판단하기 어려워요." },
+  { value: "low", label: "낮음", description: "내가 더 많이 이끈 느낌이에요." },
+  { value: "medium", label: "보통", description: "서로 어느 정도 맞춰갔어요." },
+  { value: "high", label: "높음", description: "상대도 질문이나 제안을 꽤 했어요." },
+] as const;
+
+const afterMeetingContactOptions = [
+  { value: "not_applicable", label: "해당 없음", description: "아직 만남 뒤 연락 상황이 없어요." },
+  { value: "none", label: "아직 없음", description: "만난 뒤 아직 연락하지 않았어요." },
+  { value: "self_first", label: "내가 먼저 함", description: "내가 먼저 연락했고 반응을 보는 중이에요." },
+  { value: "other_first", label: "상대가 먼저 함", description: "상대가 먼저 연락했어요." },
+  { value: "slower", label: "느려짐", description: "답장이 짧거나 느려졌어요." },
+  { value: "ongoing", label: "이어지는 중", description: "만난 뒤에도 연락이 이어지고 있어요." },
+] as const;
+
+const desiredHelpOptions = [
+  { value: "next_message", label: "다음 메시지", description: "뭐라고 보내면 좋을지 알고 싶어요." },
+  { value: "ask_for_date", label: "애프터 제안", description: "다음 만남을 제안해도 될지 궁금해요." },
+  { value: "wait_or_send", label: "기다릴지 판단", description: "더 보낼지 기다릴지 모르겠어요." },
+  { value: "decide_to_stop", label: "정리 판단", description: "그만할지 계속 볼지 고민돼요." },
 ] as const;
 
 const meetingChannelOptions = [
@@ -300,6 +347,45 @@ const signalLabels: Record<SignalType, string> = {
   caution: "Caution",
 };
 
+function SignalSection({
+  title,
+  signals,
+}: {
+  title: string;
+  signals: SignalRecord[];
+}) {
+  return (
+    <section className={styles.signalSection}>
+      <h4>{title}</h4>
+      {signals.length === 0 ? (
+        <p className={styles.signalSectionEmpty}>해당 신호는 아직 없습니다.</p>
+      ) : (
+        <div className={styles.signalList}>
+          {signals.map((signal, index) => (
+            <article
+              key={signal.id}
+              className={styles.signalCard}
+              style={{ animationDelay: `${index * 70}ms` }}
+            >
+              <div className={styles.signalHeader}>
+                <span className={styles.signalType}>{signalLabels[signal.signalType]}</span>
+                <span className={styles.signalConfidence}>
+                  {confidenceLabels[signal.confidenceLevel]}
+                </span>
+              </div>
+              <div className={styles.signalCardText}>
+                <h5>{signal.title}</h5>
+                <p>{signal.description}</p>
+                <div className={styles.evidenceBox}>{signal.evidenceText}</div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 const recommendationLabels: Record<RecommendationType, string> = {
   next_message: "Next message",
   tone_guide: "Tone guide",
@@ -467,6 +553,13 @@ export function AnalysisExperience() {
     useState<RelationshipStage>("after_first_date");
   const [meetingChannel, setMeetingChannel] = useState<MeetingChannel>("blind_date");
   const [userGoal, setUserGoal] = useState<UserGoal>("evaluate_interest");
+  const [inputFocus, setInputFocus] = useState<SituationInputFocus>("mixed");
+  const [meetingVibe, setMeetingVibe] = useState<MeetingVibe>("none");
+  const [otherInitiative, setOtherInitiative] = useState<OtherInitiative>("unknown");
+  const [afterMeetingContact, setAfterMeetingContact] =
+    useState<AfterMeetingContact>("not_applicable");
+  const [desiredHelp, setDesiredHelp] = useState<DesiredHelp>("wait_or_send");
+  const [situationFreeText, setSituationFreeText] = useState("");
   const [saveMode, setSaveMode] = useState<SaveMode>("temporary");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [streamingState, setStreamingState] = useState<StreamingState | null>(null);
@@ -478,6 +571,27 @@ export function AnalysisExperience() {
   const dragDepthRef = useRef(0);
 
   const parsedMessages = parseConversationMessages(rawText);
+  const hasMeaningfulSituationText =
+    rawText.trim().length >= 20 || situationFreeText.trim().length >= 20;
+  const canProceedFromInput =
+    parsedMessages.length >= 2 || (inputFocus !== "chat" && hasMeaningfulSituationText);
+  const guidedAnswers: GuidedAnswers = {
+    inputFocus,
+    meetingVibe,
+    otherInitiative,
+    afterMeetingContact,
+    desiredHelp,
+    freeText: situationFreeText,
+  };
+  const hasRecognizableSpeakers = parsedMessages.some(
+    (message) => message.senderRole === "self" || message.senderRole === "other",
+  );
+  const isSituationOnlyInput =
+    rawText.trim().length > 0 &&
+    inputFocus !== "chat" &&
+    parsedMessages.length > 0 &&
+    parsedMessages.every((message) => message.senderRole === "unknown");
+  const groupedSignals = streamingState ? groupSignalsByContext(streamingState.signals) : null;
   const isImageUploading = imageUpload.kind === "uploading";
   const excerptLines = rawText
     .split("\n")
@@ -715,8 +829,10 @@ export function AnalysisExperience() {
   }
 
   function handleMoveToContext() {
-    if (parsedMessages.length < 2) {
-      setErrorMessage("분석 체험을 위해 최소 2줄 이상의 대화를 붙여넣어 주세요.");
+    if (!canProceedFromInput) {
+      setErrorMessage(
+        "채팅이 없으면 실제 만남 느낌이나 이후 연락 흐름을 20자 이상 적고 입력 중심을 만남 후기나 만남 뒤 연락으로 선택해 주세요.",
+      );
       return;
     }
 
@@ -725,11 +841,18 @@ export function AnalysisExperience() {
   }
 
   async function handleRunAnalysis() {
-    const messages = parseConversationMessages(rawText);
+    const parsedInputMessages = parseConversationMessages(rawText);
+    const shouldSendParsedMessages =
+      parsedInputMessages.length >= 2 ||
+      (inputFocus === "chat" && parsedInputMessages.length > 0) ||
+      hasRecognizableSpeakers;
+    const messages = shouldSendParsedMessages ? parsedInputMessages : [];
 
-    if (messages.length < 2) {
+    if (messages.length < 2 && !canProceedFromInput) {
       setStep("input");
-      setErrorMessage("메시지 수가 너무 적습니다. 최소 2줄 이상 입력해 주세요.");
+      setErrorMessage(
+        "분석할 채팅이나 상황 설명이 부족합니다. 대화 2줄 이상 또는 만남 후기 20자 이상을 입력해 주세요.",
+      );
       return;
     }
 
@@ -764,6 +887,8 @@ export function AnalysisExperience() {
             userGoal,
             saveMode,
             rawText,
+            guidedAnswers,
+            situationContext: situationFreeText,
             selfName: "나",
             messages,
           }),
@@ -957,12 +1082,10 @@ export function AnalysisExperience() {
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
             <p className={styles.kicker}>지금 바로 시작</p>
-            <h1 className={styles.title}>
-              대화를 붙여넣어 보세요
-            </h1>
+            <h1 className={styles.title}>지금 상황을 넣어보세요</h1>
             <p className={styles.description}>
-              카카오톡이든 문자든 그대로 복사해서 넣어주세요.
-              상황을 골라주시면, 신호 분석부터 다음 메시지 추천까지 한 번에 보여드릴게요.
+              카톡 캡처, 대화 내용, 실제 만났을 때 느낀 점, 이후 연락 흐름을 함께 볼게요.
+              지금 필요한 다음 행동까지 정리해드릴게요.
             </p>
           </div>
 
@@ -1009,7 +1132,7 @@ export function AnalysisExperience() {
             <div className={styles.cardHeader}>
               <div>
                 <p className={styles.kicker}>1단계</p>
-                <h2>분석하고 싶은 대화를 붙여넣어 주세요</h2>
+                <h2>분석하고 싶은 상황을 입력해 주세요</h2>
               </div>
               <div className={styles.headerActions}>
                 <button
@@ -1131,7 +1254,7 @@ export function AnalysisExperience() {
             <div className={styles.inputLayout}>
               <div className={styles.inputColumn}>
                 <label className={styles.fieldLabel} htmlFor="conversation-input">
-                  대화 내용
+                  지금 상황
                 </label>
                 <textarea
                   id="conversation-input"
@@ -1139,11 +1262,18 @@ export function AnalysisExperience() {
                   rows={14}
                   value={rawText}
                   onChange={(event) => setRawText(event.target.value)}
-                  placeholder={`예시\n[오후 8:10] 나: 오늘 잘 들어갔어요?\n[오후 8:13] 상대: 네 덕분에요 :)`}
+                  placeholder={`예시
+어제 처음 만났는데 대화는 끊기지 않았고 2시간 정도 같이 있었어요.
+상대가 질문을 많이 하진 않았지만 웃으면서 들어줬고, 다음에 또 보자는 말은 없었어요.
+집에 와서 제가 먼저 잘 들어갔냐고 보냈고 답장은 왔는데 짧았어요.`}
                 />
                 <div className={styles.metaRow}>
                   <span>{rawText.trim().length}자</span>
-                  <span>메시지 {parsedMessages.length}개 인식됨</span>
+                  <span>
+                    {isSituationOnlyInput
+                      ? "상황 메모로 인식됨"
+                      : `메시지 ${parsedMessages.length}개 인식됨`}
+                  </span>
                 </div>
                 <p className={styles.hint}>
                   카톡 캡처가 있다면 <strong>📷 사진으로 올리기</strong>가 제일 편해요.
@@ -1154,25 +1284,33 @@ export function AnalysisExperience() {
               <aside className={styles.previewCard}>
                 <p className={styles.kicker}>실시간 확인</p>
                 <h3>이렇게 인식되고 있어요</h3>
-                <ul className={styles.previewList}>
-                  {parsedMessages.slice(0, 4).map((message) => (
-                    <li key={message.sequenceNo}>
-                      <span className={styles.previewRole}>
-                        {message.senderRole === "self"
-                          ? "나"
-                          : message.senderRole === "other"
-                            ? "상대"
-                            : "미확인"}
-                      </span>
-                      <p>{message.messageText}</p>
-                    </li>
-                  ))}
-                  {parsedMessages.length === 0 ? (
-                    <li className={styles.previewEmpty}>
-                      아직 입력된 게 없어요. 예시를 보거나 직접 붙여넣어 주세요.
-                    </li>
-                  ) : null}
-                </ul>
+                {!isSituationOnlyInput ? (
+                  <ul className={styles.previewList}>
+                    {parsedMessages.slice(0, 4).map((message) => (
+                      <li key={message.sequenceNo}>
+                        <span className={styles.previewRole}>
+                          {message.senderRole === "self"
+                            ? "나"
+                            : message.senderRole === "other"
+                              ? "상대"
+                              : "미확인"}
+                        </span>
+                        <p>{message.messageText}</p>
+                      </li>
+                    ))}
+                    {parsedMessages.length === 0 ? (
+                      <li className={styles.previewEmpty}>
+                        아직 입력된 게 없어요. 채팅이나 만남 후기를 적어주세요.
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+                {isSituationOnlyInput || (parsedMessages.length === 0 && rawText.trim().length > 0) ? (
+                  <div className={styles.situationPreview}>
+                    <strong>상황 메모로 분석할게요</strong>
+                    <p>{rawText.trim().slice(0, 180)}</p>
+                  </div>
+                ) : null}
                 <div className={styles.tipCard}>
                   <strong>이건 알아두세요</strong>
                   <p>이름, 연락처, 계정 정보 같은 민감한 정보는 지우고 넣어주시면 더 안전해요.</p>
@@ -1206,6 +1344,50 @@ export function AnalysisExperience() {
             <div className={styles.contextLayout}>
               <div className={styles.contextColumn}>
                 <ChoiceGroup
+                  label="무엇을 중심으로 볼까요?"
+                  options={inputFocusOptions}
+                  value={inputFocus}
+                  onChange={setInputFocus}
+                />
+                <ChoiceGroup
+                  label="실제 만남 분위기는 어땠나요?"
+                  options={meetingVibeOptions}
+                  value={meetingVibe}
+                  onChange={setMeetingVibe}
+                />
+                <ChoiceGroup
+                  label="상대 적극성은 어땠나요?"
+                  options={otherInitiativeOptions}
+                  value={otherInitiative}
+                  onChange={setOtherInitiative}
+                />
+                <ChoiceGroup
+                  label="만남 뒤 연락은 어땠나요?"
+                  options={afterMeetingContactOptions}
+                  value={afterMeetingContact}
+                  onChange={setAfterMeetingContact}
+                />
+                <ChoiceGroup
+                  label="지금 무엇을 정하고 싶나요?"
+                  options={desiredHelpOptions}
+                  value={desiredHelp}
+                  onChange={setDesiredHelp}
+                />
+                <label className={styles.fieldLabel} htmlFor="situation-free-text">
+                  추가로 느낀 점
+                </label>
+                <textarea
+                  id="situation-free-text"
+                  className={styles.smallTextarea}
+                  rows={4}
+                  value={situationFreeText}
+                  onChange={(event) => setSituationFreeText(event.target.value)}
+                  placeholder="예: 실제로는 편했지만 상대가 먼저 질문을 많이 하지는 않았어요."
+                />
+              </div>
+
+              <div className={styles.contextColumn}>
+                <ChoiceGroup
                   label="지금 어떤 사이세요?"
                   options={relationshipStageOptions}
                   value={relationshipStage}
@@ -1217,9 +1399,6 @@ export function AnalysisExperience() {
                   value={meetingChannel}
                   onChange={setMeetingChannel}
                 />
-              </div>
-
-              <div className={styles.contextColumn}>
                 <ChoiceGroup
                   label="가장 궁금한 점이 뭐예요?"
                   options={userGoalOptions}
@@ -1379,33 +1558,19 @@ export function AnalysisExperience() {
                     </div>
                   ) : (
                     <div
-                      className={`${styles.signalList} ${
+                      className={`${styles.groupedSignalSections} ${
                         streamingState.streamPhase === "rules_visible"
                           ? styles.signalListEnhancing
                           : ""
                       }`}
                     >
-                      {streamingState.signals.map((signal, index) => (
-                        <article
-                          key={`${signal.id}-${streamingState.streamPhase}`}
-                          className={styles.signalCard}
-                          style={{ animationDelay: `${index * 70}ms` }}
-                        >
-                          <div className={styles.signalHeader}>
-                            <span className={styles.signalType}>
-                              {signalLabels[signal.signalType]}
-                            </span>
-                            <span className={styles.signalConfidence}>
-                              {confidenceLabels[signal.confidenceLevel]}
-                            </span>
-                          </div>
-                          <div className={styles.signalCardText}>
-                            <h4>{signal.title}</h4>
-                            <p>{signal.description}</p>
-                            <div className={styles.evidenceBox}>{signal.evidenceText}</div>
-                          </div>
-                        </article>
-                      ))}
+                      <SignalSection title="채팅 신호" signals={groupedSignals?.chat ?? []} />
+                      <SignalSection title="실제 만남 신호" signals={groupedSignals?.meeting ?? []} />
+                      <SignalSection
+                        title="만남 뒤 연락 신호"
+                        signals={groupedSignals?.followUp ?? []}
+                      />
+                      <SignalSection title="불확실성" signals={groupedSignals?.uncertainty ?? []} />
                     </div>
                   )}
                 </div>
