@@ -79,10 +79,15 @@ export function checkQuality(params: {
   overallSummary: string;
   recommendedAction: string;
   rawText: string;
+  situationContext?: string | null;
   relationshipStage?: string;
 }): QualityCheckResult {
   const issues: string[] = [];
   const warnings: string[] = [];
+  const evidenceCorpus = [params.rawText, params.situationContext]
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean)
+    .join("\n");
 
   // 1. 유해 조언 검사
   for (const rec of params.recommendations) {
@@ -128,7 +133,7 @@ export function checkQuality(params: {
   }
 
   // 2. 시그널-증거 일관성
-  const normalizedRawText = normalizeForEvidenceMatch(params.rawText);
+  const normalizedEvidenceCorpus = normalizeForEvidenceMatch(evidenceCorpus);
   for (const signal of params.signals) {
     if (!signal.evidenceText || signal.evidenceText.trim().length < 5) {
       warnings.push(`시그널 "${signal.signalKey}"에 증거가 불충분합니다.`);
@@ -141,7 +146,7 @@ export function checkQuality(params: {
 
     const quotedEvidence = extractQuotedEvidence(signal.evidenceText);
     for (const quote of quotedEvidence) {
-      if (!normalizedRawText.includes(normalizeForEvidenceMatch(quote))) {
+      if (!normalizedEvidenceCorpus.includes(normalizeForEvidenceMatch(quote))) {
         issues.push(`시그널 "${signal.signalKey}"의 인용 근거가 원문에 없습니다: "${quote}"`);
       }
     }
@@ -149,7 +154,7 @@ export function checkQuality(params: {
     if (
       quotedEvidence.length === 0 &&
       !looksLikePatternSummary(signal.evidenceText) &&
-      !hasEvidenceTokenOverlap(signal.evidenceText, params.rawText)
+      !hasEvidenceTokenOverlap(signal.evidenceText, evidenceCorpus)
     ) {
       warnings.push(`시그널 "${signal.signalKey}"의 근거가 원문과 약하게 연결됩니다.`);
     }

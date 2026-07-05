@@ -53,6 +53,40 @@ describe("checkQuality", () => {
     expect(result.issues.join("\n")).toContain("인용 근거가 원문에 없습니다");
   });
 
+  it("passes when quoted evidence exists only in situationContext", () => {
+    const result = checkQuality({
+      ...baseParams,
+      rawText: "",
+      situationContext: "입력은 만남 후기 중심입니다. 상대가 '다음엔 더 여유 있게 보자'고 했어요.",
+      signals: [
+        {
+          ...baseParams.signals[0],
+          evidenceText: "\"다음엔 더 여유 있게 보자\"",
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("still fails when quoted evidence is absent from both rawText and situationContext", () => {
+    const result = checkQuality({
+      ...baseParams,
+      rawText: "",
+      situationContext: "입력은 만남 후기 중심입니다. 상대는 조심스럽게 반응했어요.",
+      signals: [
+        {
+          ...baseParams.signals[0],
+          evidenceText: "\"다음엔 더 여유 있게 보자\"",
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.issues.join("\n")).toContain("인용 근거가 원문에 없습니다");
+  });
+
   it("fails pressure-heavy next messages", () => {
     const result = checkQuality({
       ...baseParams,

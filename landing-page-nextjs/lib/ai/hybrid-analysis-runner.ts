@@ -173,6 +173,7 @@ export async function runHybridAnalysis(
         overallSummary: candidateSummary,
         recommendedAction: ruleResult.recommendedAction,
         rawText: conversation.rawText,
+        situationContext: conversation.situationContext,
         relationshipStage: conversation.relationshipStage,
       });
 
@@ -262,6 +263,7 @@ export async function runHybridAnalysis(
         overallSummary: enhancedSummary,
         recommendedAction: ruleResult.recommendedAction,
         rawText: conversation.rawText,
+        situationContext: conversation.situationContext,
         relationshipStage: conversation.relationshipStage,
       });
 

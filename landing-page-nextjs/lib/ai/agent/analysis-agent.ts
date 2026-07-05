@@ -497,6 +497,7 @@ async function executeAgentTool(
       return checkQuality({
         ...params,
         rawText: conversation.rawText,
+        situationContext: conversation.situationContext,
         relationshipStage: conversation.relationshipStage,
       });
     }
@@ -617,6 +618,7 @@ function validateFinalResult(
     overallSummary: result.overallSummary,
     recommendedAction: result.recommendedAction,
     rawText: conversation.rawText,
+    situationContext: conversation.situationContext,
     relationshipStage: conversation.relationshipStage,
   });
 

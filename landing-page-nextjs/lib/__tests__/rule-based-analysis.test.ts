@@ -496,4 +496,29 @@ describe("situation-first analysis", () => {
 
     expect(signalKeys).not.toContain("meeting_positive_vibe");
   });
+
+  it("does not misread contracted negative meeting variants as positive vibe", () => {
+    const variants = [
+      "분위기는 괜찮지 않았어요.",
+      "분위기가 괜찮진 않았어요.",
+      "전체적으로 좋진 않았어요.",
+      "분위기는 괜찮지  않았어요.",
+      "분위기가 괜찮진  않았어요.",
+      "솔직히 좋진  않았어요.",
+    ];
+
+    for (const note of variants) {
+      const conversation = makeConversation([], {
+        relationshipStage: "after_first_date",
+        rawText: `어제 소개팅에서 만났는데 ${note} 대화도 조금 어색했어요.`,
+        situationContext: `입력은 실제 만남 후기 중심입니다. ${note} 대화도 조금 어색했어요.`,
+        messages: [],
+      });
+
+      const result = buildRuleBasedAnalysis(conversation);
+      const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+      expect(signalKeys).not.toContain("meeting_positive_vibe");
+    }
+  });
 });
