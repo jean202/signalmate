@@ -84,6 +84,7 @@ describe("situation-first prompt wording", () => {
       signals: [{ signalType: "caution", signalKey: "post_meeting_followup_caution", title: "연락 온도 주의" }],
     });
 
+    expect(prompt).toContain("## 상황 원문");
     expect(prompt).toContain("실제 만남");
     expect(prompt).toContain("만남 뒤 연락");
     expect(prompt).toContain("채팅 원문만");
