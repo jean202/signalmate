@@ -20,6 +20,8 @@
 7. 반복되는 불일치 패턴 하나를 골라 실험 카드에 기록한다.
 8. 룰, 프롬프트, few-shot 중 하나만 바꾸고 같은 dataset으로 다시 측정한다.
 
+`learn:eval`의 temperature 변환은 학습용 보정 경계를 쓴다: `<45 cold`, `<70 neutral`, `<85 warm`, `85 이상 hot`.
+
 ## 마스킹 CLI
 
 ```bash
@@ -89,3 +91,5 @@ CLI가 `learning/captures/gangho-*.json`을 파일명 순서로 보여준다. �
 2. **딱 한 변수만** 바꾼다(룰 임계값/프롬프트/few-shot 중 하나).
 3. 같은 dataset으로 `npm run learn:eval` 재측정 → before/after 기록.
 4. 가설이 틀려도 카드에 남긴다. 작은 표본 과적합을 경계.
+
+현재 룰 엔진은 일정 조율 질문을 호감 질문과 분리해서 baseline 점수를 계산한다. 다만 `question_balance` 신호에서는 원시 질문 여부를 계속 본다. 즉, "몇 시가 편하세요?"는 질문을 돌려준 것으로는 보지만 호감 질문 점수에는 덜 반영한다.

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildRuleBasedAnalysis, stageFromRelationshipStage } from "../rule-based-analysis";
+import {
+  buildRuleBasedAnalysis,
+  buildRuleBaselineScores,
+  stageFromRelationshipStage,
+} from "../rule-based-analysis";
 import type { StoredConversation } from "../analysis-store";
 
 function makeConversation(
@@ -143,6 +147,42 @@ describe("stageFromRelationshipStage", () => {
   it("falls back to pre_meeting for unknown values", () => {
     expect(stageFromRelationshipStage(undefined)).toBe("pre_meeting");
     expect(stageFromRelationshipStage("unknown_stage")).toBe("pre_meeting");
+  });
+});
+
+describe("buildRuleBaselineScores", () => {
+  it("does not score logistical scheduling questions as personal question reciprocity", () => {
+    const conversation = makeConversation([
+      { role: "self", text: "저녁 몇시쯤이 좋으세요?" },
+      { role: "other", text: "한 여섯시쯤 어떠세요?" },
+    ]);
+
+    const scores = buildRuleBaselineScores(conversation);
+
+    expect(scores.questionReciprocity).toBe(50);
+  });
+
+  it("still scores personal curiosity as question reciprocity", () => {
+    const conversation = makeConversation([
+      { role: "self", text: "오늘 하루 어땠어요?" },
+      { role: "other", text: "괜찮았어요. 주말엔 뭐 하셨어요?" },
+    ]);
+
+    const scores = buildRuleBaselineScores(conversation);
+
+    expect(scores.questionReciprocity).toBe(100);
+  });
+
+  it("does not treat weekend small talk as future scheduling commitment", () => {
+    const conversation = makeConversation([
+      { role: "other", text: "주말 마무리 잘 하고 계신가요?" },
+      { role: "self", text: "카페에 나와있어요." },
+      { role: "other", text: "주말은 순식간에 흘러가네요." },
+    ]);
+
+    const scores = buildRuleBaselineScores(conversation);
+
+    expect(scores.schedulingCommitment).toBe(50);
   });
 });
 

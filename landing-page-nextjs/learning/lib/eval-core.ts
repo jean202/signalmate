@@ -39,15 +39,15 @@ export type EvalSummary = {
  * 룰 엔진 overall(0~100)을 거친 temperature 밴드로 매핑.
  *
  * 의도적으로 거친 매핑이며, 불일치가 학습 재료가 된다.
- * 경계: <40 cold, <60 neutral, <75 warm, 이상 hot.
+ * 경계: <45 cold, <70 neutral, <85 warm, 이상 hot.
  *
  * @param overall - 규칙 엔진의 overall 스코어 (0~100)
  * @returns 온도 밴드
  */
 export function deriveTemperature(overall: number): Temperature {
-  if (overall < 40) return "cold";
-  if (overall < 60) return "neutral";
-  if (overall < 75) return "warm";
+  if (overall < 45) return "cold";
+  if (overall < 70) return "neutral";
+  if (overall < 85) return "warm";
   return "hot";
 }
 

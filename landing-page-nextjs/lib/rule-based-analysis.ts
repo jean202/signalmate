@@ -28,6 +28,8 @@ type MessageMetrics = {
   otherResponsePairs: number;
   selfQuestionCount: number;
   otherQuestionCount: number;
+  selfInterestQuestionCount: number;
+  otherInterestQuestionCount: number;
   selfSchedulingAskCount: number;
   otherFutureMentionCount: number;
   otherWarmCount: number;
@@ -83,8 +85,10 @@ export function stageFromRelationshipStage(stage?: string): RelationshipStageKey
 }
 
 const futurePattern =
-  /(다음|또|같이|보자|가자|볼까요|가볼까요|주말|다음 주|이번 주|시간|약속|커피|전시|식사|산책)/i;
-const questionPattern = /\?/;
+  /(다음\s*(?:주|에)?|이번\s*주|내일|모레|또\s*(?:보|가|만나)|같이|함께|보자|가자|볼까요|가볼까요|가봐도|만날|만나|뵐|뵈|약속|예약|식당|음식점|시간\s*(?:맞|되|편|괜찮)|몇\s*시|월요일|화요일|수요일|목요일|금요일|토요일|일요일)/i;
+const questionPattern = /[?？]/;
+const schedulingQuestionPattern =
+  /(몇\s*시|언제|시간|다음\s*주|이번\s*주|내일|모레|월요일|화요일|수요일|목요일|금요일|토요일|일요일|장소|예약|식당|음식점|메뉴|못\s*드|못드|주류|마실|괜찮(?:으|을|겠|나|습니까)|편하|되세요|될까요|어떠세요|볼까요|뵐|뵈|만날|약속|앞에서|도착)/i;
 const warmPattern = /[!~ㅎㅋ🙂😊😄😂😍]/;
 const hedgePattern = /(애매|바쁘|나중에|다음에|봐야|모르겠|힘들|어려|조금|정신없|일정)/i;
 const definitePlanPattern =
@@ -92,6 +96,16 @@ const definitePlanPattern =
 const schedulingAskPattern = /(언제|주말|다음 주|이번 주|시간|볼까|볼까요|가볼까요|만날|약속)/i;
 const closingPattern = /(잘 자|수고|바이|안녕|굿[나밤]|좋은 [밤꿈하]|내일 봐|들어가)/i;
 const topicKeywords = ["전시", "커피", "식사", "영화", "산책", "공연", "맛집", "책", "드라이브"];
+
+function hasInterestQuestion(text: string): boolean {
+  if (!questionPattern.test(text)) {
+    return false;
+  }
+
+  return text
+    .split(/[.!。！]\s*/)
+    .some((fragment) => questionPattern.test(fragment) && !schedulingQuestionPattern.test(fragment));
+}
 
 function averageLength(messages: string[]) {
   if (messages.length === 0) {
@@ -136,7 +150,7 @@ function scoreOtherInitiative(metrics: Pick<MessageMetrics,
   | "firstSenderRole"
   | "otherMessages"
   | "selfMessages"
-  | "otherQuestionCount"
+  | "otherInterestQuestionCount"
   | "otherFutureMentionCount"
   | "otherAverageLength"
 >): number {
@@ -147,7 +161,7 @@ function scoreOtherInitiative(metrics: Pick<MessageMetrics,
     metrics.selfMessages > 0
       ? Math.min(metrics.otherMessages / metrics.selfMessages, 1) * 25
       : 25;
-  const questionScore = Math.min(metrics.otherQuestionCount / Math.max(metrics.otherMessages, 1), 0.5) * 50;
+  const questionScore = Math.min(metrics.otherInterestQuestionCount / Math.max(metrics.otherMessages, 1), 0.5) * 50;
   const futureScore = Math.min(metrics.otherFutureMentionCount, 2) * 10;
   const lengthScore = metrics.otherAverageLength >= 18 ? 10 : 0;
 
@@ -203,6 +217,8 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
   const otherAvgLen = averageLength(otherMessages.map((message) => message.messageText));
   const selfQuestionCount = selfMessages.filter((message) => questionPattern.test(message.messageText)).length;
   const otherQuestionCount = otherMessages.filter((message) => questionPattern.test(message.messageText)).length;
+  const selfInterestQuestionCount = selfMessages.filter((message) => hasInterestQuestion(message.messageText)).length;
+  const otherInterestQuestionCount = otherMessages.filter((message) => hasInterestQuestion(message.messageText)).length;
   const selfToOtherRatio =
     otherMessages.length > 0 ? selfMessages.length / otherMessages.length : selfMessages.length > 0 ? Infinity : 0;
 
@@ -236,6 +252,8 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
     otherResponsePairs,
     selfQuestionCount,
     otherQuestionCount,
+    selfInterestQuestionCount,
+    otherInterestQuestionCount,
     selfSchedulingAskCount: selfMessages.filter((message) =>
       schedulingAskPattern.test(message.messageText),
     ).length,
@@ -259,7 +277,10 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
   };
   const otherInitiativeScore = scoreOtherInitiative(partialMetrics);
   const responseCadenceScore = scoreResponseCadence(averageDelayMinutes);
-  const questionReciprocityScore = scoreQuestionReciprocity(selfQuestionCount, otherQuestionCount);
+  const questionReciprocityScore = scoreQuestionReciprocity(
+    selfInterestQuestionCount,
+    otherInterestQuestionCount,
+  );
   const schedulingCommitmentScore = scoreSchedulingCommitment(partialMetrics);
   const baselineScore = clampScore(
     otherInitiativeScore * 0.3 +

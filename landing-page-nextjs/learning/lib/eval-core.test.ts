@@ -11,17 +11,17 @@ describe("deriveTemperature", () => {
   it("maps overall score to coarse temperature bands", () => {
     expect(deriveTemperature(20)).toBe("cold");
     expect(deriveTemperature(50)).toBe("neutral");
-    expect(deriveTemperature(68)).toBe("warm");
+    expect(deriveTemperature(72)).toBe("warm");
     expect(deriveTemperature(85)).toBe("hot");
   });
 
-  it("uses boundaries: <40 cold, <60 neutral, <75 warm, else hot", () => {
-    expect(deriveTemperature(39)).toBe("cold");
-    expect(deriveTemperature(40)).toBe("neutral");
-    expect(deriveTemperature(59)).toBe("neutral");
-    expect(deriveTemperature(60)).toBe("warm");
-    expect(deriveTemperature(74)).toBe("warm");
-    expect(deriveTemperature(75)).toBe("hot");
+  it("uses calibrated boundaries: <45 cold, <70 neutral, <85 warm, else hot", () => {
+    expect(deriveTemperature(44)).toBe("cold");
+    expect(deriveTemperature(45)).toBe("neutral");
+    expect(deriveTemperature(69)).toBe("neutral");
+    expect(deriveTemperature(70)).toBe("warm");
+    expect(deriveTemperature(84)).toBe("warm");
+    expect(deriveTemperature(85)).toBe("hot");
   });
 });
 
