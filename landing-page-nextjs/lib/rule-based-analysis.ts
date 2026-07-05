@@ -116,12 +116,20 @@ const meetingLowReciprocityPatterns = [
 const followUpPositivePatterns = [
   /상대가 먼저 연락/i,
   /연락(?:이)?\s*이어지고/i,
-  /먼저\s*잘\s*들어갔/i,
+  /상대가\s*먼저.*잘\s*들어갔/i,
 ];
 const followUpCautionPatterns = [
-  /답장(?:은|이)?(?:.*)?(?:짧|느려|늦)/i,
-  /연락.*(?:줄|식|뜸)/i,
+  /답장(?:은|이)?(?:.*)?짧(?:아졌|았)/i,
+  /답장(?:은|이)?(?:.*)?느려(?:지|졌)/i,
+  /답장(?:은|이)?(?:.*)?늦어졌/i,
+  /연락(?:이)?(?:.*)?뜸해졌/i,
+  /연락(?:이)?(?:.*)?줄었/i,
   /만남 뒤 연락에서 답장이 느려지거나 짧아졌/i,
+];
+const followUpCautionNegationPatterns = [
+  /짧지(?:는)?\s*않/i,
+  /늦지(?:는)?\s*않/i,
+  /느리지(?:는)?\s*않/i,
 ];
 
 function hasInterestQuestion(text: string): boolean {
@@ -159,6 +167,14 @@ function hasSituationEvidence(conversation: StoredConversation): boolean {
 
 function hasAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
+}
+
+function hasFollowUpCautionPattern(text: string): boolean {
+  if (hasAny(text, followUpCautionNegationPatterns)) {
+    return false;
+  }
+
+  return hasAny(text, followUpCautionPatterns);
 }
 
 function clampScore(score: number): number {
@@ -425,7 +441,7 @@ function addSituationSignals(
   const hasMeetingPositive = !hasMeetingNegative && hasAny(text, meetingPositivePatterns);
   const hasMeetingCaution = hasAny(text, meetingLowReciprocityPatterns);
   const hasFollowUpPositive = hasAny(text, followUpPositivePatterns);
-  const hasFollowUpCaution = hasAny(text, followUpCautionPatterns);
+  const hasFollowUpCaution = hasFollowUpCautionPattern(text);
 
   if (hasMeetingPositive) {
     signalFactory.add(

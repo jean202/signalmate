@@ -419,6 +419,23 @@ describe("situation-first analysis", () => {
     expect(result.recommendedAction).toBe("keep_light");
   });
 
+  it("does not treat self-first well-home follow-up as a positive or caution signal", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 만남 분위기는 괜찮았습니다. 집에 와서 제가 먼저 잘 들어갔냐고 보냈어요.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 괜찮았습니다. 만남 뒤에는 제가 먼저 잘 들어갔냐고 보냈어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("post_meeting_followup_positive");
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+  });
+
   it("uses situation-based caution summary and action for sparse chats with strong follow-up evidence", () => {
     const conversation = makeConversation(
       [
@@ -479,6 +496,38 @@ describe("situation-first analysis", () => {
 
     expect(signalKeys).toContain("post_meeting_followup_caution");
     expect(result.recommendedAction).toBe("slow_down");
+  });
+
+  it("does not treat explicit negation of short or slow replies as caution", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "만남 뒤 연락은 이어졌고 답장은 짧지 않았어요. 늦지는 않았어요. 느리지는 않았어요.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만남 뒤 연락은 이어졌고 답장은 짧지 않았어요. 늦지는 않았어요. 느리지는 않았어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+  });
+
+  it("keeps direct cooling phrases as caution", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "답장은 짧았습니다. 답장이 느려졌습니다. 연락이 뜸해졌습니다. 연락이 줄었습니다.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 답장은 짧았습니다. 답장이 느려졌습니다. 연락이 뜸해졌습니다. 연락이 줄었습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_caution");
   });
 
   it("does not misread negative meeting notes as positive vibe", () => {
