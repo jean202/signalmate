@@ -175,7 +175,7 @@ export function buildSignalEnhancerUserPrompt(params: {
   // Stage baseline will be injected by the importing module
   const stageBaseline = formatStageBaseline(params.relationshipStage);
 
-  return `## 대화 원문
+  return `## 상황 원문
 ${params.rawText}
 
 ## 관계 컨텍스트
@@ -183,6 +183,9 @@ ${params.rawText}
 - 만남 경로: ${params.meetingChannel}
 - 사용자 목표: ${params.userGoal}
 ${formatSituationContext(params.situationContext)}${stageBaseline}
+채팅이 없거나 적어도 실제 만남 후기와 만남 뒤 연락 흐름을 근거로 분석합니다.
+단, 사용자의 느낌만으로 상대 마음을 단정하지 말고 관찰된 행동과 연락 흐름을 구분해 설명합니다.
+
 ## 규칙 기반 분석 결과 (시그널 ${params.signals.length}개)
 ${signalList}
 
@@ -209,7 +212,7 @@ export function buildRecommendationUserPrompt(params: {
   // Stage baseline will be injected by the importing module
   const stageBaseline = formatStageBaseline(params.relationshipStage);
 
-  return `## 대화 원문
+  return `## 상황 원문
 ${params.rawText}
 
 ## 관계 컨텍스트
@@ -217,6 +220,9 @@ ${params.rawText}
 - 만남 경로: ${params.meetingChannel}
 - 사용자 목표: ${params.userGoal}
 ${formatSituationContext(params.situationContext)}${stageBaseline}
+실제 만남, 만남 뒤 연락, 채팅 원문만으로 보이는 신호를 구분해서 다음 행동을 제안합니다.
+채팅 원문만 보고 단정하지 말고 가장 최근의 만남 뒤 연락 흐름을 함께 반영합니다.
+
 ## 분석 요약
 ${params.overallSummary}
 
