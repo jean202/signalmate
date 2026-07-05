@@ -352,3 +352,47 @@ describe("emoji_drop signal", () => {
     expect(signal).toBeUndefined();
   });
 });
+
+describe("situation-first analysis", () => {
+  it("creates meeting and follow-up signals when there are no parsed chat messages", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 처음 만났고 대화는 두 시간 정도 이어졌습니다. 상대가 웃으면서 듣긴 했지만 질문은 많지 않았고 다음 약속 이야기는 없었습니다. 집에 와서 내가 먼저 연락했고 답장은 왔지만 짧았습니다.",
+      situationContext:
+        "입력은 실제 만남 후기 중심입니다. 직접 1번 만났습니다. 만났을 때 분위기는 좋았습니다. 상대 적극성은 낮아 보였습니다. 만남 뒤에는 내가 먼저 연락했습니다. 사용자는 연락을 더 할지 기다릴지 판단하고 싶어합니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toEqual(
+      expect.arrayContaining([
+        "meeting_positive_vibe",
+        "meeting_low_reciprocity",
+        "post_meeting_followup_caution",
+        "signal_conflict",
+      ]),
+    );
+    expect(result.overallSummary).toContain("만남");
+    expect(result.recommendedAction).toBe("slow_down");
+  });
+
+  it("treats other-first follow-up as a positive post-meeting signal", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 만남 분위기가 좋았고 집에 온 뒤 상대가 먼저 잘 들어갔냐고 연락했습니다. 이후에도 연락이 이어지고 있습니다.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤에는 상대가 먼저 연락했습니다. 만남 뒤 연락이 이어지고 있습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_positive");
+    expect(result.recommendedAction).toBe("keep_light");
+  });
+});
