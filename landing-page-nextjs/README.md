@@ -314,6 +314,7 @@ UI에서는 상황 중심 입력을 보낼 때 보통 `messages: []`와 `guidedA
 
 ```json
 {
+  "messages": [],
   "relationshipStage": "after_first_date",
   "meetingChannel": "blind_date",
   "userGoal": "continue_chat",
@@ -323,7 +324,8 @@ UI에서는 상황 중심 입력을 보낼 때 보통 `messages: []`와 `guidedA
     "meetingCount": "once",
     "meetingVibe": "normal",
     "afterMeetingContact": "slower",
-    "desiredHelp": "wait_or_send"
+    "desiredHelp": "wait_or_send",
+    "freeText": "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다."
   }
 }
 ```
