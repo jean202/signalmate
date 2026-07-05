@@ -80,13 +80,8 @@ export function buildGuidedSituationContext(answers: GuidedAnswers): string | nu
     sentences.push(MEETING_COUNT_LABELS[answers.meetingCount]);
   }
 
-  // Q2: 만남 분위기 (만난 적 있을 때만)
-  if (
-    answers.meetingCount &&
-    answers.meetingCount !== "none" &&
-    answers.meetingVibe &&
-    MEETING_VIBE_LABELS[answers.meetingVibe]
-  ) {
+  // Q2: 만남 분위기
+  if (answers.meetingVibe && answers.meetingVibe !== "none" && MEETING_VIBE_LABELS[answers.meetingVibe]) {
     sentences.push(MEETING_VIBE_LABELS[answers.meetingVibe]);
   }
 

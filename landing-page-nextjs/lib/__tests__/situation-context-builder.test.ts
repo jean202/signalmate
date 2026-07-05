@@ -53,6 +53,15 @@ describe("situation input helpers", () => {
     ).toBe(true);
   });
 
+  it("rejects long generic chat text without situation keywords", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText:
+          "오늘은 뭐했어 밥은 먹었어 나도 그냥 집에 있었고 내일은 일찍 일어나야 해서 일찍 잘 것 같아 근데 주말에 볼까 말까는 아직 모르겠어 그냥 얘기만 이어가는 중이야",
+      }),
+    ).toBe(false);
+  });
+
   it("allows structured fallback when meeting vibe and after-meeting contact are present", () => {
     expect(
       hasEnoughSituationInput({
@@ -63,6 +72,17 @@ describe("situation input helpers", () => {
         },
       }),
     ).toBe(true);
+  });
+
+  it("builds meeting vibe context even without meeting count", () => {
+    expect(
+      buildGuidedSituationContext({
+        meetingVibe: "good",
+        afterMeetingContact: "slower",
+      }),
+    ).toBe(
+      "만났을 때 분위기는 좋았습니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다.",
+    );
   });
 
   it("keeps chat-focused input blocked", () => {

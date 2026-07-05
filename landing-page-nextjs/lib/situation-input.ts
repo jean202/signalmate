@@ -30,6 +30,23 @@ export type GuidedAnswers = {
 
 const SITUATION_FIRST_FOCUS: SituationInputFocus[] = ["meeting_note", "mixed", "follow_up"];
 const MIN_SITUATION_TEXT_LENGTH = 20;
+const SITUATION_KEYWORDS = [
+  "만났",
+  "만남",
+  "어제",
+  "분위기",
+  "답장",
+  "연락",
+  "애프터",
+  "질문",
+  "상대",
+  "다음 약속",
+  "소개팅",
+  "데이트",
+  "후기",
+  "회신",
+  "관심",
+];
 
 export function isSituationFirstFocus(focus: SituationInputFocus | undefined): boolean {
   return focus !== undefined && SITUATION_FIRST_FOCUS.includes(focus);
@@ -50,14 +67,23 @@ export function hasEnoughSituationInput(params: {
     .filter(Boolean)
     .join(" ");
 
-  if (text.length >= MIN_SITUATION_TEXT_LENGTH) {
-    return true;
-  }
-
-  return (
+  const hasStructuredFallback =
     params.guidedAnswers?.meetingVibe !== undefined &&
     params.guidedAnswers.meetingVibe !== "none" &&
     params.guidedAnswers?.afterMeetingContact !== undefined &&
-    params.guidedAnswers.afterMeetingContact !== "not_applicable"
-  );
+    params.guidedAnswers.afterMeetingContact !== "not_applicable";
+
+  if (hasStructuredFallback) {
+    return true;
+  }
+
+  if (isSituationFirstFocus(focus)) {
+    return text.length >= MIN_SITUATION_TEXT_LENGTH;
+  }
+
+  if (text.length >= MIN_SITUATION_TEXT_LENGTH) {
+    return SITUATION_KEYWORDS.some((keyword) => text.includes(keyword));
+  }
+
+  return false;
 }
