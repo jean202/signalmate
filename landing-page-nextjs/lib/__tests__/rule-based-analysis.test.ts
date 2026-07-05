@@ -449,6 +449,38 @@ describe("situation-first analysis", () => {
     expect(result.recommendedActionReason).toContain("만남 뒤 연락 온도");
   });
 
+  it("does not treat self-first follow-up alone as caution or slow_down", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤에는 내가 먼저 연락했습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+    expect(result.recommendedAction).not.toBe("slow_down");
+  });
+
+  it("keeps slower follow-up as caution and slow_down for structured-only input", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_caution");
+    expect(result.recommendedAction).toBe("slow_down");
+  });
+
   it("does not misread negative meeting notes as positive vibe", () => {
     const conversation = makeConversation([], {
       relationshipStage: "after_first_date",

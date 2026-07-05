@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAnalysisRequestInput,
+  buildCreateConversationRequestBody,
   parseConversationMessages,
   resolveMessagesForAnalysisInput,
   shouldSendParsedMessages,
@@ -76,6 +77,56 @@ describe("analysis input message contract", () => {
     expect("situationContext" in result).toBe(false);
   });
 
+  it("builds the exact request body for mixed input without top-level situationContext", () => {
+    const result = buildCreateConversationRequestBody({
+      title: "직접 붙여넣은 대화",
+      sourceType: "manual",
+      relationshipStage: "after_first_date",
+      meetingChannel: "blind_date",
+      userGoal: "continue_chat",
+      saveMode: "temporary",
+      rawText:
+        "[오후 8:10] 나: 오늘 즐거웠어요.\n[오후 8:12] 상대: 저도요.\n카페에서는 분위기가 좋았는데 집에 가서는 답장이 느려졌어요.",
+      inputFocus: "mixed",
+      guidedAnswers: {
+        inputFocus: "mixed",
+        freeText: "이미 적어둔 메모",
+      },
+      selfName: "나",
+    });
+
+    expect(result).toEqual({
+      title: "직접 붙여넣은 대화",
+      sourceType: "manual",
+      relationshipStage: "after_first_date",
+      meetingChannel: "blind_date",
+      userGoal: "continue_chat",
+      saveMode: "temporary",
+      rawText:
+        "[오후 8:10] 나: 오늘 즐거웠어요.\n[오후 8:12] 상대: 저도요.\n카페에서는 분위기가 좋았는데 집에 가서는 답장이 느려졌어요.",
+      selfName: "나",
+      messages: [
+        {
+          senderRole: "self",
+          messageText: "오늘 즐거웠어요.",
+          sentAt: null,
+          sequenceNo: 1,
+        },
+        {
+          senderRole: "other",
+          messageText: "저도요.",
+          sentAt: null,
+          sequenceNo: 2,
+        },
+      ],
+      guidedAnswers: {
+        inputFocus: "mixed",
+        freeText: "이미 적어둔 메모\n\n카페에서는 분위기가 좋았는데 집에 가서는 답장이 느려졌어요.",
+      },
+    });
+    expect("situationContext" in result).toBe(false);
+  });
+
   it("keeps situation-only meeting notes as free-text evidence without messages", () => {
     const result = buildAnalysisRequestInput({
       rawText: "소개팅 분위기는 좋았는데 헤어진 뒤로 연락이 조금 뜸해졌어요.",
@@ -107,6 +158,29 @@ describe("analysis input message contract", () => {
     );
   });
 
+  it("builds situation-only request body with empty messages", () => {
+    const result = buildCreateConversationRequestBody({
+      title: "직접 붙여넣은 대화",
+      sourceType: "manual",
+      relationshipStage: "after_first_date",
+      meetingChannel: "blind_date",
+      userGoal: "continue_chat",
+      saveMode: "temporary",
+      rawText: "소개팅 분위기는 좋았는데 헤어진 뒤로 연락이 조금 뜸해졌어요.",
+      inputFocus: "meeting_note",
+      guidedAnswers: {
+        inputFocus: "meeting_note",
+      },
+      selfName: "나",
+    });
+
+    expect(result.messages).toEqual([]);
+    expect(result.guidedAnswers.freeText).toBe(
+      "소개팅 분위기는 좋았는데 헤어진 뒤로 연락이 조금 뜸해졌어요.",
+    );
+    expect("situationContext" in result).toBe(false);
+  });
+
   it("preserves chat-focused continuation parsing", () => {
     const messages = parseConversationMessages("나: 오늘 어땠어요?\n사진도 잘 봤어요.\n상대: 저도 재밌었어요.");
     const result = buildAnalysisRequestInput({
@@ -120,5 +194,28 @@ describe("analysis input message contract", () => {
     expect(messages[0]?.messageText).toBe("오늘 어땠어요?\n사진도 잘 봤어요.");
     expect(result.messages).toEqual(messages);
     expect(result.guidedAnswers.freeText).toBeUndefined();
+  });
+
+  it("builds chat-focused request body with continuation parsing preserved", () => {
+    const result = buildCreateConversationRequestBody({
+      title: "직접 붙여넣은 대화",
+      sourceType: "manual",
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      saveMode: "temporary",
+      rawText: "나: 오늘 어땠어요?\n사진도 잘 봤어요.\n상대: 저도 재밌었어요.",
+      inputFocus: "chat",
+      guidedAnswers: {
+        inputFocus: "chat",
+      },
+      selfName: "나",
+    });
+
+    expect(result.messages).toEqual(
+      parseConversationMessages("나: 오늘 어땠어요?\n사진도 잘 봤어요.\n상대: 저도 재밌었어요."),
+    );
+    expect(result.guidedAnswers.freeText).toBeUndefined();
+    expect("situationContext" in result).toBe(false);
   });
 });

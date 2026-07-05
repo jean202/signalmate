@@ -118,9 +118,8 @@ const followUpPositivePatterns = [
   /먼저\s*잘\s*들어갔/i,
 ];
 const followUpCautionPatterns = [
-  /답장(?:은|이)?\s*(?:짧|느려|늦)/i,
+  /답장(?:은|이)?(?:.*)?(?:짧|느려|늦)/i,
   /연락.*(?:줄|식|뜸)/i,
-  /내가 먼저 연락/i,
   /만남 뒤 연락에서 답장이 느려지거나 짧아졌/i,
 ];
 

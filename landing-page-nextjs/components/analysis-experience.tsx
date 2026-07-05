@@ -10,7 +10,7 @@ import {
   type MouseEvent,
 } from "react";
 import {
-  buildAnalysisRequestInput,
+  buildCreateConversationRequestBody,
   parseConversationMessages,
   shouldSendParsedMessages,
 } from "@/lib/analysis-input";
@@ -793,12 +793,19 @@ export function AnalysisExperience() {
   }
 
   async function handleRunAnalysis() {
-    const analysisInput = buildAnalysisRequestInput({
+    const conversationRequestBody = buildCreateConversationRequestBody({
+      title: "직접 붙여넣은 대화",
+      sourceType: "manual",
+      relationshipStage,
+      meetingChannel,
+      userGoal,
+      saveMode,
       rawText,
       inputFocus,
       guidedAnswers,
+      selfName: "나",
     });
-    const messages = analysisInput.messages;
+    const messages = conversationRequestBody.messages;
 
     if (messages.length < 2 && !canProceedFromInput) {
       setStep("input");
@@ -831,18 +838,7 @@ export function AnalysisExperience() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: "직접 붙여넣은 대화",
-            sourceType: "manual",
-            relationshipStage,
-            meetingChannel,
-            userGoal,
-            saveMode,
-            rawText,
-            guidedAnswers: analysisInput.guidedAnswers,
-            selfName: "나",
-            messages,
-          }),
+          body: JSON.stringify(conversationRequestBody),
         },
       );
 

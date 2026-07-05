@@ -1,5 +1,6 @@
 import { parseChatText } from "@/lib/chat-parser";
 import type { GuidedAnswers, SituationInputFocus } from "@/lib/situation-input";
+import type { SaveMode } from "@/lib/store";
 
 export type AnalysisInputMessage = {
   senderRole: "self" | "other" | "unknown";
@@ -13,6 +14,28 @@ type BuildAnalysisRequestInputParams = {
   inputFocus: SituationInputFocus;
   guidedAnswers: GuidedAnswers;
   selfName?: string;
+};
+
+type BuildCreateConversationRequestBodyParams = BuildAnalysisRequestInputParams & {
+  title: string;
+  sourceType: string;
+  relationshipStage: string;
+  meetingChannel: string;
+  userGoal: string;
+  saveMode: SaveMode;
+};
+
+export type CreateConversationRequestBody = {
+  title: string;
+  sourceType: string;
+  relationshipStage: string;
+  meetingChannel: string;
+  userGoal: string;
+  saveMode: SaveMode;
+  rawText: string;
+  selfName: string;
+  guidedAnswers: GuidedAnswers;
+  messages: AnalysisInputMessage[];
 };
 
 const SELF_SPEAKER_PATTERN = "나|저|me|self|mine";
@@ -169,5 +192,38 @@ export function buildAnalysisRequestInput({
       ...guidedAnswers,
       freeText: mergeSituationFreeText(guidedAnswers.freeText, situationText),
     },
+  };
+}
+
+export function buildCreateConversationRequestBody({
+  title,
+  sourceType,
+  relationshipStage,
+  meetingChannel,
+  userGoal,
+  saveMode,
+  rawText,
+  inputFocus,
+  guidedAnswers,
+  selfName = "나",
+}: BuildCreateConversationRequestBodyParams): CreateConversationRequestBody {
+  const analysisInput = buildAnalysisRequestInput({
+    rawText,
+    inputFocus,
+    guidedAnswers,
+    selfName,
+  });
+
+  return {
+    title,
+    sourceType,
+    relationshipStage,
+    meetingChannel,
+    userGoal,
+    saveMode,
+    rawText,
+    selfName,
+    guidedAnswers: analysisInput.guidedAnswers,
+    messages: analysisInput.messages,
   };
 }

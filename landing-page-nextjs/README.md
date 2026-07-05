@@ -286,9 +286,12 @@ curl -X POST .../conversations -d '{
   "relationshipStage": "after_first_date",
   "meetingChannel": "dating_app",
   "userGoal": "evaluate_interest",
-  "rawText": "나: 어제 재밌었어!\n상대: 나도! 다음에 또 보자",
-  "situationContext": "3번째 만남이고, 직접 만났을 때 분위기는 좋았어요. 상대는 원래 답장이 느린 편이에요.",
-  "messages": [...]
+  "rawText": "3번째 만남이고, 직접 만났을 때 분위기는 좋았어요. 상대는 원래 답장이 느린 편이에요.",
+  "messages": [],
+  "guidedAnswers": {
+    "inputFocus": "meeting_note",
+    "freeText": "3번째 만남이고, 직접 만났을 때 분위기는 좋았어요. 상대는 원래 답장이 느린 편이에요."
+  }
 }'
 
 # Mode B: 가이드 질문 응답
@@ -302,6 +305,8 @@ curl -X POST .../conversations -d '{
   }
 }'
 ```
+
+UI에서는 상황 중심 입력을 보낼 때 보통 `messages: []`와 `guidedAnswers.freeText`를 함께 보냅니다. 서버는 같은 내용을 `rawText`나 `situationContext`로 받아도 처리할 수 있습니다.
 
 ### 상황 중심 분석
 
