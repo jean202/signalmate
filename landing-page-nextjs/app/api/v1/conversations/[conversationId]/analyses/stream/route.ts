@@ -45,6 +45,7 @@ export async function POST(request: Request, context: RouteContext) {
       meetingChannel: string;
       userGoal: string;
       situationContext?: string | null;
+      // situation-only 입력을 위해 빈 배열도 허용한다.
       messages: Array<{
         senderRole: string;
         messageText: string;

@@ -1,8 +1,12 @@
 import { errorResponse, successResponse } from "@/lib/api-response";
 import { createConversation, type SaveMode, type SenderRole } from "@/lib/store";
-import { mergeSituationContext, type GuidedAnswers } from "@/lib/situation-context-builder";
 import { getCurrentUserId } from "@/lib/auth-helpers";
 import { parseChatText } from "@/lib/chat-parser";
+import { mergeSituationContext } from "@/lib/situation-context-builder";
+import {
+  hasEnoughSituationInput,
+  type GuidedAnswers,
+} from "@/lib/situation-input";
 
 type ConversationMessageInput = {
   senderRole?: "self" | "other" | "unknown";
@@ -81,10 +85,6 @@ export async function POST(request: Request) {
     }));
   }
 
-  if (normalizedMessages.length === 0) {
-    return errorResponse(400, "VALIDATION_ERROR", "Could not parse any messages from the input.");
-  }
-
   if (body.saveMode && !validSaveModes.includes(body.saveMode as SaveMode)) {
     return errorResponse(400, "VALIDATION_ERROR", "saveMode must be temporary or saved.");
   }
@@ -93,6 +93,20 @@ export async function POST(request: Request) {
   const situationContext = mergeSituationContext(body.situationContext, body.guidedAnswers);
   if (situationContext && situationContext.length > 2000) {
     return errorResponse(400, "VALIDATION_ERROR", "situationContext must be 2000 characters or less.");
+  }
+
+  const allowsSituationOnly = hasEnoughSituationInput({
+    rawText: body.rawText,
+    situationContext: body.situationContext,
+    guidedAnswers: body.guidedAnswers,
+  });
+
+  if (normalizedMessages.length === 0 && !allowsSituationOnly) {
+    return errorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "채팅 메시지를 찾지 못했어요. 만남 후기만 입력할 때는 상황을 20자 이상 적고 입력 중심을 만남 후기나 만남 뒤 연락으로 선택해 주세요.",
+    );
   }
 
   // 로그인된 유저가 있으면 연결 (비로그인도 허용)
