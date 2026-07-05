@@ -87,6 +87,65 @@ describe("runAgentAnalysis", () => {
       }),
     );
   });
+
+  it("treats situation context as analysis evidence in system and initial prompts", async () => {
+    anthropicMocks.create.mockResolvedValue(
+      makeMessage([
+        {
+          type: "tool_use",
+          id: "tool-1",
+          name: "submit_result",
+          input: {
+            overallSummary: "만남 메모와 후속 연락을 함께 보면 아직 더 지켜볼 구간입니다.",
+            confidenceLevel: "medium",
+            recommendedAction: "slow_down",
+            recommendedActionReason: "만남 뒤 연락 흐름도 근거로 같이 봐야 합니다.",
+            signals: [
+              {
+                signalType: "caution",
+                signalKey: "post_meeting_followup_caution",
+                title: "만남 뒤 연락 온도 주의",
+                description: "답장 흐름이 다소 식은 신호로 읽힙니다.",
+                evidenceText: "답장이 느려지고 짧아졌습니다.",
+                confidenceLevel: "medium",
+              },
+            ],
+            recommendations: [
+              makeRecommendation("next_message", "가벼운 확인"),
+              makeRecommendation("tone_guide", "조금 느슨한 톤"),
+              makeRecommendation("avoid_phrase", "재촉 표현 피하기"),
+            ],
+          },
+        },
+      ]),
+    );
+
+    await runAgentAnalysis(
+      makeConversationFixture({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "evaluate_interest",
+        rawText: "",
+        situationContext: "만남 메모와 만남 뒤 연락 흐름입니다. 답장이 느려지고 짧아졌습니다.",
+        messages: [],
+      }),
+    );
+
+    expect(anthropicMocks.create).toHaveBeenCalled();
+    const request = anthropicMocks.create.mock.calls[0]?.[0];
+    const systemPrompt = request?.system?.[0]?.text;
+    const initialPrompt = request?.messages?.[0]?.content;
+
+    expect(systemPrompt).toContain("만남 메모, 만남 뒤 연락, 사용자가 제공한 배경 맥락");
+    expect(systemPrompt).toContain("채팅 텍스트가 없거나 적으면 situation context도 분석 근거");
+    expect(systemPrompt).not.toContain("대화에 드러나지 않는 배경 맥락");
+    expect(systemPrompt).not.toContain("대화 텍스트의 증거가 우선");
+
+    expect(initialPrompt).toContain("이 블록은 만남 메모, 만남 뒤 연락, 또는 배경 맥락을 담을 수 있습니다.");
+    expect(initialPrompt).toContain("채팅 텍스트가 없거나 적으면 이 블록도 분석 근거입니다.");
+    expect(initialPrompt).not.toContain("대화 텍스트에 나타나지 않는 배경 맥락입니다.");
+    expect(initialPrompt).not.toContain("대화 텍스트의 증거가 우선합니다.");
+  });
 });
 
 function makeMessage(content: unknown[]) {

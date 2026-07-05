@@ -91,6 +91,28 @@ describe("POST /api/v1/conversations", () => {
     );
   });
 
+  it("accepts long top-level situationContext without marker terms", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        situationContext: "서로의 기대와 이후 방향이 조금 달라 보여서 판단이 어렵고 어떻게 움직여야 할지 고민입니다.",
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawText: "",
+        messages: [],
+        situationContext: "서로의 기대와 이후 방향이 조금 달라 보여서 판단이 어렵고 어떻게 움직여야 할지 고민입니다.",
+      }),
+    );
+  });
+
   it("creates a conversation from structured guided answers only", async () => {
     const { POST } = await import("../route");
     const response = await POST(
@@ -182,6 +204,42 @@ describe("POST /api/v1/conversations", () => {
         userGoal: "continue_chat",
         rawText: "만났어",
         guidedAnswers: { inputFocus: "meeting_note" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects short top-level situationContext without chat messages", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        situationContext: "판단이 어려워요",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects overlong merged situationContext instead of truncating it", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        situationContext: "가".repeat(2100),
+        guidedAnswers: {
+          inputFocus: "follow_up",
+          afterMeetingContact: "slower",
+        },
       }),
     );
 

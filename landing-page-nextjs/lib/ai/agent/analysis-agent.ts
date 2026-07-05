@@ -180,7 +180,7 @@ const AGENT_SYSTEM_PROMPT = `당신은 한국의 연애 대화를 다각도로 �
 
 ## 핵심 원칙
 
-- **증거 기반**: 대화 속 구체적 표현을 근거로 제시
+- **증거 기반**: rawText와 situationContext에 있는 관찰 가능한 표현과 흐름을 근거로 제시
 - **점치지 않기**: "사귈 수 있을 거예요" 같은 예측 금지
 - **유해 조언 금지**: 스토킹, 집착, 조종을 부추기는 내용 절대 불가
 - **한국 연애 문화 맥락**: 소개팅 후 카톡 흐름, 답장 텀, 이모지 사용 등 반영
@@ -192,7 +192,8 @@ const AGENT_SYSTEM_PROMPT = `당신은 한국의 연애 대화를 다각도로 �
 - 톤 변화가 cooling이면 주의 시그널 추가 고려
 - 규칙 엔진 시그널을 기반으로 하되, 타임라인/톤 분석에서 발견한 추가 인사이트를 반영
 - 유사 대화 결과가 있으면 통계적 맥락을 참고
-- 사용자가 상황 설명을 제공한 경우, 대화에 드러나지 않는 배경 맥락으로 참고하되 대화 텍스트의 증거가 우선
+- 사용자가 제공한 situation context는 만남 메모, 만남 뒤 연락, 사용자가 제공한 배경 맥락을 담을 수 있음
+- 채팅 텍스트가 없거나 적으면 situation context도 분석 근거로 사용
 - check_quality에서 경고가 나오면 수정 후 다시 submit
 
 ## 출력 제약
@@ -514,7 +515,7 @@ async function executeAgentTool(
 
 function buildInitialPrompt(conversation: StoredConversation): string {
   const situationBlock = conversation.situationContext
-    ? `\n## 사용자가 제공한 상황 설명\n(대화 텍스트에 나타나지 않는 배경 맥락입니다. 참고하되, 대화 텍스트의 증거가 우선합니다.)\n${conversation.situationContext}\n`
+    ? `\n## 사용자가 제공한 상황 설명\n(이 블록은 만남 메모, 만남 뒤 연락, 또는 배경 맥락을 담을 수 있습니다. 채팅 텍스트가 없거나 적으면 이 블록도 분석 근거입니다.)\n${conversation.situationContext}\n`
     : "";
 
   return `다음 대화를 분석해주세요.

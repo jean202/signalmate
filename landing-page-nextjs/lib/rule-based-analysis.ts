@@ -169,12 +169,17 @@ function hasAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
 
-function hasFollowUpCautionPattern(text: string): boolean {
-  if (hasAny(text, followUpCautionNegationPatterns)) {
-    return false;
-  }
+function maskPatternSpans(text: string, patterns: RegExp[]): string {
+  return patterns.reduce((currentText, pattern) => {
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    const globalPattern = new RegExp(pattern.source, flags);
+    return currentText.replace(globalPattern, (match) => " ".repeat(match.length));
+  }, text);
+}
 
-  return hasAny(text, followUpCautionPatterns);
+function hasFollowUpCautionPattern(text: string): boolean {
+  const textWithoutNegatedSpans = maskPatternSpans(text, followUpCautionNegationPatterns);
+  return hasAny(textWithoutNegatedSpans, followUpCautionPatterns);
 }
 
 function clampScore(score: number): number {

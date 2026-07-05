@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // situationContext: Mode A(자유 텍스트) + Mode B(가이드 응답) 병합, 최대 2000자
+  // situationContext: Mode A(자유 텍스트) + Mode B(가이드 응답) 병합. 길이 제한은 아래에서 검증한다.
   const situationContext = mergeSituationContext(body.situationContext, body.guidedAnswers);
   if (situationContext && situationContext.length > 2000) {
     return errorResponse(400, "VALIDATION_ERROR", "situationContext must be 2000 characters or less.");

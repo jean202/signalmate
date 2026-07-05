@@ -135,14 +135,14 @@ export function mergeSituationContext(
 
   if (guidedText && trimmedFree) {
     if (trimmedGuidedFree && trimmedGuidedFree === trimmedFree) {
-      return guidedText.slice(0, 2000);
+      return guidedText;
     }
 
     // 가이드 텍스트 + 추가 자유 입력
-    return `${guidedText} ${trimmedFree}`.slice(0, 2000);
+    return `${guidedText} ${trimmedFree}`;
   }
 
-  return (guidedText || trimmedFree)?.slice(0, 2000) ?? null;
+  return guidedText || trimmedFree;
 }
 
 export type { GuidedAnswers } from "@/lib/situation-input";

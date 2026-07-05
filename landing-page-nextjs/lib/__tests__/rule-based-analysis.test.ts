@@ -514,6 +514,21 @@ describe("situation-first analysis", () => {
     expect(signalKeys).not.toContain("post_meeting_followup_caution");
   });
 
+  it("keeps cooling evidence when a negated phrase appears elsewhere", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "답장은 짧지 않았지만 연락이 뜸해졌어요.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 답장은 짧지 않았지만 연락이 뜸해졌어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_caution");
+  });
+
   it("keeps direct cooling phrases as caution", () => {
     const conversation = makeConversation([], {
       relationshipStage: "after_first_date",

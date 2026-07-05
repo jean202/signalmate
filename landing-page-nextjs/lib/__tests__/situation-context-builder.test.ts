@@ -47,6 +47,19 @@ describe("buildGuidedSituationContext", () => {
       "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다. 답장이 갑자기 짧아졌어요.",
     );
   });
+
+  it("does not truncate merged situation context before route validation", () => {
+    const freeText = "가".repeat(2100);
+    const result = mergeSituationContext(freeText, {
+      inputFocus: "follow_up",
+      afterMeetingContact: "slower",
+    });
+
+    expect(result).toBe(
+      `입력은 만남 뒤 연락 흐름 중심입니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다. ${freeText}`,
+    );
+    expect(result?.length).toBeGreaterThan(2000);
+  });
 });
 
 describe("situation input helpers", () => {
@@ -71,6 +84,15 @@ describe("situation input helpers", () => {
       hasEnoughSituationInput({
         rawText: "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다.",
         guidedAnswers: { inputFocus: "meeting_note" },
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts explicit top-level situation context by length even without marker terms", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText: "",
+        situationContext: "서로의 기대와 이후 방향이 조금 달라 보여서 판단이 어렵습니다.",
       }),
     ).toBe(true);
   });

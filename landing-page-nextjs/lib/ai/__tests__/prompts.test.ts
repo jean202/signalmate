@@ -3,6 +3,8 @@ import {
   formatStageBaseline,
   buildSignalEnhancerUserPrompt,
   buildRecommendationUserPrompt,
+  SIGNAL_ENHANCER_SYSTEM_PROMPT,
+  RECOMMENDATION_SYSTEM_PROMPT,
 } from "../prompts/index";
 
 describe("formatStageBaseline", () => {
@@ -47,6 +49,18 @@ describe("buildSignalEnhancerUserPrompt includes stage baseline", () => {
 });
 
 describe("situation-first prompt wording", () => {
+  it("uses situation context as valid evidence in system prompts", () => {
+    expect(SIGNAL_ENHANCER_SYSTEM_PROMPT).toContain("rawText와 situationContext");
+    expect(SIGNAL_ENHANCER_SYSTEM_PROMPT).toContain("실제 만남 메모와 만남 뒤 연락 메모");
+    expect(SIGNAL_ENHANCER_SYSTEM_PROMPT).not.toContain("대화 속 구체적 표현");
+    expect(SIGNAL_ENHANCER_SYSTEM_PROMPT).not.toContain("대화 원문");
+
+    expect(RECOMMENDATION_SYSTEM_PROMPT).toContain("rawText와 situationContext");
+    expect(RECOMMENDATION_SYSTEM_PROMPT).toContain("실제 만남 메모나 만남 뒤 연락 메모");
+    expect(RECOMMENDATION_SYSTEM_PROMPT).not.toContain("상대가 대화에서 언급한 구체적 소재");
+    expect(RECOMMENDATION_SYSTEM_PROMPT).not.toContain("대화 속 소재가 충분하지 않으면");
+  });
+
   it("labels raw input as situation input for signal enhancement", () => {
     const prompt = buildSignalEnhancerUserPrompt({
       rawText: "어제 만났고 이후 답장이 짧아졌습니다.",

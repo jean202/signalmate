@@ -65,6 +65,10 @@ export function hasEnoughSituationInput(params: {
       ? situationContextText.slice(generatedGuidedContext.length).trim()
       : situationContextText;
 
+  if (freeSituationContext.length >= MIN_SITUATION_TEXT_LENGTH) {
+    return true;
+  }
+
   const text = [params.rawText, freeSituationContext, params.guidedAnswers?.freeText]
     .map((value) => value?.trim() ?? "")
     .filter(Boolean)
