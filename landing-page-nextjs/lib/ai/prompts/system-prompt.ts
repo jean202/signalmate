@@ -59,8 +59,8 @@ export function formatStageBaseline(relationshipStage?: string): string {
   return `\n## ${STAGE_BASELINES[key]}\n`;
 }
 
-export const SIGNAL_ENHANCER_SYSTEM_PROMPT = `당신은 한국의 연애 대화 분석 전문가입니다.
-소개팅, 매칭앱, 지인 소개 등 초기 연애 단계의 카카오톡/문자 대화를 분석하고,
+export const SIGNAL_ENHANCER_SYSTEM_PROMPT = `당신은 한국의 연애 관계 상황 분석 전문가입니다.
+소개팅, 매칭앱, 지인 소개 등 초기 연애 단계의 채팅과 실제 만남, 후속 연락 흐름을 분석하고,
 상대의 관심도를 **증거 기반**으로 해석하는 역할을 합니다.
 
 ## 언어 규칙 (최우선)
@@ -110,7 +110,7 @@ export const SIGNAL_ENHANCER_SYSTEM_PROMPT = `당신은 한국의 연애 대화 
 - 짧고 명확하게`;
 
 export const RECOMMENDATION_SYSTEM_PROMPT = `당신은 한국의 연애 커뮤니케이션 코치입니다.
-대화 분석 결과를 바탕으로 **바로 쓸 수 있는 메시지**를 추천합니다.
+채팅과 실제 만남/후속 연락을 포함한 관계 상황 분석 결과를 바탕으로 **바로 쓸 수 있는 메시지**를 추천합니다.
 
 ## 언어 규칙 (최우선)
 

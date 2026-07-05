@@ -101,6 +101,11 @@ const meetingPositivePatterns = [
   /대화(?:는|가)?\s*(?:끊기지|이어졌|잘 통|편했)/i,
   /웃으면서|잘 들어줬|시간(?:이)?\s*(?:빨리|금방)/i,
 ];
+const meetingNegativePatterns = [
+  /분위기(?:는|가)?\s*(?:좋지\s*않|안\s*좋|별로|나쁘)/i,
+  /대화(?:는|가)?\s*(?:잘\s*통하지\s*않|안\s*통|끊겼|어색했)/i,
+  /편하지\s*않|안\s*편|불편했/i,
+];
 const meetingLowReciprocityPatterns = [
   /질문(?:은|이)?\s*(?:많지|적|없)/i,
   /다음\s*(?:약속|만남|일정).*(?:없|안)/i,
@@ -416,7 +421,8 @@ function addSituationSignals(
   hasFollowUpCaution: boolean;
 } {
   const text = getSituationText(conversation);
-  const hasMeetingPositive = hasAny(text, meetingPositivePatterns);
+  const hasMeetingNegative = hasAny(text, meetingNegativePatterns);
+  const hasMeetingPositive = !hasMeetingNegative && hasAny(text, meetingPositivePatterns);
   const hasMeetingCaution = hasAny(text, meetingLowReciprocityPatterns);
   const hasFollowUpPositive = hasAny(text, followUpPositivePatterns);
   const hasFollowUpCaution = hasAny(text, followUpCautionPatterns);

@@ -448,4 +448,20 @@ describe("situation-first analysis", () => {
     expect(result.recommendedAction).toBe("slow_down");
     expect(result.recommendedActionReason).toContain("만남 뒤 연락 온도");
   });
+
+  it("does not misread negative meeting notes as positive vibe", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 소개팅에서 만났는데 분위기는 좋지 않았어요. 대화가 잘 통하지 않았고 편하지도 않았어요. 답장은 아직 오고 있습니다.",
+      situationContext:
+        "입력은 실제 만남 후기 중심입니다. 분위기는 좋지 않았어요. 대화가 잘 통하지 않았어요. 편하지 않았어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("meeting_positive_vibe");
+  });
 });

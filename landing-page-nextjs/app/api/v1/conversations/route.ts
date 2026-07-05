@@ -77,8 +77,8 @@ export async function POST(request: Request) {
 
   let normalizedMessages: { senderRole: SenderRole; messageText: string; sentAt: string | null; sequenceNo: number }[];
 
-  if (Array.isArray(body.messages) && body.messages.length > 0) {
-    // Mode 1: Pre-parsed messages provided
+  if (Array.isArray(body.messages)) {
+    // Mode 1: Pre-parsed messages provided. 빈 배열도 명시적 입력으로 존중한다.
     normalizedMessages = body.messages
       .map((message, index) => ({
         senderRole: validSenderRoles.includes(message.senderRole ?? "unknown")

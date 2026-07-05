@@ -131,8 +131,13 @@ export function mergeSituationContext(
 ): string | null {
   const guidedText = guidedAnswers ? buildGuidedSituationContext(guidedAnswers) : null;
   const trimmedFree = freeText?.trim() || null;
+  const trimmedGuidedFree = guidedAnswers?.freeText?.trim() || null;
 
   if (guidedText && trimmedFree) {
+    if (trimmedGuidedFree && trimmedGuidedFree === trimmedFree) {
+      return guidedText.slice(0, 2000);
+    }
+
     // 가이드 텍스트 + 추가 자유 입력
     return `${guidedText} ${trimmedFree}`.slice(0, 2000);
   }

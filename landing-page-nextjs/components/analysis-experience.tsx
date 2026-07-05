@@ -10,6 +10,7 @@ import {
   type MouseEvent,
 } from "react";
 import { parseChatText } from "@/lib/chat-parser";
+import { resolveMessagesForAnalysisInput, shouldSendParsedMessages } from "@/lib/analysis-input";
 import { groupSignalsByContext } from "@/lib/signal-groups";
 import {
   MAX_IMAGE_UPLOAD_FILES,
@@ -37,7 +38,7 @@ const sampleConversation = `[오후 8:10] 나: 오늘 잘 들어갔어요?
 [오후 8:31] 상대: 이번 주말은 조금 애매한데, 다음 주는 괜찮을 것 같아요.`;
 
 const progressSteps = [
-  { key: "input", label: "대화 붙여넣기", caption: "카톡 그대로" },
+  { key: "input", label: "상황 입력하기", caption: "채팅·만남 메모" },
   { key: "context", label: "상황 알려주기", caption: "어떤 사이?" },
   { key: "loading", label: "신호 읽는 중", caption: "잠깐만요" },
   { key: "results", label: "결과 확인", caption: "다음 메시지까지" },
@@ -474,25 +475,6 @@ function parseConversationMessages(rawText: string): ConversationMessageInput[] 
     .filter((message) => message.messageText.length > 0);
 }
 
-function hasRecognizableSpeakers(messages: ConversationMessageInput[]) {
-  return messages.some((message) => message.senderRole === "self" || message.senderRole === "other");
-}
-
-function shouldSendParsedMessages(
-  messages: ConversationMessageInput[],
-  inputFocus: SituationInputFocus,
-) {
-  if (messages.length === 0) {
-    return false;
-  }
-
-  if (inputFocus === "chat") {
-    return true;
-  }
-
-  return hasRecognizableSpeakers(messages);
-}
-
 function createUploadItem(file: File, index: number): ImageUploadItem {
   return {
     id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
@@ -855,9 +837,7 @@ export function AnalysisExperience() {
 
   async function handleRunAnalysis() {
     const parsedInputMessages = parseConversationMessages(rawText);
-    const messages = shouldSendParsedMessages(parsedInputMessages, inputFocus)
-      ? parsedInputMessages
-      : [];
+    const messages = resolveMessagesForAnalysisInput(parsedInputMessages, inputFocus);
 
     if (messages.length < 2 && !canProceedFromInput) {
       setStep("input");
@@ -899,7 +879,6 @@ export function AnalysisExperience() {
             saveMode,
             rawText,
             guidedAnswers,
-            situationContext: situationFreeText,
             selfName: "나",
             messages,
           }),
@@ -1455,7 +1434,7 @@ export function AnalysisExperience() {
         {step === "loading" ? (
           <section className={`${styles.card} ${styles.loadingCard}`}>
             <p className={styles.kicker}>3단계</p>
-            <h2>대화 속 신호를 읽고 있어요</h2>
+            <h2>관계 신호를 읽고 있어요</h2>
             <p className={styles.loadingDescription}>{loadingMessages[loadingMessageIndex]}</p>
             <div className={styles.loadingMeter} aria-hidden="true">
               <span />
@@ -1654,8 +1633,8 @@ export function AnalysisExperience() {
                 <div className={styles.resultCard}>
                   <div className={styles.resultCardHeader}>
                     <div>
-                      <p className={styles.kicker}>입력한 대화</p>
-                      <h3>분석에 쓰인 대화 일부</h3>
+                      <p className={styles.kicker}>입력한 상황</p>
+                      <h3>분석에 반영된 내용 일부</h3>
                     </div>
                   </div>
                   <div className={styles.excerptBox}>

@@ -34,6 +34,19 @@ describe("buildGuidedSituationContext", () => {
     );
     expect(result?.length).toBeLessThanOrEqual(2000);
   });
+
+  it("does not append duplicate free text when guided answers already contain it", () => {
+    const result = mergeSituationContext("답장이 갑자기 짧아졌어요.", {
+      inputFocus: "follow_up",
+      meetingVibe: "good",
+      afterMeetingContact: "slower",
+      freeText: "답장이 갑자기 짧아졌어요.",
+    });
+
+    expect(result).toBe(
+      "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다. 답장이 갑자기 짧아졌어요.",
+    );
+  });
 });
 
 describe("situation input helpers", () => {

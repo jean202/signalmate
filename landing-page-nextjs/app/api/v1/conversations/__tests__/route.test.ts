@@ -117,6 +117,62 @@ describe("POST /api/v1/conversations", () => {
     );
   });
 
+  it("respects explicit empty messages without reparsing rawText", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        rawText: "나: 오늘 잘 들어갔어요?\n상대: 네, 잘 들어갔어요.",
+        messages: [],
+        guidedAnswers: {
+          inputFocus: "follow_up",
+          meetingVibe: "good",
+          afterMeetingContact: "slower",
+          freeText: "답장이 갑자기 짧아졌어요.",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [],
+        situationContext: expect.stringContaining("답장이 갑자기 짧아졌어요."),
+      }),
+    );
+  });
+
+  it("does not duplicate free-text notes when the same note is sent in both fields", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        rawText: "어제 만나고 나서 답장이 짧아졌어요.",
+        messages: [],
+        situationContext: "답장이 갑자기 짧아졌어요.",
+        guidedAnswers: {
+          inputFocus: "follow_up",
+          meetingVibe: "good",
+          afterMeetingContact: "slower",
+          freeText: "답장이 갑자기 짧아졌어요.",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [],
+        situationContext:
+          "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다. 답장이 갑자기 짧아졌어요.",
+      }),
+    );
+  });
+
   it("keeps rejecting short non-chat input", async () => {
     const { POST } = await import("../route");
     const response = await POST(
