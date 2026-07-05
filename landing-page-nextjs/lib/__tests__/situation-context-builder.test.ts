@@ -53,6 +53,15 @@ describe("situation input helpers", () => {
     ).toBe(true);
   });
 
+  it("allows long free text when meeting_note focus is selected", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText: "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다.",
+        guidedAnswers: { inputFocus: "meeting_note" },
+      }),
+    ).toBe(true);
+  });
+
   it("rejects long generic chat text without situation keywords", () => {
     expect(
       hasEnoughSituationInput({

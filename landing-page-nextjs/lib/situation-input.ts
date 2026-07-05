@@ -30,22 +30,14 @@ export type GuidedAnswers = {
 
 const SITUATION_FIRST_FOCUS: SituationInputFocus[] = ["meeting_note", "mixed", "follow_up"];
 const MIN_SITUATION_TEXT_LENGTH = 20;
-const SITUATION_KEYWORDS = [
-  "만났",
-  "만남",
-  "어제",
-  "분위기",
-  "답장",
-  "연락",
-  "애프터",
-  "질문",
-  "상대",
-  "다음 약속",
-  "소개팅",
-  "데이트",
-  "후기",
-  "회신",
-  "관심",
+const OFFLINE_MEETING_MARKERS = ["만났", "만남", "소개팅", "데이트", "애프터"];
+const FOLLOW_UP_MARKERS = ["분위기", "답장", "연락", "다음 약속", "또 보", "후속"];
+const EXPLICIT_FOLLOW_UP_PHRASES = [
+  "만남 뒤",
+  "만난 뒤",
+  "만난 후",
+  "이후 연락",
+  "후속 연락",
 ];
 
 export function isSituationFirstFocus(focus: SituationInputFocus | undefined): boolean {
@@ -82,7 +74,19 @@ export function hasEnoughSituationInput(params: {
   }
 
   if (text.length >= MIN_SITUATION_TEXT_LENGTH) {
-    return SITUATION_KEYWORDS.some((keyword) => text.includes(keyword));
+    const hasExplicitFollowUpPhrase = EXPLICIT_FOLLOW_UP_PHRASES.some((phrase) =>
+      text.includes(phrase),
+    );
+    if (hasExplicitFollowUpPhrase) {
+      return true;
+    }
+
+    const hasOfflineMeetingMarker = OFFLINE_MEETING_MARKERS.some((marker) =>
+      text.includes(marker),
+    );
+    const hasFollowUpMarker = FOLLOW_UP_MARKERS.some((marker) => text.includes(marker));
+
+    return hasOfflineMeetingMarker && hasFollowUpMarker;
   }
 
   return false;
