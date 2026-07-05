@@ -41,7 +41,7 @@ export function hasEnoughSituationInput(params: {
   guidedAnswers?: GuidedAnswers | null;
 }): boolean {
   const focus = params.guidedAnswers?.inputFocus;
-  if (!isSituationFirstFocus(focus)) {
+  if (focus === "chat") {
     return false;
   }
 
@@ -54,10 +54,10 @@ export function hasEnoughSituationInput(params: {
     return true;
   }
 
-  return Boolean(
-    params.guidedAnswers?.meetingVibe &&
-      params.guidedAnswers.meetingVibe !== "none" &&
-      params.guidedAnswers?.afterMeetingContact &&
-      params.guidedAnswers.afterMeetingContact !== "not_applicable",
+  return (
+    params.guidedAnswers?.meetingVibe !== undefined &&
+    params.guidedAnswers.meetingVibe !== "none" &&
+    params.guidedAnswers?.afterMeetingContact !== undefined &&
+    params.guidedAnswers.afterMeetingContact !== "not_applicable"
   );
 }

@@ -49,9 +49,29 @@ describe("situation input helpers", () => {
     expect(
       hasEnoughSituationInput({
         rawText: "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다.",
-        guidedAnswers: { inputFocus: "meeting_note" },
       }),
     ).toBe(true);
+  });
+
+  it("allows structured fallback when meeting vibe and after-meeting contact are present", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText: "짧은 메모",
+        guidedAnswers: {
+          meetingVibe: "good",
+          afterMeetingContact: "slower",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps chat-focused input blocked", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText: "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다.",
+        guidedAnswers: { inputFocus: "chat" },
+      }),
+    ).toBe(false);
   });
 
   it("rejects very short non-chat input", () => {
