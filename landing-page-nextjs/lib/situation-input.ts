@@ -1,3 +1,5 @@
+import { buildGuidedSituationContext } from "@/lib/situation-context-builder";
+
 export type SituationInputFocus = "chat" | "meeting_note" | "mixed" | "follow_up";
 export type MeetingVibe = "none" | "awkward" | "normal" | "good" | "great";
 export type OtherInitiative = "low" | "medium" | "high" | "unknown";
@@ -54,7 +56,16 @@ export function hasEnoughSituationInput(params: {
     return false;
   }
 
-  const text = [params.rawText, params.situationContext, params.guidedAnswers?.freeText]
+  const generatedGuidedContext = params.guidedAnswers
+    ? buildGuidedSituationContext(params.guidedAnswers)
+    : null;
+  const situationContextText = params.situationContext?.trim() ?? "";
+  const freeSituationContext =
+    generatedGuidedContext && situationContextText.startsWith(generatedGuidedContext)
+      ? situationContextText.slice(generatedGuidedContext.length).trim()
+      : situationContextText;
+
+  const text = [params.rawText, freeSituationContext, params.guidedAnswers?.freeText]
     .map((value) => value?.trim() ?? "")
     .filter(Boolean)
     .join(" ");

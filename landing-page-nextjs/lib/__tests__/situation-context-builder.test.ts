@@ -111,4 +111,16 @@ describe("situation input helpers", () => {
       }),
     ).toBe(false);
   });
+
+  it("rejects merged context when it only adds focus labels to short text", () => {
+    expect(
+      hasEnoughSituationInput({
+        rawText: "만났어",
+        situationContext: mergeSituationContext(undefined, {
+          inputFocus: "meeting_note",
+        }),
+        guidedAnswers: { inputFocus: "meeting_note" },
+      }),
+    ).toBe(false);
+  });
 });

@@ -67,6 +67,56 @@ describe("POST /api/v1/conversations", () => {
     expect(payload.data.conversation.messageCount).toBe(0);
   });
 
+  it("creates a conversation from situationContext only without chat messages", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        situationContext:
+          "소개팅에서 처음 만났는데 분위기는 괜찮았고, 만남 뒤에는 상대 답장이 조금 느려져서 먼저 다시 연락해도 될지 고민입니다.",
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawText: "",
+        messages: [],
+        situationContext:
+          "소개팅에서 처음 만났는데 분위기는 괜찮았고, 만남 뒤에는 상대 답장이 조금 느려져서 먼저 다시 연락해도 될지 고민입니다.",
+      }),
+    );
+  });
+
+  it("creates a conversation from structured guided answers only", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        guidedAnswers: {
+          inputFocus: "follow_up",
+          meetingVibe: "good",
+          afterMeetingContact: "slower",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawText: "",
+        messages: [],
+        situationContext: expect.stringContaining("만났을 때 분위기는 좋았습니다"),
+      }),
+    );
+  });
+
   it("keeps rejecting short non-chat input", async () => {
     const { POST } = await import("../route");
     const response = await POST(
@@ -76,6 +126,21 @@ describe("POST /api/v1/conversations", () => {
         userGoal: "continue_chat",
         rawText: "만났어",
         guidedAnswers: { inputFocus: "meeting_note" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps rejecting completely empty input", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
       }),
     );
 

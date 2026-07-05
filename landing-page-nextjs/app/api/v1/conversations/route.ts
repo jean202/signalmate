@@ -55,7 +55,23 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.rawText?.trim() && (!Array.isArray(body.messages) || body.messages.length === 0)) {
+  // situationContext: Mode A(자유 텍스트) + Mode B(가이드 응답) 병합, 최대 2000자
+  const situationContext = mergeSituationContext(body.situationContext, body.guidedAnswers);
+  if (situationContext && situationContext.length > 2000) {
+    return errorResponse(400, "VALIDATION_ERROR", "situationContext must be 2000 characters or less.");
+  }
+
+  const allowsSituationOnly = hasEnoughSituationInput({
+    rawText: body.rawText,
+    situationContext,
+    guidedAnswers: body.guidedAnswers,
+  });
+
+  if (
+    !body.rawText?.trim() &&
+    (!Array.isArray(body.messages) || body.messages.length === 0) &&
+    !allowsSituationOnly
+  ) {
     return errorResponse(400, "VALIDATION_ERROR", "rawText or messages is required.");
   }
 
@@ -74,32 +90,22 @@ export async function POST(request: Request) {
       }))
       .filter((message) => message.messageText.length > 0)
       .sort((left, right) => left.sequenceNo - right.sequenceNo);
-  } else {
+  } else if (body.rawText?.trim()) {
     // Mode 2: Auto-parse from rawText
-    const parseResult = parseChatText(body.rawText!, body.selfName);
+    const parseResult = parseChatText(body.rawText, body.selfName);
     normalizedMessages = parseResult.messages.map((m) => ({
       senderRole: m.senderRole as SenderRole,
       messageText: m.messageText,
       sentAt: m.sentAt,
       sequenceNo: m.sequenceNo,
     }));
+  } else {
+    normalizedMessages = [];
   }
 
   if (body.saveMode && !validSaveModes.includes(body.saveMode as SaveMode)) {
     return errorResponse(400, "VALIDATION_ERROR", "saveMode must be temporary or saved.");
   }
-
-  // situationContext: Mode A(자유 텍스트) + Mode B(가이드 응답) 병합, 최대 2000자
-  const situationContext = mergeSituationContext(body.situationContext, body.guidedAnswers);
-  if (situationContext && situationContext.length > 2000) {
-    return errorResponse(400, "VALIDATION_ERROR", "situationContext must be 2000 characters or less.");
-  }
-
-  const allowsSituationOnly = hasEnoughSituationInput({
-    rawText: body.rawText,
-    situationContext: body.situationContext,
-    guidedAnswers: body.guidedAnswers,
-  });
 
   if (normalizedMessages.length === 0 && !allowsSituationOnly) {
     return errorResponse(
