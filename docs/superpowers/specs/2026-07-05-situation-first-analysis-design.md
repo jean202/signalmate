@@ -192,6 +192,8 @@ type SituationInput = {
 
 ### 1차
 
+이 구현 계획은 1차 범위와 최소한의 상황 기반 규칙 신호까지 포함한다. 사람/관계 단위 타임라인 모델과 학습 CLI의 사후 피드백 입력은 다음 계획에서 다룬다.
+
 - 입력 화면 문구 변경
 - `inputFocus`와 만남 후 선택 질문 추가
 - `situation-context-builder` 확장

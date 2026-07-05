@@ -303,6 +303,26 @@ curl -X POST .../conversations -d '{
 }'
 ```
 
+### 상황 중심 분석
+
+채팅 캡처 없이 실제 만남 후기만으로도 분석할 수 있습니다.
+
+```json
+{
+  "relationshipStage": "after_first_date",
+  "meetingChannel": "blind_date",
+  "userGoal": "continue_chat",
+  "rawText": "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다.",
+  "guidedAnswers": {
+    "inputFocus": "meeting_note",
+    "meetingCount": "once",
+    "meetingVibe": "normal",
+    "afterMeetingContact": "slower",
+    "desiredHelp": "wait_or_send"
+  }
+}
+```
+
 **분석 요청 예시**:
 ```bash
 # 규칙 기반
