@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "env -u ANTHROPIC_API_KEY next dev --port 3000",
+    "dev": "env -u ANTHROPIC_API_KEY next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "test": "vitest run",
