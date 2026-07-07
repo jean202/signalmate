@@ -286,9 +286,12 @@ curl -X POST .../conversations -d '{
   "relationshipStage": "after_first_date",
   "meetingChannel": "dating_app",
   "userGoal": "evaluate_interest",
-  "rawText": "나: 어제 재밌었어!\n상대: 나도! 다음에 또 보자",
-  "situationContext": "3번째 만남이고, 직접 만났을 때 분위기는 좋았어요. 상대는 원래 답장이 느린 편이에요.",
-  "messages": [...]
+  "rawText": "3번째 만남이고, 직접 만났을 때 분위기는 좋았어요. 상대는 원래 답장이 느린 편이에요.",
+  "messages": [],
+  "guidedAnswers": {
+    "inputFocus": "meeting_note",
+    "freeText": "3번째 만남이고, 직접 만났을 때 분위기는 좋았어요. 상대는 원래 답장이 느린 편이에요."
+  }
 }'
 
 # Mode B: 가이드 질문 응답
@@ -301,6 +304,30 @@ curl -X POST .../conversations -d '{
     "freeText": "갑자기 이모지를 안 쓰기 시작해서 걱정"
   }
 }'
+```
+
+UI에서는 상황 중심 입력을 보낼 때 보통 `messages: []`와 `guidedAnswers.freeText`를 함께 보냅니다. 서버는 같은 내용을 `rawText`나 `situationContext`로 받아도 처리할 수 있습니다.
+
+### 상황 중심 분석
+
+채팅 캡처 없이 실제 만남 후기만으로도 분석할 수 있습니다.
+
+```json
+{
+  "messages": [],
+  "relationshipStage": "after_first_date",
+  "meetingChannel": "blind_date",
+  "userGoal": "continue_chat",
+  "rawText": "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다.",
+  "guidedAnswers": {
+    "inputFocus": "meeting_note",
+    "meetingCount": "once",
+    "meetingVibe": "normal",
+    "afterMeetingContact": "slower",
+    "desiredHelp": "wait_or_send",
+    "freeText": "어제 처음 만났고 분위기는 괜찮았지만 만남 뒤 답장이 짧아졌습니다."
+  }
+}
 ```
 
 **분석 요청 예시**:

@@ -32,3 +32,6 @@ captures/
 
 # Local git worktrees
 .worktrees/
+
+# Local superpowers workflow scratch files
+.superpowers/

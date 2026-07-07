@@ -527,6 +527,24 @@
   box-shadow: 0 0 0 4px rgba(255, 79, 129, 0.14);
 }
 
+.smallTextarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.smallTextarea:focus {
+  outline: none;
+  border-color: var(--brand-pink);
+  box-shadow: 0 0 0 4px rgba(255, 79, 129, 0.14);
+}
+
 .metaRow {
   display: flex;
   justify-content: space-between;
@@ -632,6 +650,27 @@
   color: var(--color-ink-mute);
 }
 
+.situationPreview {
+  margin-top: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.situationPreview strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.situationPreview p {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .tipCard,
 .evidenceBox,
 .excerptBox {
@@ -644,6 +683,7 @@
 
 .tipCard strong,
 .signalCard h4,
+.signalCard h5,
 .recommendationCard h4 {
   font-size: 1rem;
 }
@@ -858,6 +898,30 @@
   gap: 1rem;
 }
 
+.groupedSignalSections {
+  display: grid;
+  gap: 14px;
+}
+
+.signalSection {
+  display: grid;
+  gap: 10px;
+}
+
+.signalSection h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.signalSectionEmpty {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  border: 1px dashed rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+  padding: 12px;
+}
+
 .signalCard,
 .recommendationCard {
   padding: 1rem;
@@ -890,6 +954,7 @@
 }
 
 .signalCard h4,
+.signalCard h5,
 .recommendationCard h4 {
   margin: 0.65rem 0 0;
   font-size: 1rem;

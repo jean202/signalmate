@@ -96,6 +96,41 @@ const definitePlanPattern =
 const schedulingAskPattern = /(언제|주말|다음 주|이번 주|시간|볼까|볼까요|가볼까요|만날|약속)/i;
 const closingPattern = /(잘 자|수고|바이|안녕|굿[나밤]|좋은 [밤꿈하]|내일 봐|들어가)/i;
 const topicKeywords = ["전시", "커피", "식사", "영화", "산책", "공연", "맛집", "책", "드라이브"];
+const meetingPositivePatterns = [
+  /분위기(?:는|가)?\s*(?:좋|괜찮|편|즐거|아주 좋)/i,
+  /대화(?:는|가)?\s*(?:끊기지|이어졌|잘 통|편했)/i,
+  /웃으면서|잘 들어줬|시간(?:이)?\s*(?:빨리|금방)/i,
+];
+const meetingNegativePatterns = [
+  /분위기(?:는|가)?\s*(?:좋지(?:는|도)?\s*않|좋진\s*않|안\s*좋|괜찮지(?:는|도)?\s*않|괜찮진\s*않|별로|나쁘)/i,
+  /(?:전체적(?:으로)?|솔직히)?\s*좋(?:지(?:는|도)?|진)\s*않/i,
+  /대화(?:는|가)?\s*(?:잘\s*통하지\s*않|안\s*통|끊겼|어색했)/i,
+  /편하지\s*않|안\s*편|불편했/i,
+];
+const meetingLowReciprocityPatterns = [
+  /질문(?:은|이)?\s*(?:많지|적|없)/i,
+  /다음\s*(?:약속|만남|일정).*(?:없|안)/i,
+  /또\s*보자는\s*말(?:은|이)?\s*없/i,
+  /상대 적극성은 낮/i,
+];
+const followUpPositivePatterns = [
+  /상대가 먼저 연락/i,
+  /연락(?:이)?\s*이어지고/i,
+  /상대가\s*먼저.*잘\s*들어갔/i,
+];
+const followUpCautionPatterns = [
+  /답장(?:은|이)?(?:.*)?짧(?:아졌|았)/i,
+  /답장(?:은|이)?(?:.*)?느려(?:지|졌)/i,
+  /답장(?:은|이)?(?:.*)?늦어졌/i,
+  /연락(?:이)?(?:.*)?뜸해졌/i,
+  /연락(?:이)?(?:.*)?줄었/i,
+  /만남 뒤 연락에서 답장이 느려지거나 짧아졌/i,
+];
+const followUpCautionNegationPatterns = [
+  /짧지(?:는)?\s*않/i,
+  /늦지(?:는)?\s*않/i,
+  /느리지(?:는)?\s*않/i,
+];
 
 function hasInterestQuestion(text: string): boolean {
   if (!questionPattern.test(text)) {
@@ -114,6 +149,37 @@ function averageLength(messages: string[]) {
 
   const totalLength = messages.reduce((sum, message) => sum + message.length, 0);
   return totalLength / messages.length;
+}
+
+function getSituationText(conversation: StoredConversation): string {
+  const situationOnlyRawText =
+    conversation.messages.length === 0 ? conversation.rawText : null;
+
+  return [conversation.situationContext, situationOnlyRawText]
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean)
+    .join("\n");
+}
+
+function hasSituationEvidence(conversation: StoredConversation): boolean {
+  return getSituationText(conversation).length >= 20;
+}
+
+function hasAny(text: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function maskPatternSpans(text: string, patterns: RegExp[]): string {
+  return patterns.reduce((currentText, pattern) => {
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    const globalPattern = new RegExp(pattern.source, flags);
+    return currentText.replace(globalPattern, (match) => " ".repeat(match.length));
+  }, text);
+}
+
+function hasFollowUpCautionPattern(text: string): boolean {
+  const textWithoutNegatedSpans = maskPatternSpans(text, followUpCautionNegationPatterns);
+  return hasAny(textWithoutNegatedSpans, followUpCautionPatterns);
 }
 
 function clampScore(score: number): number {
@@ -366,6 +432,85 @@ function buildSignalFactory() {
   };
 }
 
+function addSituationSignals(
+  conversation: StoredConversation,
+  signalFactory: ReturnType<typeof buildSignalFactory>,
+): {
+  hasMeetingPositive: boolean;
+  hasMeetingCaution: boolean;
+  hasFollowUpPositive: boolean;
+  hasFollowUpCaution: boolean;
+} {
+  const text = getSituationText(conversation);
+  const hasMeetingNegative = hasAny(text, meetingNegativePatterns);
+  const hasMeetingPositive = !hasMeetingNegative && hasAny(text, meetingPositivePatterns);
+  const hasMeetingCaution = hasAny(text, meetingLowReciprocityPatterns);
+  const hasFollowUpPositive = hasAny(text, followUpPositivePatterns);
+  const hasFollowUpCaution = hasFollowUpCautionPattern(text);
+
+  if (hasMeetingPositive) {
+    signalFactory.add(
+      "positive",
+      "meeting_positive_vibe",
+      "실제 만남 분위기는 나쁘지 않았어요",
+      "사용자가 기록한 만남 후기에 대화가 이어지거나 분위기가 괜찮았다는 근거가 있습니다.",
+      "만남 후기에서 좋은 분위기나 편한 대화 흐름이 확인됐습니다.",
+      "medium",
+    );
+  }
+
+  if (hasMeetingCaution) {
+    signalFactory.add(
+      "ambiguous",
+      "meeting_low_reciprocity",
+      "만남 중 상호 호응은 더 확인이 필요해요",
+      "분위기는 괜찮았더라도 질문, 다음 만남 언급, 상대 주도성이 약했다는 기록이 있습니다.",
+      "만남 후기에서 질문 부족이나 다음 약속 언급 부재가 확인됐습니다.",
+      "medium",
+    );
+  }
+
+  if (hasFollowUpPositive) {
+    signalFactory.add(
+      "positive",
+      "post_meeting_followup_positive",
+      "만남 뒤 연락이 이어지고 있어요",
+      "상대가 먼저 연락했거나 만남 뒤 대화가 이어지는 흐름은 긍정 신호입니다.",
+      "만남 이후 상대 선연락 또는 이어지는 연락 흐름이 확인됐습니다.",
+      "medium",
+    );
+  }
+
+  if (hasFollowUpCaution) {
+    signalFactory.add(
+      "caution",
+      "post_meeting_followup_caution",
+      "만남 뒤 연락 온도는 조심스럽게 봐야 해요",
+      "만남 이후 답장이 짧아지거나 느려진 흐름은 최신 신호로 보수적으로 해석해야 합니다.",
+      "만남 이후 짧거나 느려진 답장 흐름이 확인됐습니다.",
+      "medium",
+    );
+  }
+
+  if ((hasMeetingPositive || hasFollowUpPositive) && (hasMeetingCaution || hasFollowUpCaution)) {
+    signalFactory.add(
+      "ambiguous",
+      "signal_conflict",
+      "좋은 신호와 조심할 신호가 섞여 있어요",
+      "만남 분위기와 이후 연락 흐름이 같은 방향으로만 움직이지 않아 단정하기 어렵습니다.",
+      "실제 만남 신호와 만남 뒤 연락 신호가 서로 다른 방향을 보입니다.",
+      "high",
+    );
+  }
+
+  return {
+    hasMeetingPositive,
+    hasMeetingCaution,
+    hasFollowUpPositive,
+    hasFollowUpCaution,
+  };
+}
+
 function hasLowEngagementPattern(metrics: MessageMetrics) {
   const shortReplyRatio =
     metrics.otherMessages > 0 ? metrics.otherShortReplyCount / metrics.otherMessages : 0;
@@ -521,6 +666,34 @@ function buildConversationHook(conversation: StoredConversation) {
   return "아까 나눈 이야기";
 }
 
+function buildSituationSummary(situationFlags: {
+  hasMeetingPositive: boolean;
+  hasMeetingCaution: boolean;
+  hasFollowUpPositive: boolean;
+  hasFollowUpCaution: boolean;
+}): string | null {
+  if (
+    (situationFlags.hasMeetingPositive || situationFlags.hasFollowUpPositive) &&
+    (situationFlags.hasMeetingCaution || situationFlags.hasFollowUpCaution)
+  ) {
+    return "실제 만남 분위기는 나쁘지 않았지만 이후 연락과 상호 호응은 더 봐야 해, 만남 신호가 엇갈리는 상태입니다.";
+  }
+
+  if (situationFlags.hasFollowUpPositive) {
+    return "실제 만남 뒤 연락이 자연스럽게 이어지고 있어, 만남 이후 흐름은 비교적 안정적인 편입니다.";
+  }
+
+  if (situationFlags.hasMeetingPositive) {
+    return "채팅 표본은 적어도 실제 만남 분위기는 나쁘지 않아, 만남 기준으로는 가볍게 연결을 이어볼 만합니다.";
+  }
+
+  if (situationFlags.hasMeetingCaution || situationFlags.hasFollowUpCaution) {
+    return "실제 만남 이후 신호가 조심스럽게 보여, 만남 해석보다 추가 반응 관찰이 더 중요합니다.";
+  }
+
+  return null;
+}
+
 function buildRecommendations(
   action: RecommendedAction,
   reason: string,
@@ -660,6 +833,14 @@ export function buildRuleBasedAnalysis(
   const stageConfig = STAGE_CONFIGS[stageFromRelationshipStage(conversation.relationshipStage)];
   const metrics = buildMetrics(conversation, stageConfig);
   const signalFactory = buildSignalFactory();
+  const situationFlags = hasSituationEvidence(conversation)
+    ? addSituationSignals(conversation, signalFactory)
+    : {
+        hasMeetingPositive: false,
+        hasMeetingCaution: false,
+        hasFollowUpPositive: false,
+        hasFollowUpCaution: false,
+      };
 
   if (metrics.otherResponsePairs >= 2 || (metrics.otherMessages >= 2 && metrics.otherResponsePairs >= 1)) {
     signalFactory.add(
@@ -892,8 +1073,8 @@ export function buildRuleBasedAnalysis(
       "ambiguous",
       "limited_signal",
       "아직 뚜렷한 신호가 부족합니다",
-      "대화가 너무 짧거나 화자 구분이 희미해 강한 해석을 내리기 어렵습니다.",
-      `총 ${metrics.totalMessages}개 메시지로는 패턴 해석보다 추가 대화 관찰이 더 중요합니다.`,
+      "대화나 상황 기록이 너무 짧아 강한 해석을 내리기 어렵습니다.",
+      `총 ${metrics.totalMessages}개 메시지와 상황 기록을 기준으로는 추가 관찰이 더 중요합니다.`,
       "low",
     );
   }
@@ -903,18 +1084,44 @@ export function buildRuleBasedAnalysis(
   const ambiguousSignalCount = signals.filter((signal) => signal.signalType === "ambiguous").length;
   const cautionSignalCount = signals.filter((signal) => signal.signalType === "caution").length;
   const confidenceLevel = buildConfidenceLevel(metrics, signals.length);
-  const { action, reason } = buildRecommendedAction(
-    metrics,
-    positiveSignalCount,
-    cautionSignalCount,
-  );
+  const situationOnly =
+    hasSituationEvidence(conversation) &&
+    (metrics.totalMessages <= 2 || metrics.otherMessages <= 1);
+  const situationAction =
+    situationOnly && situationFlags.hasFollowUpCaution
+      ? {
+          action: "slow_down" as RecommendedAction,
+          reason:
+            "실제 만남 분위기는 나쁘지 않아도 만남 뒤 연락 온도가 약해 보여서, 지금은 한 템포 낮춰 반응을 보는 편이 안전합니다.",
+        }
+      : situationOnly && situationFlags.hasFollowUpPositive
+        ? {
+            action: "keep_light" as RecommendedAction,
+            reason:
+              "만남 뒤 연락이 이어지고 있어 부담 없는 톤으로 자연스럽게 연결을 유지하는 편이 좋습니다.",
+          }
+        : situationOnly && situationFlags.hasMeetingPositive
+          ? {
+              action: "keep_light" as RecommendedAction,
+              reason:
+                "채팅 근거는 적지만 실제 만남 분위기가 나쁘지 않아, 부담 없는 톤으로 연결을 유지해볼 만합니다.",
+            }
+          : null;
+  const { action, reason } =
+    situationAction ??
+    buildRecommendedAction(
+      metrics,
+      positiveSignalCount,
+      cautionSignalCount,
+    );
   const recommendations = buildRecommendations(action, reason, conversation);
+  const situationSummary = situationOnly ? buildSituationSummary(situationFlags) : null;
 
   return {
     conversationId: conversation.id,
     analysisVersion: options?.analysisVersion?.trim() || "v1",
     modelName: options?.modelName?.trim() || "rule-based-dev",
-    overallSummary: buildSummary(metrics, positiveSignalCount, cautionSignalCount),
+    overallSummary: situationSummary ?? buildSummary(metrics, positiveSignalCount, cautionSignalCount),
     positiveSignalCount,
     ambiguousSignalCount,
     cautionSignalCount,

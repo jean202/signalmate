@@ -22,6 +22,8 @@ export type ParseResult = {
   selfName: string | null;
 };
 
+export type ChatTranscriptLineKind = "empty" | "metadata" | "message" | "other";
+
 // ─── KakaoTalk format ──────────────────────────────────────
 // Korean: "2026년 3월 15일 오후 2:30, 김진하 : 안녕"
 // Korean alt: "[김진하] [오후 2:30] 안녕"
@@ -50,6 +52,67 @@ const GENERIC_TIME_NAME =
 
 // "김진하: 메시지" or "Name: message"
 const SIMPLE_NAME_MSG = /^(.+?)[:：]\s+(.+)$/;
+const SITUATION_NOTE_LABELS = ["상황", "메모", "후기", "느낌", "추가"] as const;
+const MAX_COMPOUND_SITUATION_NOTE_LABEL_LENGTH = 12;
+
+function isSimpleNameCandidate(candidateName: string): boolean {
+  return candidateName.length <= 20 && !candidateName.includes("http") && !candidateName.includes("/");
+}
+
+export function isSituationNoteLabel(rawLabel: string): boolean {
+  const normalizedLabel = rawLabel.trim().replace(/\s+/g, " ");
+
+  if (
+    SITUATION_NOTE_LABELS.includes(
+      normalizedLabel as (typeof SITUATION_NOTE_LABELS)[number],
+    )
+  ) {
+    return true;
+  }
+
+  const compactLabel = normalizedLabel.replace(/\s+/g, "");
+
+  if (
+    compactLabel.length === 0 ||
+    compactLabel.length > MAX_COMPOUND_SITUATION_NOTE_LABEL_LENGTH
+  ) {
+    return false;
+  }
+
+  return SITUATION_NOTE_LABELS.some((token) => compactLabel.includes(token));
+}
+
+export function classifyChatTranscriptLine(rawLine: string): ChatTranscriptLineKind {
+  const trimmed = rawLine.trim();
+
+  if (!trimmed) {
+    return "empty";
+  }
+
+  if (KAKAO_DATE_HEADER_KR.test(trimmed) || KAKAO_DATE_HEADER_EN.test(trimmed)) {
+    return "metadata";
+  }
+
+  if (KAKAO_SYSTEM_MSG.test(trimmed)) {
+    return "metadata";
+  }
+
+  if (
+    KAKAO_LINE_KR.test(trimmed) ||
+    KAKAO_LINE_BRACKET.test(trimmed) ||
+    KAKAO_LINE_EN.test(trimmed) ||
+    GENERIC_TIME_NAME.test(trimmed)
+  ) {
+    return "message";
+  }
+
+  const simpleMatch = trimmed.match(SIMPLE_NAME_MSG);
+  if (simpleMatch && isSimpleNameCandidate(simpleMatch[1].trim())) {
+    return "message";
+  }
+
+  return "other";
+}
 
 // ─── Timestamp parsing ─────────────────────────────────────
 
@@ -213,7 +276,7 @@ export function parseChatText(rawText: string, selfNameHint?: string): ParseResu
     if (match) {
       const candidateName = match[1].trim();
       // Avoid matching URLs or very long "names"
-      if (candidateName.length <= 20 && !candidateName.includes("http") && !candidateName.includes("/")) {
+      if (isSimpleNameCandidate(candidateName)) {
         detectedFormat = "simple";
         collected.push({
           senderName: candidateName,

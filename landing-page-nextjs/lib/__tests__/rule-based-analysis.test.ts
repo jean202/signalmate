@@ -352,3 +352,255 @@ describe("emoji_drop signal", () => {
     expect(signal).toBeUndefined();
   });
 });
+
+describe("situation-first analysis", () => {
+  it("does not create situation signals from general chat rawText when parsed messages exist", () => {
+    const conversation = makeConversation(
+      [
+        { role: "self", text: "오늘 얘기 재밌었어요" },
+        { role: "other", text: "저도요 ㅎㅎ 다음에 또 봐요" },
+      ],
+      {
+        relationshipStage: "before_first_date",
+        rawText:
+          "분위기 좋네요. 다음에 또 얘기해요. 상대가 웃으면서 잘 들어줬고 만남 뒤 내가 먼저 연락했어요.",
+        situationContext: null,
+      },
+    );
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("meeting_positive_vibe");
+    expect(signalKeys).not.toContain("meeting_low_reciprocity");
+    expect(signalKeys).not.toContain("post_meeting_followup_positive");
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+  });
+
+  it("creates meeting and follow-up signals when there are no parsed chat messages", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 처음 만났고 대화는 두 시간 정도 이어졌습니다. 상대가 웃으면서 듣긴 했지만 질문은 많지 않았고 다음 약속 이야기는 없었습니다. 집에 와서 내가 먼저 연락했고 답장은 왔지만 짧았습니다.",
+      situationContext:
+        "입력은 실제 만남 후기 중심입니다. 직접 1번 만났습니다. 만났을 때 분위기는 좋았습니다. 상대 적극성은 낮아 보였습니다. 만남 뒤에는 내가 먼저 연락했습니다. 사용자는 연락을 더 할지 기다릴지 판단하고 싶어합니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toEqual(
+      expect.arrayContaining([
+        "meeting_positive_vibe",
+        "meeting_low_reciprocity",
+        "post_meeting_followup_caution",
+        "signal_conflict",
+      ]),
+    );
+    expect(result.overallSummary).toContain("만남");
+    expect(result.recommendedAction).toBe("slow_down");
+  });
+
+  it("treats other-first follow-up as a positive post-meeting signal", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 만남 분위기가 좋았고 집에 온 뒤 상대가 먼저 잘 들어갔냐고 연락했습니다. 이후에도 연락이 이어지고 있습니다.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤에는 상대가 먼저 연락했습니다. 만남 뒤 연락이 이어지고 있습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_positive");
+    expect(result.recommendedAction).toBe("keep_light");
+  });
+
+  it("does not treat self-first well-home follow-up as a positive or caution signal", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 만남 분위기는 괜찮았습니다. 집에 와서 제가 먼저 잘 들어갔냐고 보냈어요.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 괜찮았습니다. 만남 뒤에는 제가 먼저 잘 들어갔냐고 보냈어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("post_meeting_followup_positive");
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+  });
+
+  it("uses situation-based caution summary and action for sparse chats with strong follow-up evidence", () => {
+    const conversation = makeConversation(
+      [
+        { role: "self", text: "오늘 만나서 좋았어요" },
+        { role: "other", text: "저도요" },
+      ],
+      {
+        relationshipStage: "after_first_date",
+        rawText:
+          "짧게 연락은 오갔지만 아직 채팅 기록은 많지 않습니다.",
+        situationContext:
+          "입력은 만남 후기와 후속 연락 판단입니다. 만났을 때 분위기는 좋았습니다. 상대 적극성은 낮아 보였습니다. 다음 약속 이야기는 없었습니다. 만남 뒤에는 내가 먼저 연락했습니다. 답장은 짧았습니다.",
+      },
+    );
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toEqual(
+      expect.arrayContaining([
+        "meeting_positive_vibe",
+        "meeting_low_reciprocity",
+        "post_meeting_followup_caution",
+      ]),
+    );
+    expect(result.overallSummary).toContain("만남");
+    expect(result.recommendedAction).toBe("slow_down");
+    expect(result.recommendedActionReason).toContain("만남 뒤 연락 온도");
+  });
+
+  it("does not treat self-first follow-up alone as caution or slow_down", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤에는 내가 먼저 연락했습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+    expect(result.recommendedAction).not.toBe("slow_down");
+  });
+
+  it("keeps slower follow-up as caution and slow_down for structured-only input", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만났을 때 분위기는 좋았습니다. 만남 뒤 연락에서 답장이 느려지거나 짧아졌습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_caution");
+    expect(result.recommendedAction).toBe("slow_down");
+  });
+
+  it("does not treat explicit negation of short or slow replies as caution", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "만남 뒤 연락은 이어졌고 답장은 짧지 않았어요. 늦지는 않았어요. 느리지는 않았어요.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 만남 뒤 연락은 이어졌고 답장은 짧지 않았어요. 늦지는 않았어요. 느리지는 않았어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("post_meeting_followup_caution");
+  });
+
+  it("keeps cooling evidence when a negated phrase appears elsewhere", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "답장은 짧지 않았지만 연락이 뜸해졌어요.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 답장은 짧지 않았지만 연락이 뜸해졌어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_caution");
+  });
+
+  it("keeps direct cooling phrases as caution", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "답장은 짧았습니다. 답장이 느려졌습니다. 연락이 뜸해졌습니다. 연락이 줄었습니다.",
+      situationContext:
+        "입력은 만남 뒤 연락 흐름 중심입니다. 답장은 짧았습니다. 답장이 느려졌습니다. 연락이 뜸해졌습니다. 연락이 줄었습니다.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("post_meeting_followup_caution");
+  });
+
+  it("does not misread negative meeting notes as positive vibe", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText:
+        "어제 소개팅에서 만났는데 분위기는 좋지 않았어요. 대화가 잘 통하지 않았고 편하지도 않았어요. 답장은 아직 오고 있습니다.",
+      situationContext:
+        "입력은 실제 만남 후기 중심입니다. 분위기는 좋지 않았어요. 대화가 잘 통하지 않았어요. 편하지 않았어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).not.toContain("meeting_positive_vibe");
+  });
+
+  it("does not misread contracted negative meeting variants as positive vibe", () => {
+    const variants = [
+      "분위기는 괜찮지 않았어요.",
+      "분위기가 괜찮진 않았어요.",
+      "전체적으로 좋진 않았어요.",
+      "분위기는 괜찮지  않았어요.",
+      "분위기가 괜찮진  않았어요.",
+      "솔직히 좋진  않았어요.",
+      "분위기는 좋지는 않았어요.",
+      "분위기는 좋지도 않았어요.",
+      "분위기는 괜찮지는 않았어요.",
+      "분위기는 괜찮지도 않았어요.",
+    ];
+
+    for (const note of variants) {
+      const conversation = makeConversation([], {
+        relationshipStage: "after_first_date",
+        rawText: `어제 소개팅에서 만났는데 ${note} 대화도 조금 어색했어요.`,
+        situationContext: `입력은 실제 만남 후기 중심입니다. ${note} 대화도 조금 어색했어요.`,
+        messages: [],
+      });
+
+      const result = buildRuleBasedAnalysis(conversation);
+      const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+      expect(signalKeys).not.toContain("meeting_positive_vibe");
+    }
+  });
+
+  it("still keeps truly positive meeting notes as positive vibe", () => {
+    const conversation = makeConversation([], {
+      relationshipStage: "after_first_date",
+      rawText: "어제 만났는데 분위기는 괜찮았어요. 대화도 편하게 이어졌어요.",
+      situationContext: "입력은 실제 만남 후기 중심입니다. 분위기는 괜찮았어요. 대화도 편하게 이어졌어요.",
+      messages: [],
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const signalKeys = result.signals.map((signal) => signal.signalKey);
+
+    expect(signalKeys).toContain("meeting_positive_vibe");
+  });
+});
