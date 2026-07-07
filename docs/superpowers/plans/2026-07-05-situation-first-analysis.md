@@ -122,7 +122,7 @@ export function hasEnoughSituationInput(params: {
 - Consumes: no earlier task output.
 - Produces: `GuidedAnswers`, `SituationInputFocus`, `hasEnoughSituationInput()`, expanded `buildGuidedSituationContext()`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `lib/__tests__/situation-context-builder.test.ts`:
 
@@ -194,7 +194,7 @@ describe("situation input helpers", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run from `landing-page-nextjs/`:
 
@@ -204,7 +204,7 @@ npx vitest run lib/__tests__/situation-context-builder.test.ts
 
 Expected: FAIL because `../situation-input` does not exist and `GuidedAnswers` does not include the new fields.
 
-- [ ] **Step 3: Create `lib/situation-input.ts`**
+- [x] **Step 3: Create `lib/situation-input.ts`**
 
 ```ts
 export type SituationInputFocus = "chat" | "meeting_note" | "mixed" | "follow_up";
@@ -272,7 +272,7 @@ export function hasEnoughSituationInput(params: {
 }
 ```
 
-- [ ] **Step 4: Extend `lib/situation-context-builder.ts`**
+- [x] **Step 4: Extend `lib/situation-context-builder.ts`**
 
 Remove the local `GuidedAnswers` type and import it:
 
@@ -343,7 +343,7 @@ Keep the final return:
 return sentences.join(". ").replace(/\.\./g, ".") + ".";
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 npx vitest run lib/__tests__/situation-context-builder.test.ts
@@ -351,7 +351,7 @@ npx vitest run lib/__tests__/situation-context-builder.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add landing-page-nextjs/lib/situation-input.ts landing-page-nextjs/lib/situation-context-builder.ts landing-page-nextjs/lib/__tests__/situation-context-builder.test.ts
@@ -371,7 +371,7 @@ git commit -m "feat: add situation input context helpers"
 - Consumes: `GuidedAnswers`, `hasEnoughSituationInput()` from Task 1.
 - Produces: API behavior where `messages: []` is valid only for meaningful situation-first input.
 
-- [ ] **Step 1: Write route tests**
+- [x] **Step 1: Write route tests**
 
 Create `app/api/v1/conversations/__tests__/route.test.ts`:
 
@@ -485,7 +485,7 @@ describe("POST /api/v1/conversations", () => {
 });
 ```
 
-- [ ] **Step 2: Run route test to verify it fails**
+- [x] **Step 2: Run route test to verify it fails**
 
 ```bash
 npx vitest run app/api/v1/conversations/__tests__/route.test.ts
@@ -493,7 +493,7 @@ npx vitest run app/api/v1/conversations/__tests__/route.test.ts
 
 Expected: FAIL because `route.ts` still rejects zero parsed messages.
 
-- [ ] **Step 3: Modify `app/api/v1/conversations/route.ts` imports and body type**
+- [x] **Step 3: Modify `app/api/v1/conversations/route.ts` imports and body type**
 
 Change imports:
 
@@ -511,7 +511,7 @@ import {
 
 Keep `guidedAnswers?: GuidedAnswers;` in `ConversationCreateBody`.
 
-- [ ] **Step 4: Compute `situationContext` before message validation**
+- [x] **Step 4: Compute `situationContext` before message validation**
 
 Move the existing `situationContext` creation above the `normalizedMessages.length` check:
 
@@ -546,7 +546,7 @@ if (normalizedMessages.length === 0) {
 
 Use `situationContext` in `createConversation()` as before.
 
-- [ ] **Step 5: Update stream inline type**
+- [x] **Step 5: Update stream inline type**
 
 In `app/api/v1/conversations/[conversationId]/analyses/stream/route.ts`, keep the runtime behavior but allow an empty messages array by preserving the current type:
 
@@ -561,7 +561,7 @@ messages: Array<{
 
 No additional validation is added in this route. The conversation creation route owns validation, and inline mode receives the already-normalized payload from the client.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 ```bash
 npx vitest run app/api/v1/conversations/__tests__/route.test.ts
@@ -570,7 +570,7 @@ npm test -- app/api/v1/conversations/[conversationId]/analyses/__tests__/analysi
 
 Expected: both PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add landing-page-nextjs/app/api/v1/conversations/route.ts landing-page-nextjs/app/api/v1/conversations/__tests__/route.test.ts landing-page-nextjs/app/api/v1/conversations/[conversationId]/analyses/stream/route.ts
@@ -589,7 +589,7 @@ git commit -m "feat: allow situation-only conversation input"
 - Consumes: existing `StoredConversation.situationContext` and `rawText`.
 - Produces: new signal keys `meeting_positive_vibe`, `meeting_low_reciprocity`, `post_meeting_followup_positive`, `post_meeting_followup_caution`, `signal_conflict`.
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Append to `lib/__tests__/rule-based-analysis.test.ts`:
 
@@ -639,7 +639,7 @@ describe("situation-first analysis", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 npx vitest run lib/__tests__/rule-based-analysis.test.ts -t "situation-first analysis"
@@ -647,7 +647,7 @@ npx vitest run lib/__tests__/rule-based-analysis.test.ts -t "situation-first ana
 
 Expected: FAIL because the new signal keys are not produced and the no-message summary is still chat-centric.
 
-- [ ] **Step 3: Add situation text helpers to `rule-based-analysis.ts`**
+- [x] **Step 3: Add situation text helpers to `rule-based-analysis.ts`**
 
 Add near the existing regex constants:
 
@@ -698,7 +698,7 @@ const followUpCautionPatterns = [
 ];
 ```
 
-- [ ] **Step 4: Add situation signal builder**
+- [x] **Step 4: Add situation signal builder**
 
 Add before `buildRuleBasedAnalysis()`:
 
@@ -782,7 +782,7 @@ function addSituationSignals(
 }
 ```
 
-- [ ] **Step 5: Invoke situation signals in `buildRuleBasedAnalysis()`**
+- [x] **Step 5: Invoke situation signals in `buildRuleBasedAnalysis()`**
 
 After `const signalFactory = buildSignalFactory();`, add:
 
@@ -856,7 +856,7 @@ if (metrics.totalMessages <= 1 && positiveCount >= 1) {
 }
 ```
 
-- [ ] **Step 6: Run rule tests**
+- [x] **Step 6: Run rule tests**
 
 ```bash
 npx vitest run lib/__tests__/rule-based-analysis.test.ts
@@ -864,7 +864,7 @@ npx vitest run lib/__tests__/rule-based-analysis.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add landing-page-nextjs/lib/rule-based-analysis.ts landing-page-nextjs/lib/__tests__/rule-based-analysis.test.ts
@@ -883,7 +883,7 @@ git commit -m "feat: add situation-aware rule signals"
 - Consumes: existing prompt builders.
 - Produces: prompts that explicitly support relationship situation notes and no-chat inputs.
 
-- [ ] **Step 1: Add failing prompt tests**
+- [x] **Step 1: Add failing prompt tests**
 
 Update the existing import at the top of `lib/ai/__tests__/prompts.test.ts`:
 
@@ -944,7 +944,7 @@ describe("situation-first prompt wording", () => {
 });
 ```
 
-- [ ] **Step 2: Run prompt tests to verify they fail**
+- [x] **Step 2: Run prompt tests to verify they fail**
 
 ```bash
 npx vitest run lib/ai/__tests__/prompts.test.ts
@@ -952,7 +952,7 @@ npx vitest run lib/ai/__tests__/prompts.test.ts
 
 Expected: FAIL because the prompt still says `## 대화 원문` and lacks no-chat situation instructions.
 
-- [ ] **Step 3: Update prompt labels and instructions**
+- [x] **Step 3: Update prompt labels and instructions**
 
 In `buildSignalEnhancerUserPrompt()`, change:
 
@@ -984,7 +984,7 @@ Add this paragraph before `## 분석 요약` in `buildRecommendationUserPrompt()
 채팅 원문만 보고 단정하지 말고 가장 최근의 만남 뒤 연락 흐름을 함께 반영합니다.
 ```
 
-- [ ] **Step 4: Run prompt tests**
+- [x] **Step 4: Run prompt tests**
 
 ```bash
 npx vitest run lib/ai/__tests__/prompts.test.ts
@@ -992,7 +992,7 @@ npx vitest run lib/ai/__tests__/prompts.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add landing-page-nextjs/lib/ai/prompts/system-prompt.ts landing-page-nextjs/lib/ai/__tests__/prompts.test.ts
@@ -1011,7 +1011,7 @@ git commit -m "feat: update prompts for situation-first analysis"
 - Consumes: signal objects with `signalKey`.
 - Produces: `groupSignalsByContext()` for UI rendering.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `lib/__tests__/signal-groups.test.ts`:
 
@@ -1056,7 +1056,7 @@ describe("groupSignalsByContext", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 npx vitest run lib/__tests__/signal-groups.test.ts
@@ -1064,7 +1064,7 @@ npx vitest run lib/__tests__/signal-groups.test.ts
 
 Expected: FAIL because `lib/signal-groups.ts` does not exist.
 
-- [ ] **Step 3: Create `lib/signal-groups.ts`**
+- [x] **Step 3: Create `lib/signal-groups.ts`**
 
 ```ts
 type SignalLike = {
@@ -1114,7 +1114,7 @@ export function groupSignalsByContext<T extends SignalLike>(signals: T[]): Signa
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 npx vitest run lib/__tests__/signal-groups.test.ts
@@ -1122,7 +1122,7 @@ npx vitest run lib/__tests__/signal-groups.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add landing-page-nextjs/lib/signal-groups.ts landing-page-nextjs/lib/__tests__/signal-groups.test.ts
@@ -1141,7 +1141,7 @@ git commit -m "feat: group analysis signals by context"
 - Consumes: `GuidedAnswers` shape from Task 1 and `groupSignalsByContext()` from Task 5.
 - Produces: UI that lets users proceed with non-chat situation text and sends guided answers to the API.
 
-- [ ] **Step 1: Import helpers and add local option types**
+- [x] **Step 1: Import helpers and add local option types**
 
 In `components/analysis-experience.tsx`, add imports:
 
@@ -1199,7 +1199,7 @@ const desiredHelpOptions = [
 ] as const;
 ```
 
-- [ ] **Step 2: Add component state**
+- [x] **Step 2: Add component state**
 
 Inside `AnalysisExperience()`, add state after `userGoal`:
 
@@ -1228,7 +1228,7 @@ const guidedAnswers: GuidedAnswers = {
 };
 ```
 
-- [ ] **Step 3: Update validation**
+- [x] **Step 3: Update validation**
 
 Replace `handleMoveToContext()` with:
 
@@ -1258,7 +1258,7 @@ if (messages.length < 2 && !canProceedFromInput) {
 }
 ```
 
-- [ ] **Step 4: Send guided answers to the API**
+- [x] **Step 4: Send guided answers to the API**
 
 In the body for `POST /api/v1/conversations`, add:
 
@@ -1275,7 +1275,7 @@ messages,
 
 This means situation-only input sends `messages: []`, and Task 2 route validation allows it.
 
-- [ ] **Step 5: Update input copy and preview**
+- [x] **Step 5: Update input copy and preview**
 
 Change the hero title:
 
@@ -1330,7 +1330,7 @@ Add a non-chat preview branch below the message preview list:
 ) : null}
 ```
 
-- [ ] **Step 6: Add context controls**
+- [x] **Step 6: Add context controls**
 
 In the context step, add `ChoiceGroup` controls before the existing relationship/channel controls:
 
@@ -1383,7 +1383,7 @@ Add a free text textarea in the context step after the choice groups:
 />
 ```
 
-- [ ] **Step 7: Render grouped signals**
+- [x] **Step 7: Render grouped signals**
 
 Before JSX `return`, compute:
 
@@ -1447,7 +1447,7 @@ function SignalSection({
 }
 ```
 
-- [ ] **Step 8: Add CSS**
+- [x] **Step 8: Add CSS**
 
 Append to `components/analysis-experience.module.css`:
 
@@ -1509,7 +1509,7 @@ Append to `components/analysis-experience.module.css`:
 }
 ```
 
-- [ ] **Step 9: Run focused verification**
+- [x] **Step 9: Run focused verification**
 
 ```bash
 npx tsc --noEmit
@@ -1518,7 +1518,7 @@ npm test -- lib/__tests__/signal-groups.test.ts
 
 Expected: TypeScript check passes, signal group tests pass.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add landing-page-nextjs/components/analysis-experience.tsx landing-page-nextjs/components/analysis-experience.module.css
@@ -1537,7 +1537,7 @@ git commit -m "feat: add situation-first analysis UI"
 - Consumes: all previous tasks.
 - Produces: documented usage and verified behavior.
 
-- [ ] **Step 1: Update README analysis example**
+- [x] **Step 1: Update README analysis example**
 
 In `landing-page-nextjs/README.md`, near the analysis request examples, add:
 
@@ -1563,7 +1563,7 @@ In `landing-page-nextjs/README.md`, near the analysis request examples, add:
 ```
 ````
 
-- [ ] **Step 2: Mark spec implementation slice**
+- [x] **Step 2: Mark spec implementation slice**
 
 In `docs/superpowers/specs/2026-07-05-situation-first-analysis-design.md`, add under "단계별 구현 범위" after `### 1차`:
 
@@ -1571,7 +1571,7 @@ In `docs/superpowers/specs/2026-07-05-situation-first-analysis-design.md`, add u
 이 구현 계획은 1차 범위와 최소한의 상황 기반 규칙 신호까지 포함한다. 사람/관계 단위 타임라인 모델과 학습 CLI의 사후 피드백 입력은 다음 계획에서 다룬다.
 ```
 
-- [ ] **Step 3: Run full tests**
+- [x] **Step 3: Run full tests**
 
 ```bash
 npm test
@@ -1579,7 +1579,7 @@ npm test
 
 Expected: all Vitest files pass.
 
-- [ ] **Step 4: Run manual API smoke test**
+- [x] **Step 4: Run manual API smoke test**
 
 Start the dev server if it is not running:
 
@@ -1623,7 +1623,7 @@ Expected response includes:
 
 The exact `situationContext` string is longer; verify it contains the phrase above and `messageCount` is `0`.
 
-- [ ] **Step 5: Run UI smoke check**
+- [x] **Step 5: Run UI smoke check**
 
 Open `/analyze` in the browser. Enter:
 
@@ -1646,7 +1646,7 @@ Expected:
 - The signal sections include "실제 만남 신호" and "만남 뒤 연락 신호".
 - The recommendation is conservative and does not tell the user to pressure the other person.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add landing-page-nextjs/README.md docs/superpowers/specs/2026-07-05-situation-first-analysis-design.md
