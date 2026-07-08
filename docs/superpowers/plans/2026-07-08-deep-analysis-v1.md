@@ -773,7 +773,7 @@ git commit -m "feat: add deep report tool schemas and prompts"
 - Create: `lib/ai/chains/deep-report-generator.ts`
 - Create: `lib/ai/chains/__tests__/deep-report-generator.test.ts`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `lib/ai/chains/__tests__/deep-report-generator.test.ts`:
 
@@ -864,7 +864,7 @@ describe("generateDeepReport", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 npx vitest run lib/ai/chains/__tests__/deep-report-generator.test.ts
@@ -872,7 +872,7 @@ npx vitest run lib/ai/chains/__tests__/deep-report-generator.test.ts
 
 Expected: FAIL — 모듈 없음.
 
-- [ ] **Step 3: `lib/ai/chains/deep-report-generator.ts` 작성**
+- [x] **Step 3: `lib/ai/chains/deep-report-generator.ts` 작성**
 
 `signal-enhancer.ts`와 같은 호출 구조(single call + tool_choice 강제):
 
@@ -1026,7 +1026,7 @@ export async function generateDeepReport(params: {
 
 주의: `getInferenceTimeoutMs`·`buildInferenceOptions`·`resolveMaxTokens`·`trackUsage`의 실제 시그니처는 구현 시 `lib/ai/anthropic-client.ts`·`lib/ai/token-tracker.ts`에서 확인하고 기존 체인(signal-enhancer)의 호출 방식을 그대로 따른다. 단계 이름 파라미터가 union 타입이면 `"deep_report"`를 그 타입에 추가한다.
 
-- [ ] **Step 4: 테스트 통과 확인 + Commit**
+- [x] **Step 4: 테스트 통과 확인 + Commit**
 
 ```bash
 npx vitest run lib/ai/chains/__tests__/deep-report-generator.test.ts

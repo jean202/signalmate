@@ -77,23 +77,27 @@ export function getMinCacheableTokens(model?: string): number {
 type InferenceStage =
   | "signal_enhancer"
   | "recommendation_generator"
+  | "deep_report"
   | "agent_iteration";
 
 const DEFAULT_STAGE_TIMEOUT_MS: Record<InferenceStage, number> = {
   signal_enhancer: 20_000,
   recommendation_generator: 25_000,
+  deep_report: 35_000,
   agent_iteration: 8_000,
 };
 
 const STAGE_TIMEOUT_ENV: Record<InferenceStage, string> = {
   signal_enhancer: "ANTHROPIC_SIGNAL_TIMEOUT_MS",
   recommendation_generator: "ANTHROPIC_RECOMMENDATION_TIMEOUT_MS",
+  deep_report: "ANTHROPIC_DEEP_REPORT_TIMEOUT_MS",
   agent_iteration: "ANTHROPIC_AGENT_ITERATION_TIMEOUT_MS",
 };
 
 const STAGE_THINKING_ENV: Record<InferenceStage, string> = {
   signal_enhancer: "ANTHROPIC_THINKING_SIGNAL_ENHANCER",
   recommendation_generator: "ANTHROPIC_THINKING_RECOMMENDATION",
+  deep_report: "ANTHROPIC_THINKING_DEEP_REPORT",
   agent_iteration: "ANTHROPIC_THINKING_AGENT",
 };
 
@@ -103,12 +107,14 @@ const STAGE_THINKING_ENV: Record<InferenceStage, string> = {
 const STAGE_DEFAULT_THINKING: Record<InferenceStage, string> = {
   signal_enhancer: "off",
   recommendation_generator: "enabled",
+  deep_report: "enabled",
   agent_iteration: "enabled",
 };
 
 const STAGE_THINKING_BUDGET_TOKENS: Record<InferenceStage, number> = {
   signal_enhancer: 1024,
   recommendation_generator: 2048,
+  deep_report: 2048,
   agent_iteration: 1024,
 };
 
