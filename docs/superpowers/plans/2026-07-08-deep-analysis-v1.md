@@ -1521,7 +1521,7 @@ git commit -m "feat: add deep report store and payment access checks"
 - Create: `app/api/v1/analyses/[analysisId]/deep-report/route.ts`
 - Create: `app/api/v1/analyses/[analysisId]/deep-report/__tests__/route.test.ts`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `app/api/v1/analyses/[analysisId]/deep-report/__tests__/route.test.ts`:
 
@@ -1707,7 +1707,7 @@ describe("deep-report route", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 npx vitest run "app/api/v1/analyses/[analysisId]/deep-report/__tests__/route.test.ts"
@@ -1715,7 +1715,7 @@ npx vitest run "app/api/v1/analyses/[analysisId]/deep-report/__tests__/route.tes
 
 Expected: FAIL — 모듈 없음.
 
-- [ ] **Step 3: `app/api/v1/analyses/[analysisId]/deep-report/route.ts` 작성**
+- [x] **Step 3: `app/api/v1/analyses/[analysisId]/deep-report/route.ts` 작성**
 
 ```ts
 import { requireAuth } from "@/lib/auth-helpers";
@@ -1870,7 +1870,7 @@ export async function GET(request: Request, context: RouteContext) {
 
 주의: `getAnalysis`/`getConversation`이 `lib/store.ts`에서 export되는지 확인하고, 없으면 store.ts의 기존 re-export 패턴에 맞춰 추가한다.
 
-- [ ] **Step 4: 테스트 통과 확인 + Commit**
+- [x] **Step 4: 테스트 통과 확인 + Commit**
 
 ```bash
 npx vitest run "app/api/v1/analyses/[analysisId]/deep-report/__tests__/route.test.ts"
