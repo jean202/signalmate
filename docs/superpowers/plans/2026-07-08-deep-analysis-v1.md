@@ -2771,7 +2771,7 @@ git commit -m "feat: add deep report page with draft check"
 - Create: `learning/scripts/seed-embed.ts`
 - Modify: `package.json`
 
-- [ ] **Step 1: 실패하는 스키마 테스트 작성**
+- [x] **Step 1: 실패하는 스키마 테스트 작성**
 
 `learning/lib/__tests__/seed-schema.test.ts`:
 
@@ -2803,7 +2803,7 @@ describe("validateSeedCase", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 npx vitest run learning/lib/__tests__/seed-schema.test.ts
@@ -2811,7 +2811,7 @@ npx vitest run learning/lib/__tests__/seed-schema.test.ts
 
 Expected: FAIL — 모듈 없음.
 
-- [ ] **Step 3: `learning/lib/seed-schema.ts` 작성**
+- [x] **Step 3: `learning/lib/seed-schema.ts` 작성**
 
 ```ts
 export type SeedCase = {
@@ -2871,7 +2871,7 @@ export function validateSeedCase(
 }
 ```
 
-- [ ] **Step 4: `learning/scripts/seed-gen.ts` 작성**
+- [x] **Step 4: `learning/scripts/seed-gen.ts` 작성**
 
 Anthropic SDK를 직접 사용해 유형×결말 조합별 사례 초안을 생성하고 `learning/seeds/drafts/`에 저장:
 
@@ -2958,7 +2958,7 @@ main().catch((error) => {
 });
 ```
 
-- [ ] **Step 5: `learning/scripts/seed-embed.ts` 작성**
+- [x] **Step 5: `learning/scripts/seed-embed.ts` 작성**
 
 승인본을 임베딩해 reference_cases에 업서트:
 
@@ -3044,7 +3044,7 @@ main().catch((error) => {
 });
 ```
 
-- [ ] **Step 6: package.json 스크립트 추가**
+- [x] **Step 6: package.json 스크립트 추가**
 
 `"learn:label"` 줄 뒤에 추가:
 
@@ -3053,7 +3053,7 @@ main().catch((error) => {
     "learn:seed-embed": "tsx learning/scripts/seed-embed.ts",
 ```
 
-- [ ] **Step 7: 테스트 + Commit**
+- [x] **Step 7: 테스트 + Commit**
 
 ```bash
 npx vitest run learning/lib/__tests__/seed-schema.test.ts

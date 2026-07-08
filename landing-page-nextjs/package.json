@@ -11,7 +11,9 @@
     "learn:trace": "tsx learning/scripts/trace.ts",
     "learn:eval": "tsx learning/scripts/eval.ts",
     "learn:mask": "tsx learning/scripts/mask.ts",
-    "learn:label": "tsx learning/scripts/label.ts"
+    "learn:label": "tsx learning/scripts/label.ts",
+    "learn:seed-gen": "tsx learning/scripts/seed-gen.ts",
+    "learn:seed-embed": "tsx learning/scripts/seed-embed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
