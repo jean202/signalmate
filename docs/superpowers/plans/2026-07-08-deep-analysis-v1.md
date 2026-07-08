@@ -2231,7 +2231,7 @@ git commit -m "feat: wire single payment to deep report flow"
 - Modify: `components/analysis-experience.tsx`
 - Modify: `components/analysis-experience.module.css`
 
-- [ ] **Step 1: 프리뷰 카드 마크업 추가**
+- [x] **Step 1: 프리뷰 카드 마크업 추가**
 
 `components/analysis-experience.tsx`에서 액션 버튼 블록(`{/* ── 액션 버튼 ... */}` 주석이 있는 `<div className={styles.actions}>`) 바로 위에 추가:
 
@@ -2265,7 +2265,7 @@ git commit -m "feat: wire single payment to deep report flow"
 
 그리고 기존 `actions` div 안의 `<PaymentButton ... />` 블록(3줄)은 제거한다 (프리뷰 카드로 이동했으므로).
 
-- [ ] **Step 2: 스타일 추가**
+- [x] **Step 2: 스타일 추가**
 
 `components/analysis-experience.module.css` 끝에 추가:
 
@@ -2300,7 +2300,7 @@ git commit -m "feat: wire single payment to deep report flow"
 }
 ```
 
-- [ ] **Step 3: 검증 + Commit**
+- [x] **Step 3: 검증 + Commit**
 
 ```bash
 npx tsc --noEmit

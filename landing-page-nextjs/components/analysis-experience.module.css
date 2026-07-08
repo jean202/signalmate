@@ -709,6 +709,37 @@
   margin-top: 1.2rem;
 }
 
+/* ── 심화 분석 프리뷰 카드 ───────────────────────────── */
+
+.deepPreviewCard {
+  margin-top: 1.4rem;
+  padding: 1.2rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.06));
+}
+
+.deepPreviewCard h3 {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.deepPreviewList {
+  margin: 0 0 0.75rem;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.deepPreviewNote {
+  margin: 0 0 1rem;
+  font-size: 0.86rem;
+  color: var(--color-ink-mute);
+  line-height: 1.55;
+}
+
 .contextLayout {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

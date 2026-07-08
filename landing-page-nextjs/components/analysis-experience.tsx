@@ -1616,14 +1616,34 @@ export function AnalysisExperience() {
               </div>
             </div>
 
-            {/* ── 액션 버튼 (complete 단계에서만 완전 활성화) ───────────── */}
-            <div className={styles.actions}>
-              {streamingState.analysisId ? (
+            {/* ── 심화 분석 프리뷰 (유료) ───────────────────────────── */}
+            {streamingState.analysisId ? (
+              <div className={styles.deepPreviewCard}>
+                <p className={styles.kicker}>심화 분석</p>
+                <h3>여기서 한 단계 더 깊게 볼 수 있어요</h3>
+                <ul className={styles.deepPreviewList}>
+                  <li>
+                    <strong>유사 사례 비교</strong> - 비슷한 상황들이 실제로 어떻게 흘러갔는지
+                  </li>
+                  <li>
+                    <strong>행동 시나리오 시뮬레이션</strong> - 보내기/기다리기/제안하기 경로별 예상 전개와 리스크
+                  </li>
+                  <li>
+                    <strong>초안 메시지 검증 5회</strong> - 보내기 전에 예상 반응과 개선안 확인
+                  </li>
+                </ul>
+                <p className={styles.deepPreviewNote}>
+                  심화 리포트는 로그인 후 이용할 수 있고, 결제한 분석은 저장되어 다시 볼 수 있어요.
+                </p>
                 <PaymentButton
                   purchaseType="single_analysis"
                   analysisId={streamingState.analysisId}
                 />
-              ) : null}
+              </div>
+            ) : null}
+
+            {/* ── 액션 버튼 (complete 단계에서만 완전 활성화) ───────────── */}
+            <div className={styles.actions}>
               <button
                 type="button"
                 className={styles.primaryButton}
