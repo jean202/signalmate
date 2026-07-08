@@ -421,6 +421,35 @@ export async function getUserPayments(userId: string) {
   });
 }
 
+/**
+ * 결제 전에 익명(temporary) 분석을 로그인 사용자 소유로 승격합니다.
+ * - 분석 userId가 비어 있으면 현재 사용자로 claim + 대화 saveMode=saved
+ * - 이미 본인 소유면 아무것도 안 함
+ * - 타인 소유면 forbidden
+ */
+export async function claimAnalysisForUser(
+  userId: string,
+  analysisId: string,
+): Promise<"claimed" | "owned" | "forbidden" | "not_found"> {
+  const analysis = await prisma.analysis.findUnique({
+    where: { id: analysisId },
+    select: { id: true, userId: true, conversationId: true },
+  });
+
+  if (!analysis) return "not_found";
+  if (analysis.userId === userId) return "owned";
+  if (analysis.userId && analysis.userId !== userId) return "forbidden";
+
+  await prisma.$transaction([
+    prisma.analysis.update({ where: { id: analysisId }, data: { userId } }),
+    prisma.conversation.update({
+      where: { id: analysis.conversationId },
+      data: { userId, saveMode: "saved" },
+    }),
+  ]);
+  return "claimed";
+}
+
 // ─── Waitlist ────────────────────────────────────────────
 
 export type WaitlistEntry = {

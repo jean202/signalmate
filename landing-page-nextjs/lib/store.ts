@@ -16,6 +16,11 @@ function useDb(): boolean {
   return process.env.USE_DB === "true";
 }
 
+/** 심화 분석 등 DB 전용 기능에서 사용. */
+export function isDbEnabled(): boolean {
+  return useDb();
+}
+
 // ─── Re-export types (always from analysis-store — the canonical types) ──
 
 export type {

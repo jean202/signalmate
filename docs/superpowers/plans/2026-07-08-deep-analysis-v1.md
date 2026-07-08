@@ -1253,7 +1253,7 @@ git commit -m "feat: add draft checker chain"
 - Modify: `lib/db-store.ts` — `claimAnalysisForUser()` 추가
 - Modify: `lib/store.ts` — `isDbEnabled()` export 추가
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `lib/__tests__/deep-report-store.test.ts`:
 
@@ -1343,7 +1343,7 @@ describe("deep-report-store", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 npx vitest run lib/__tests__/deep-report-store.test.ts
@@ -1351,7 +1351,7 @@ npx vitest run lib/__tests__/deep-report-store.test.ts
 
 Expected: FAIL — 모듈 없음.
 
-- [ ] **Step 3: `lib/deep-report-store.ts` 작성**
+- [x] **Step 3: `lib/deep-report-store.ts` 작성**
 
 ```ts
 import { prisma } from "@/lib/prisma";
@@ -1458,7 +1458,7 @@ export async function hasDeepAccess(userId: string, analysisId: string): Promise
 }
 ```
 
-- [ ] **Step 4: `lib/db-store.ts`에 claim 함수 추가**
+- [x] **Step 4: `lib/db-store.ts`에 claim 함수 추가**
 
 `getUserPayments` 함수 뒤에 추가:
 
@@ -1493,7 +1493,7 @@ export async function claimAnalysisForUser(
 }
 ```
 
-- [ ] **Step 5: `lib/store.ts`에 `isDbEnabled` export 추가**
+- [x] **Step 5: `lib/store.ts`에 `isDbEnabled` export 추가**
 
 `function useDb(): boolean { ... }` 아래에 추가:
 
@@ -1504,7 +1504,7 @@ export function isDbEnabled(): boolean {
 }
 ```
 
-- [ ] **Step 6: 테스트 통과 확인 + Commit**
+- [x] **Step 6: 테스트 통과 확인 + Commit**
 
 ```bash
 npx vitest run lib/__tests__/deep-report-store.test.ts
