@@ -3072,7 +3072,7 @@ git commit -m "feat: add seed corpus generation and embedding scripts"
 - Modify: `README.md`
 - Modify: `docs/superpowers/specs/2026-07-08-deep-analysis-v1-design.md`
 
-- [ ] **Step 1: 전체 테스트·타입체크**
+- [x] **Step 1: 전체 테스트·타입체크**
 
 ```bash
 export PATH="$HOME/.nvm/versions/node/v22.21.0/bin:$PATH"
@@ -3082,7 +3082,7 @@ npx tsc --noEmit
 
 Expected: 전부 PASS, exit 0.
 
-- [ ] **Step 2: README에 심화 분석 섹션 추가**
+- [x] **Step 2: README에 심화 분석 섹션 추가**
 
 `README.md`의 "상황 중심 분석" 섹션 뒤에 추가:
 
@@ -3107,6 +3107,8 @@ curl -X POST http://localhost:3000/api/v1/analyses/{analysisId}/deep-report/draf
 
 - [ ] **Step 3: 수동 E2E 스모크 (USE_DB=true 필요)**
 
+> 미실행: 로컬 DB 마이그레이션 적용/리셋 동의와 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, Toss 테스트 키가 필요한 수동 단계.
+
 ```bash
 docker compose -f ../docker-compose.yml up -d
 # .env.local에 USE_DB=true, DATABASE_URL, ANTHROPIC_API_KEY, OPENAI_API_KEY 확인
@@ -3122,7 +3124,7 @@ npm run dev
 6. 새로고침 → 저장된 리포트 즉시 재열람.
 7. `ANTHROPIC_API_KEY` 제거 후 새 분석·결제로 재시도 → fallback 리포트 + 안내 문구.
 
-- [ ] **Step 4: 스펙 상태 갱신 + Commit**
+- [x] **Step 4: 스펙 상태 갱신 + Commit**
 
 `docs/superpowers/specs/2026-07-08-deep-analysis-v1-design.md`의 `상태:` 줄을 `상태: 구현 완료 (2026-07-08 플랜 실행)`으로 바꾼다.
 

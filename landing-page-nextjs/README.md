@@ -330,6 +330,25 @@ UI에서는 상황 중심 입력을 보낼 때 보통 `messages: []`와 `guidedA
 }
 ```
 
+### 심화 분석 (유료)
+
+로그인 + 단건 결제(₩3,900) 또는 구독 후 이용. 유사 사례 비교, 행동 시나리오 시뮬레이션, 초안 검증 5회를 제공합니다. DB 모드(`USE_DB=true`) 전용.
+
+```bash
+# 시드 코퍼스 준비 (1회)
+npm run learn:seed-gen      # LLM으로 사례 초안 생성 -> learning/seeds/drafts/
+# drafts/를 검수해 learning/seeds/approved/로 복사
+npm run learn:seed-embed    # 임베딩 + reference_cases 업서트
+
+# 리포트 생성 (결제 후)
+curl -X POST http://localhost:3000/api/v1/analyses/{analysisId}/deep-report
+
+# 초안 검증
+curl -X POST http://localhost:3000/api/v1/analyses/{analysisId}/deep-report/draft-check \
+  -H 'Content-Type: application/json' \
+  -d '{"draftText": "보내려는 메시지"}'
+```
+
 **분석 요청 예시**:
 ```bash
 # 규칙 기반
