@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 function SuccessContent() {
   const router = useRouter();
   const params = useSearchParams();
+  const analysisId = params.get("analysisId");
   const [status, setStatus] = useState<"confirming" | "success" | "error">("confirming");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -67,8 +68,11 @@ function SuccessContent() {
       <div style={styles.iconSuccess}>✓</div>
       <h2 style={styles.title}>결제가 완료되었습니다</h2>
       <p style={styles.sub}>심화 분석 결과를 확인하세요.</p>
-      <button style={styles.button} onClick={() => router.push("/analyze")}>
-        분석 결과 보기
+      <button
+        style={styles.button}
+        onClick={() => router.push(analysisId ? `/report/${analysisId}` : "/analyze")}
+      >
+        {analysisId ? "심화 리포트 보기" : "분석 결과 보기"}
       </button>
     </div>
   );

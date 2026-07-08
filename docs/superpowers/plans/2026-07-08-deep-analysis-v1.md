@@ -2125,7 +2125,7 @@ git commit -m "feat: add draft check route with usage limit"
 - Modify: `components/payment-button.tsx`
 - Modify: `app/payment/success/page.tsx`
 
-- [ ] **Step 1: checkout에 claim 추가**
+- [x] **Step 1: checkout에 claim 추가**
 
 `app/api/v1/payments/checkout/route.ts`에서 import에 `claimAnalysisForUser` 추가:
 
@@ -2151,7 +2151,7 @@ import { createPendingPayment, claimAnalysisForUser } from "@/lib/db-store";
   }
 ```
 
-- [ ] **Step 2: checkout 라우트 기존 테스트 갱신**
+- [x] **Step 2: checkout 라우트 기존 테스트 갱신**
 
 `app/api/v1/payments/__tests__/payment-routes.test.ts`를 열어 checkout 테스트의 mock에 `claimAnalysisForUser: vi.fn(async () => "claimed")`를 추가하고(모듈 mock `@/lib/db-store`에 함수 추가), single_analysis 케이스에 analysisId가 없으면 400이 되는 테스트를 1개 추가한다:
 
@@ -2171,7 +2171,7 @@ import { createPendingPayment, claimAnalysisForUser } from "@/lib/db-store";
 
 (기존 테스트가 single_analysis를 analysisId 없이 호출하고 있다면 analysisId를 추가해 통과시킨다.)
 
-- [ ] **Step 3: PaymentButton — successUrl에 analysisId, 401 로그인 유도**
+- [x] **Step 3: PaymentButton — successUrl에 analysisId, 401 로그인 유도**
 
 `components/payment-button.tsx`의 `handleClick` 안에서:
 
@@ -2195,7 +2195,7 @@ import { createPendingPayment, claimAnalysisForUser } from "@/lib/db-store";
         successUrl: `${origin}/payment/success${analysisId ? `?analysisId=${analysisId}` : ""}`,
 ```
 
-- [ ] **Step 4: success 페이지 — 리포트로 리다이렉트**
+- [x] **Step 4: success 페이지 — 리포트로 리다이렉트**
 
 `app/payment/success/page.tsx`의 `SuccessContent`에서 `const params = useSearchParams();` 아래에 추가:
 
@@ -2214,7 +2214,7 @@ import { createPendingPayment, claimAnalysisForUser } from "@/lib/db-store";
       </button>
 ```
 
-- [ ] **Step 5: 테스트 + Commit**
+- [x] **Step 5: 테스트 + Commit**
 
 ```bash
 npx vitest run app/api/v1/payments

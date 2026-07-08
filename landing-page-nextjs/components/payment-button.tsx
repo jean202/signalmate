@@ -44,6 +44,10 @@ export function PaymentButton({ purchaseType, analysisId, label, className }: Pa
       const json = await res.json();
 
       if (!json.success) {
+        if (res.status === 401) {
+          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+          return;
+        }
         setError(json.error?.message ?? "결제 초기화에 실패했습니다.");
         setLoading(false);
         return;
@@ -58,7 +62,7 @@ export function PaymentButton({ purchaseType, analysisId, label, className }: Pa
         orderId,
         orderName,
         customerName: "SignalMate 사용자",
-        successUrl: `${origin}/payment/success`,
+        successUrl: `${origin}/payment/success${analysisId ? `?analysisId=${analysisId}` : ""}`,
         failUrl: `${origin}/payment/fail`,
       });
     } catch (e: unknown) {

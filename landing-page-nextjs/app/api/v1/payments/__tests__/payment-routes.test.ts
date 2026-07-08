@@ -5,6 +5,7 @@ import { POST as confirmPOST } from "../confirm/route";
 const routeMocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),
   createPendingPayment: vi.fn(),
+  claimAnalysisForUser: vi.fn(),
   confirmPayment: vi.fn(),
   failPayment: vi.fn(),
   confirmTossPayment: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@/lib/auth-helpers", () => ({
 
 vi.mock("@/lib/db-store", () => ({
   createPendingPayment: routeMocks.createPendingPayment,
+  claimAnalysisForUser: routeMocks.claimAnalysisForUser,
   confirmPayment: routeMocks.confirmPayment,
   failPayment: routeMocks.failPayment,
 }));
@@ -67,9 +69,11 @@ describe("POST /api/v1/payments/checkout", () => {
   beforeEach(() => {
     routeMocks.requireAuth.mockReset();
     routeMocks.createPendingPayment.mockReset();
+    routeMocks.claimAnalysisForUser.mockReset();
     routeMocks.generateOrderId.mockReset();
 
     routeMocks.requireAuth.mockResolvedValue({ userId: "user_12345678" });
+    routeMocks.claimAnalysisForUser.mockResolvedValue("claimed");
     routeMocks.createPendingPayment.mockResolvedValue({
       id: "payment_1",
       orderId: "single_user_12345678_1",
@@ -111,6 +115,7 @@ describe("POST /api/v1/payments/checkout", () => {
       "single_analysis",
       "user_12345678",
     );
+    expect(routeMocks.claimAnalysisForUser).toHaveBeenCalledWith("user_12345678", "analysis_1");
     expect(routeMocks.createPendingPayment).toHaveBeenCalledWith({
       userId: "user_12345678",
       orderId: "single_user_12345678_1",
@@ -144,6 +149,23 @@ describe("POST /api/v1/payments/checkout", () => {
     if (!payload.success) {
       expect(payload.error.code).toBe("UNAUTHORIZED");
     }
+    expect(routeMocks.createPendingPayment).not.toHaveBeenCalled();
+  });
+
+  it("rejects single_analysis checkout without analysisId", async () => {
+    const response = await checkoutPOST(
+      jsonRequest("/api/v1/payments/checkout", {
+        purchaseType: "single_analysis",
+      }),
+    );
+    const payload = await readEnvelope(response);
+
+    expect(response.status).toBe(400);
+    expect(payload.success).toBe(false);
+    if (!payload.success) {
+      expect(payload.error.code).toBe("VALIDATION_ERROR");
+    }
+    expect(routeMocks.claimAnalysisForUser).not.toHaveBeenCalled();
     expect(routeMocks.createPendingPayment).not.toHaveBeenCalled();
   });
 
