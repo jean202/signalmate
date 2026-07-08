@@ -2319,7 +2319,7 @@ git commit -m "feat: add deep analysis preview card"
 - Create: `app/report/[analysisId]/page.tsx`
 - Create: `app/report/[analysisId]/report.module.css`
 
-- [ ] **Step 1: 페이지 작성**
+- [x] **Step 1: 페이지 작성**
 
 `app/report/[analysisId]/page.tsx`:
 
@@ -2591,7 +2591,7 @@ function ReportBody({
 }
 ```
 
-- [ ] **Step 2: `report.module.css` 작성**
+- [x] **Step 2: `report.module.css` 작성**
 
 ```css
 .page {
@@ -2751,7 +2751,7 @@ function ReportBody({
 }
 ```
 
-- [ ] **Step 3: 검증 + Commit**
+- [x] **Step 3: 검증 + Commit**
 
 ```bash
 npx tsc --noEmit

@@ -1,0 +1,200 @@
+.page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+  display: grid;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.backLink {
+  font-size: 14px;
+  color: #6366f1;
+}
+
+.card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 24px;
+  display: grid;
+  gap: 12px;
+  background: #fff;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.fallbackNote {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.patternSummary {
+  margin: 0;
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.caseGrid,
+.scenarioGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.caseCard,
+.scenarioCard {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.caseCard p,
+.scenarioCard p {
+  margin: 0;
+}
+
+.scenarioCard header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.scenarioCard h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.outcomeBadge {
+  justify-self: start;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.outcomeBadge[data-outcome="progressed"] {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.outcomeBadge[data-outcome="ended"] {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.lesson,
+.rationale {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.confidence {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.risk {
+  color: #b45309;
+}
+
+.bestMessage {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.timing {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.remaining {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.draftInput {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.primaryButton {
+  justify-self: start;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  background: #a5b4fc;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  color: #ef4444;
+  font-size: 13px;
+}
+
+.checkResult {
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  padding-top: 12px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.checkResult p {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 24px 16px 64px;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+}
