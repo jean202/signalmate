@@ -138,6 +138,7 @@ model User {
   analyses       Analysis[]
   subscriptions  Subscription[]
   payments       Payment[]
+  deepReports    DeepReport[]
 
   @@unique([authProvider, providerUserId])
   @@index([email])
@@ -156,22 +157,22 @@ model WaitlistSignup {
 }
 
 model Conversation {
-  id                      String                @id @default(uuid()) @db.Uuid
-  userId                  String?               @map("user_id") @db.Uuid
-  sessionId               String?               @map("session_id") @db.Uuid
-  title                   String?               @db.Text
-  sourceType              SourceType            @default(manual) @map("source_type")
-  relationshipStage       RelationshipStage     @map("relationship_stage")
-  meetingChannel          MeetingChannel        @map("meeting_channel")
-  userGoal                UserGoal              @map("user_goal")
-  saveMode                SaveMode              @default(temporary) @map("save_mode")
-  rawTextRedacted         String?               @map("raw_text_redacted") @db.Text
-  rawTextStorageExpiresAt DateTime?             @map("raw_text_storage_expires_at") @db.Timestamptz(6)
-  situationContext        String?               @map("situation_context") @db.Text
-  analysisContext         Json                  @default("{}") @map("analysis_context")
-  createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user                    User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                      String                 @id @default(uuid()) @db.Uuid
+  userId                  String?                @map("user_id") @db.Uuid
+  sessionId               String?                @map("session_id") @db.Uuid
+  title                   String?                @db.Text
+  sourceType              SourceType             @default(manual) @map("source_type")
+  relationshipStage       RelationshipStage      @map("relationship_stage")
+  meetingChannel          MeetingChannel         @map("meeting_channel")
+  userGoal                UserGoal               @map("user_goal")
+  saveMode                SaveMode               @default(temporary) @map("save_mode")
+  rawTextRedacted         String?                @map("raw_text_redacted") @db.Text
+  rawTextStorageExpiresAt DateTime?              @map("raw_text_storage_expires_at") @db.Timestamptz(6)
+  situationContext        String?                @map("situation_context") @db.Text
+  analysisContext         Json                   @default("{}") @map("analysis_context")
+  createdAt               DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                    User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
   messages                ConversationMessage[]
   analyses                Analysis[]
   embedding               ConversationEmbedding?
@@ -221,6 +222,7 @@ model Analysis {
   signals                 AnalysisSignal[]
   recommendations         AnalysisRecommendation[]
   payments                Payment[]
+  deepReport              DeepReport?
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([sessionId, createdAt(sort: Desc)])
@@ -267,7 +269,7 @@ model Subscription {
   userId                 String             @map("user_id") @db.Uuid
   planCode               String             @map("plan_code") @db.Text
   status                 SubscriptionStatus @default(active)
-  billingProvider        BillingProvider     @map("billing_provider")
+  billingProvider        BillingProvider    @map("billing_provider")
   providerSubscriptionId String?            @map("provider_subscription_id") @db.Text
   currentPeriodStart     DateTime           @map("current_period_start") @db.Timestamptz(6)
   currentPeriodEnd       DateTime           @map("current_period_end") @db.Timestamptz(6)
@@ -305,16 +307,46 @@ model Payment {
   @@map("payments")
 }
 
+// ─── Deep Analysis (유료 심화 리포트) ─────────────────────
+
+model DeepReport {
+  id              String    @id @default(uuid()) @db.Uuid
+  analysisId      String    @unique @map("analysis_id") @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  status          String    @default("generating") @db.Text
+  contentJson     Json?     @map("content_json")
+  draftCheckCount Int       @default(0) @map("draft_check_count")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis        Analysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("deep_reports")
+}
+
+model ReferenceCase {
+  id            String                      @id @default(uuid()) @db.Uuid
+  summaryText   String                      @map("summary_text") @db.Text
+  situationType String                      @map("situation_type") @db.Text
+  outcomeLabel  String                      @map("outcome_label") @db.Text
+  lesson        String                      @db.Text
+  embedding     Unsupported("vector(1536)")
+  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("reference_cases")
+}
+
 // ─── Phase 3: Vector Embeddings (RAG) ────────────────────
 
 model ConversationEmbedding {
-  id             String       @id @default(uuid()) @db.Uuid
-  conversationId String       @unique @map("conversation_id") @db.Uuid
-  summaryText    String       @map("summary_text") @db.Text
-  outcomeLabel   String?      @map("outcome_label") @db.Text
+  id             String                      @id @default(uuid()) @db.Uuid
+  conversationId String                      @unique @map("conversation_id") @db.Uuid
+  summaryText    String                      @map("summary_text") @db.Text
+  outcomeLabel   String?                     @map("outcome_label") @db.Text
   embedding      Unsupported("vector(1536)")
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  conversation   Conversation                @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@map("conversation_embeddings")
 }
@@ -322,24 +354,24 @@ model ConversationEmbedding {
 // ─── Phase 1: AI Usage Tracking ──────────────────────────
 
 model AiUsageLog {
-  id            String   @id @default(uuid()) @db.Uuid
-  analysisId    String?  @map("analysis_id") @db.Uuid
-  modelName     String   @map("model_name") @db.Text
-  chainStep     String?  @map("chain_step") @db.Text
-  inputTokens   Int      @map("input_tokens")
-  outputTokens  Int      @map("output_tokens")
+  id                       String   @id @default(uuid()) @db.Uuid
+  analysisId               String?  @map("analysis_id") @db.Uuid
+  modelName                String   @map("model_name") @db.Text
+  chainStep                String?  @map("chain_step") @db.Text
+  inputTokens              Int      @map("input_tokens")
+  outputTokens             Int      @map("output_tokens")
   cacheReadInputTokens     Int      @default(0) @map("cache_read_input_tokens")
   cacheCreationInputTokens Int      @default(0) @map("cache_creation_input_tokens")
-  totalTokens   Int      @map("total_tokens")
-  costUsd       Float    @map("cost_usd")
-  durationMs    Int      @map("duration_ms")
-  retryCount    Int      @default(0) @map("retry_count")
-  timeoutMs     Int?     @map("timeout_ms")
-  success       Boolean  @default(true)
-  errorMessage  String?  @map("error_message") @db.Text
-  fallbackStage String?  @map("fallback_stage") @db.Text
-  qualityWarnings Json?  @map("quality_warnings")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  totalTokens              Int      @map("total_tokens")
+  costUsd                  Float    @map("cost_usd")
+  durationMs               Int      @map("duration_ms")
+  retryCount               Int      @default(0) @map("retry_count")
+  timeoutMs                Int?     @map("timeout_ms")
+  success                  Boolean  @default(true)
+  errorMessage             String?  @map("error_message") @db.Text
+  fallbackStage            String?  @map("fallback_stage") @db.Text
+  qualityWarnings          Json?    @map("quality_warnings")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([analysisId])
   @@index([chainStep, createdAt(sort: Desc)])
