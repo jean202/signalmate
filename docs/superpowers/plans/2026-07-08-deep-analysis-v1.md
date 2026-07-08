@@ -1043,7 +1043,7 @@ git commit -m "feat: add deep report generator chain"
 - Create: `lib/ai/chains/draft-checker.ts`
 - Create: `lib/ai/chains/__tests__/draft-checker.test.ts`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `lib/ai/chains/__tests__/draft-checker.test.ts`:
 
@@ -1126,7 +1126,7 @@ describe("checkDraft", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 npx vitest run lib/ai/chains/__tests__/draft-checker.test.ts
@@ -1134,7 +1134,7 @@ npx vitest run lib/ai/chains/__tests__/draft-checker.test.ts
 
 Expected: FAIL — 모듈 없음.
 
-- [ ] **Step 3: `lib/ai/chains/draft-checker.ts` 작성**
+- [x] **Step 3: `lib/ai/chains/draft-checker.ts` 작성**
 
 ```ts
 import {
@@ -1234,7 +1234,7 @@ export async function checkDraft(params: {
 
 Task 5와 같은 주의: 헬퍼 시그니처는 기존 체인 기준으로 맞추고, 단계 이름 union이 있으면 `"draft_check"`를 추가한다.
 
-- [ ] **Step 4: 테스트 통과 확인 + Commit**
+- [x] **Step 4: 테스트 통과 확인 + Commit**
 
 ```bash
 npx vitest run lib/ai/chains/__tests__/draft-checker.test.ts
