@@ -127,7 +127,7 @@ export function hasDeepAccess(userId: string, analysisId: string): Promise<boole
 **Files:**
 - Modify: `prisma/schema.prisma`
 
-- [ ] **Step 1: User/Analysis에 백레퍼런스 추가**
+- [x] **Step 1: User/Analysis에 백레퍼런스 추가**
 
 `model User` 안의 `payments       Payment[]` 줄 아래에 추가:
 
@@ -141,7 +141,7 @@ export function hasDeepAccess(userId: string, analysisId: string): Promise<boole
   deepReport              DeepReport?
 ```
 
-- [ ] **Step 2: 새 모델 2개 추가**
+- [x] **Step 2: 새 모델 2개 추가**
 
 `model Payment { ... }` 블록 뒤에 추가:
 
@@ -177,7 +177,7 @@ model ReferenceCase {
 }
 ```
 
-- [ ] **Step 3: 스키마 검증 + 마이그레이션**
+- [x] **Step 3: 스키마 검증 + 마이그레이션**
 
 ```bash
 npx prisma validate
@@ -187,7 +187,7 @@ npx prisma migrate dev --name add_deep_report_and_reference_cases
 
 Expected: `prisma validate` 성공, 마이그레이션 폴더 생성. DB를 띄울 수 없는 환경이면 `npx prisma migrate diff --from-schema-datamodel prisma/schema.prisma --to-schema-datasource prisma/schema.prisma` 대신 `npx prisma format && npx prisma validate`까지만 확인하고 마이그레이션 생성은 `--create-only`로 남긴다.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add prisma
@@ -202,7 +202,7 @@ git commit -m "feat: add deep report and reference case models"
 - Create: `lib/deep-report.ts`
 - Create: `lib/__tests__/deep-report.test.ts`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `lib/__tests__/deep-report.test.ts`:
 
@@ -254,7 +254,7 @@ describe("buildFallbackDeepReport", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 export PATH="$HOME/.nvm/versions/node/v22.21.0/bin:$PATH"
@@ -263,7 +263,7 @@ npx vitest run lib/__tests__/deep-report.test.ts
 
 Expected: FAIL — `../deep-report` 없음.
 
-- [ ] **Step 3: `lib/deep-report.ts` 작성**
+- [x] **Step 3: `lib/deep-report.ts` 작성**
 
 ```ts
 import type { ReferenceCaseHit } from "@/lib/ai/embeddings/reference-search";
@@ -355,7 +355,7 @@ export function buildFallbackDeepReport(params: {
 }
 ```
 
-- [ ] **Step 4: 테스트 통과 확인**
+- [x] **Step 4: 테스트 통과 확인**
 
 ```bash
 npx vitest run lib/__tests__/deep-report.test.ts
@@ -363,7 +363,7 @@ npx vitest run lib/__tests__/deep-report.test.ts
 
 Expected: PASS. (reference-search가 아직 없어 타입 import가 실패하면 Task 3을 먼저 진행하지 말고, 이 시점에는 `lib/ai/embeddings/reference-search.ts`에 타입만 미리 만든다 — Task 3 Step 3의 파일에서 타입 부분만 먼저 작성해도 된다.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/deep-report.ts lib/__tests__/deep-report.test.ts
@@ -378,7 +378,7 @@ git commit -m "feat: add deep report types and fallback builder"
 - Create: `lib/ai/embeddings/reference-search.ts`
 - Create: `lib/ai/embeddings/__tests__/reference-search.test.ts`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `lib/ai/embeddings/__tests__/reference-search.test.ts`:
 
@@ -446,7 +446,7 @@ describe("findSimilarReferenceCases", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 npx vitest run lib/ai/embeddings/__tests__/reference-search.test.ts
@@ -454,7 +454,7 @@ npx vitest run lib/ai/embeddings/__tests__/reference-search.test.ts
 
 Expected: FAIL — 모듈 없음(또는 Task 2에서 타입만 만든 경우 함수 없음).
 
-- [ ] **Step 3: `lib/ai/embeddings/reference-search.ts` 작성**
+- [x] **Step 3: `lib/ai/embeddings/reference-search.ts` 작성**
 
 기존 `similarity-search.ts`와 같은 패턴:
 
@@ -544,7 +544,7 @@ export async function findSimilarReferenceCases(
 }
 ```
 
-- [ ] **Step 4: 테스트 통과 확인 + Commit**
+- [x] **Step 4: 테스트 통과 확인 + Commit**
 
 ```bash
 npx vitest run lib/ai/embeddings/__tests__/reference-search.test.ts lib/__tests__/deep-report.test.ts
@@ -562,7 +562,7 @@ git commit -m "feat: add reference case similarity search"
 
 테스트는 Task 5·6의 체인 테스트가 커버하므로 이 태스크는 구현만 한다.
 
-- [ ] **Step 1: `lib/ai/schemas/deep-report-schema.ts` 작성**
+- [x] **Step 1: `lib/ai/schemas/deep-report-schema.ts` 작성**
 
 기존 `analysis-schema.ts`의 `Tool` 패턴을 따른다:
 
@@ -674,7 +674,7 @@ export const submitDraftCheckTool: Tool = {
 };
 ```
 
-- [ ] **Step 2: `lib/ai/prompts/deep-report-prompt.ts` 작성**
+- [x] **Step 2: `lib/ai/prompts/deep-report-prompt.ts` 작성**
 
 ```ts
 import type { ReferenceCaseHit } from "@/lib/ai/embeddings/reference-search";
@@ -757,7 +757,7 @@ submit_draft_check 도구로 검증 결과를 제출하세요.`;
 }
 ```
 
-- [ ] **Step 3: 타입체크 + Commit**
+- [x] **Step 3: 타입체크 + Commit**
 
 ```bash
 npx tsc --noEmit
