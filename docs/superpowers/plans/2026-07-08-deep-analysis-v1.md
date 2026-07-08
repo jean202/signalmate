@@ -1887,7 +1887,7 @@ git commit -m "feat: add deep report generate and view routes"
 - Create: `app/api/v1/analyses/[analysisId]/deep-report/draft-check/route.ts`
 - Create: `app/api/v1/analyses/[analysisId]/deep-report/draft-check/__tests__/route.test.ts`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `.../draft-check/__tests__/route.test.ts`:
 
@@ -2008,7 +2008,7 @@ describe("draft-check route", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 npx vitest run "app/api/v1/analyses/[analysisId]/deep-report/draft-check/__tests__/route.test.ts"
@@ -2016,7 +2016,7 @@ npx vitest run "app/api/v1/analyses/[analysisId]/deep-report/draft-check/__tests
 
 Expected: FAIL — 모듈 없음.
 
-- [ ] **Step 3: `.../draft-check/route.ts` 작성**
+- [x] **Step 3: `.../draft-check/route.ts` 작성**
 
 ```ts
 import { requireAuth } from "@/lib/auth-helpers";
@@ -2107,7 +2107,7 @@ export async function POST(request: Request, context: RouteContext) {
 }
 ```
 
-- [ ] **Step 4: 테스트 통과 확인 + Commit**
+- [x] **Step 4: 테스트 통과 확인 + Commit**
 
 ```bash
 npx vitest run "app/api/v1/analyses/[analysisId]/deep-report/draft-check/__tests__/route.test.ts"
