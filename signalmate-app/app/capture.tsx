@@ -42,8 +42,14 @@ function assetFileName(asset: ImagePicker.ImagePickerAsset, index: number): stri
   return asset.fileName ?? `capture-${index + 1}.${extensionOf(asset) ?? 'jpg'}`;
 }
 
-function fingerprint(fileName: string, fileSize: number, mimeType: string): string {
-  return `${fileName.toLowerCase()}|${fileSize}|${mimeType}`;
+function sourceKeyOf(asset: ImagePicker.ImagePickerAsset): string {
+  return asset.assetId ? `asset:${asset.assetId}` : `uri:${asset.uri}`;
+}
+
+function cleanupCachedImages(images: Array<Pick<ImageDraftItem, 'uri'>>): void {
+  for (const image of images) {
+    try { deleteCachedImage(image.uri); } catch { /* Cleanup is best effort on this defensive path. */ }
+  }
 }
 
 function safeErrorCode(error: unknown): string {
@@ -62,18 +68,40 @@ export default function CaptureScreen() {
   const { draft, hydrated, updateDraft } = useAnalysis();
   const [notices, setNotices] = useState<string[]>([]);
   const [processing, setProcessing] = useState(false);
+  const [pickerBusy, setPickerBusy] = useState(false);
   const imagesRef = useRef(draft.images);
+  const lastDraftImagesRef = useRef(draft.images);
   const pendingConsumed = useRef(false);
   const idSequence = useRef(0);
-  imagesRef.current = draft.images;
+  const mountedRef = useRef(true);
+  const pickerBusyRef = useRef(false);
+  const processingRef = useRef(false);
+  const assetQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  const processAssets = useCallback((assets: ImagePicker.ImagePickerAsset[]) => {
+  if (lastDraftImagesRef.current !== draft.images) {
+    lastDraftImagesRef.current = draft.images;
+    imagesRef.current = draft.images;
+  }
+
+  const commitImages = useCallback((images: ImageDraftItem[], markCapture = false) => {
+    if (!mountedRef.current) return false;
+    imagesRef.current = images;
+    updateDraft((current) => ({
+      ...current,
+      primaryInput: markCapture ? 'capture' : current.primaryInput,
+      images,
+    }));
+    return true;
+  }, [updateDraft]);
+
+  const processAssets = useCallback(async (assets: ImagePicker.ImagePickerAsset[]) => {
+    if (!mountedRef.current) return;
     const currentImages = imagesRef.current;
     const available = Math.max(0, MAX_IMAGES - currentImages.length);
     if (available === 0) return;
 
-    const existing = new Set(currentImages.map((item) => (
-      fingerprint(item.fileName, item.fileSize, item.mimeType)
+    const existing = new Set(currentImages.flatMap((item) => (
+      item.sourceKey ? [item.sourceKey] : []
     )));
     const accepted: ImageDraftItem[] = [];
     const nextNotices = new Set<string>();
@@ -103,16 +131,21 @@ export default function CaptureScreen() {
       }
 
       const fileName = assetFileName(asset, assetIndex);
-      const key = fingerprint(fileName, asset.fileSize, mimeType);
-      if (existing.has(key)) continue;
+      const sourceKey = sourceKeyOf(asset);
+      if (existing.has(sourceKey)) continue;
 
       const id = `capture-${Date.now()}-${idSequence.current++}`;
       try {
         const uri = cachePickedImage(asset.uri, id, fileName, mimeType);
+        if (!mountedRef.current) {
+          cleanupCachedImages([{ uri }, ...accepted]);
+          return;
+        }
         accepted.push({
           id,
           order: currentImages.length + accepted.length,
           uri,
+          sourceKey,
           fileName,
           mimeType,
           fileSize: asset.fileSize,
@@ -123,45 +156,64 @@ export default function CaptureScreen() {
           errorCode: null,
           reviewed: false,
         });
-        existing.add(key);
+        existing.add(sourceKey);
       } catch {
         nextNotices.add('이미지를 보관하지 못했어요. 해당 파일을 다시 선택해 주세요.');
       }
     }
 
+    if (!mountedRef.current) {
+      cleanupCachedImages(accepted);
+      return;
+    }
     setNotices(Array.from(nextNotices));
     if (accepted.length === 0) return;
-    updateDraft((current) => ({
-      ...current,
-      primaryInput: 'capture',
-      images: [...current.images, ...accepted].slice(0, MAX_IMAGES).map((item, order) => ({
-        ...item,
-        order,
-      })),
-    }));
-  }, [updateDraft]);
+    const admitted = [...currentImages, ...accepted]
+      .slice(0, MAX_IMAGES)
+      .map((item, order) => ({ ...item, order }));
+    const admittedIds = new Set(admitted.map((item) => item.id));
+    cleanupCachedImages(accepted.filter((copied) => !admittedIds.has(copied.id)));
+    if (!commitImages(admitted, true)) {
+      cleanupCachedImages(accepted);
+      return;
+    }
+  }, [commitImages]);
+
+  const enqueueAssetBatch = useCallback((assets: ImagePicker.ImagePickerAsset[]) => {
+    const operation = assetQueueRef.current.then(() => processAssets(assets));
+    assetQueueRef.current = operation.catch(() => undefined);
+    return operation;
+  }, [processAssets]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     if (!hydrated || Platform.OS !== 'android' || pendingConsumed.current) return;
     pendingConsumed.current = true;
-    let active = true;
 
-    void ImagePicker.getPendingResultAsync()
-      .then((result) => {
-        if (active && result && 'canceled' in result && !result.canceled) {
-          processAssets(result.assets);
+    void (async () => {
+      try {
+        const result = await ImagePicker.getPendingResultAsync();
+        if (mountedRef.current && result && 'canceled' in result && !result.canceled) {
+          await enqueueAssetBatch(result.assets);
         }
-      })
-      .catch(() => {
-        if (active) setNotices(['중단된 사진 선택 결과를 불러오지 못했어요. 다시 선택해 주세요.']);
-      });
-
-    return () => { active = false; };
-  }, [hydrated, processAssets]);
+      } catch {
+        if (mountedRef.current) {
+          setNotices(['중단된 사진 선택 결과를 불러오지 못했어요. 다시 선택해 주세요.']);
+        }
+      }
+    })();
+  }, [enqueueAssetBatch, hydrated]);
 
   const pickImages = async () => {
+    if (pickerBusyRef.current || !mountedRef.current) return;
     const remaining = MAX_IMAGES - imagesRef.current.length;
     if (remaining <= 0) return;
+    pickerBusyRef.current = true;
+    setPickerBusy(true);
     setNotices([]);
 
     try {
@@ -172,46 +224,49 @@ export default function CaptureScreen() {
         orderedSelection: true,
         quality: 1,
       });
-      if (!result.canceled) processAssets(result.assets);
+      if (!result.canceled && mountedRef.current) await enqueueAssetBatch(result.assets);
     } catch {
-      setNotices(['사진 선택기를 열지 못했어요. 잠시 후 다시 시도해 주세요.']);
+      if (mountedRef.current) {
+        setNotices(['사진 선택기를 열지 못했어요. 잠시 후 다시 시도해 주세요.']);
+      }
+    } finally {
+      pickerBusyRef.current = false;
+      if (mountedRef.current) setPickerBusy(false);
     }
   };
 
   const moveImage = (from: number, to: number) => {
-    updateDraft((current) => ({ ...current, images: moveDraftImage(current.images, from, to) }));
+    commitImages(moveDraftImage(imagesRef.current, from, to));
   };
 
   const removeImage = (image: ImageDraftItem) => {
     try {
       deleteCachedImage(image.uri);
     } catch {
-      setNotices(['기기 캐시 일부를 정리하지 못했지만 목록에서는 삭제했어요.']);
+      if (mountedRef.current) {
+        setNotices(['이미지를 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.']);
+      }
+      return;
     }
-    updateDraft((current) => ({
-      ...current,
-      images: current.images
-        .filter((item) => item.id !== image.id)
-        .map((item, order) => ({ ...item, order })),
-    }));
+    commitImages(imagesRef.current
+      .filter((item) => item.id !== image.id)
+      .map((item, order) => ({ ...item, order })));
   };
 
   const runExtraction = async (items: ImageDraftItem[]) => {
-    if (processing || items.length === 0) return;
+    if (processingRef.current || items.length === 0 || !mountedRef.current) return;
+    processingRef.current = true;
     setProcessing(true);
     await runOcrQueue(items, async (image) => {
-      updateDraft((current) => ({
-        ...current,
-        images: current.images.map((item) => item.id === image.id
-          ? { ...item, status: 'extracting', errorCode: null }
-          : item),
-      }));
+      if (!mountedRef.current) return null;
+      commitImages(imagesRef.current.map((item) => item.id === image.id
+        ? { ...item, status: 'extracting', errorCode: null }
+        : item));
 
       try {
         const extracted = await extractImage(image.uri);
-        updateDraft((current) => ({
-          ...current,
-          images: current.images.map((item) => item.id === image.id
+        if (mountedRef.current) {
+          commitImages(imagesRef.current.map((item) => item.id === image.id
             ? {
                 ...item,
                 status: 'complete',
@@ -220,20 +275,20 @@ export default function CaptureScreen() {
                 notes: extracted.notes,
                 errorCode: null,
               }
-            : item),
-        }));
+            : item));
+        }
         return extracted;
       } catch (error) {
-        updateDraft((current) => ({
-          ...current,
-          images: current.images.map((item) => item.id === image.id
+        if (mountedRef.current) {
+          commitImages(imagesRef.current.map((item) => item.id === image.id
             ? { ...item, status: 'failed', notes: [OCR_FAILURE_NOTE], errorCode: safeErrorCode(error) }
-            : item),
-        }));
+            : item));
+        }
         throw error;
       }
     }, 2);
-    setProcessing(false);
+    processingRef.current = false;
+    if (mountedRef.current) setProcessing(false);
   };
 
   const completeCount = draft.images.filter((image) => image.status === 'complete').length;
@@ -260,13 +315,13 @@ export default function CaptureScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="캡처 추가"
-            accessibilityState={{ disabled: draft.images.length >= MAX_IMAGES }}
-            disabled={draft.images.length >= MAX_IMAGES}
+            accessibilityState={{ disabled: draft.images.length >= MAX_IMAGES || pickerBusy }}
+            disabled={draft.images.length >= MAX_IMAGES || pickerBusy}
             onPress={() => { void pickImages(); }}
             style={({ pressed }) => [
               styles.addButton,
               pressed && styles.addButtonPressed,
-              draft.images.length >= MAX_IMAGES && styles.disabled,
+              (draft.images.length >= MAX_IMAGES || pickerBusy) && styles.disabled,
             ]}
           >
             <Plus color={colors.background} size={19} strokeWidth={2.2} />

@@ -23,6 +23,7 @@ export type ImageDraftItem = {
   id: string;
   order: number;
   uri: string;
+  sourceKey?: string;
   fileName: string;
   mimeType: string;
   fileSize: number;

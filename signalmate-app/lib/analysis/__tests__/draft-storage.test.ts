@@ -14,14 +14,17 @@ describe('analysis draft storage', () => {
     });
     const draft = createEmptyDraft();
     draft.images = [{
-      id: 'a', order: 0, uri: 'file://a.png', fileName: 'a.png', mimeType: 'image/png',
+      id: 'a', order: 0, uri: 'file://a.png', sourceKey: 'asset:persisted-a',
+      fileName: 'a.png', mimeType: 'image/png',
       fileSize: 1, status: 'extracting', extractedText: '', editedText: '', notes: [],
       errorCode: null, reviewed: false,
     }];
 
     await storage.save(draft);
 
-    expect((await storage.load())?.images[0].status).toBe('queued');
+    const restored = await storage.load();
+    expect(restored?.images[0].status).toBe('queued');
+    expect(restored?.images[0].sourceKey).toBe('asset:persisted-a');
   });
 
   test('손상된 저장값은 복구하지 않는다', async () => {

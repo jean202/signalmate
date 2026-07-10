@@ -47,27 +47,29 @@ export function ImageQueueList({ images, onMove, onDelete }: ImageQueueListProps
   return (
     <View style={styles.list}>
       {images.map((image, index) => (
-        <View key={image.id} style={styles.row}>
-          <View style={styles.sequence}>
-            <Text style={styles.sequenceText}>{index + 1}</Text>
+        <View key={image.id} style={styles.item} testID={`capture-item-${image.id}`}>
+          <View style={styles.infoRow} testID={`capture-info-row-${image.id}`}>
+            <View style={styles.sequence}>
+              <Text style={styles.sequenceText}>{index + 1}</Text>
+            </View>
+            <Image accessibilityLabel={`${image.fileName} 미리보기`} source={{ uri: image.uri }} style={styles.thumbnail} />
+            <View style={styles.details}>
+              <Text numberOfLines={2} style={styles.fileName} testID="capture-file-name">
+                {image.fileName}
+              </Text>
+              <Text style={[
+                styles.status,
+                image.status === 'complete' && styles.statusComplete,
+                image.status === 'failed' && styles.statusFailed,
+              ]}>
+                {STATUS_LABEL[image.status]}
+              </Text>
+              {image.status === 'failed' && image.notes[0] && (
+                <Text numberOfLines={2} style={styles.failureNote}>{image.notes[0]}</Text>
+              )}
+            </View>
           </View>
-          <Image accessibilityLabel={`${image.fileName} 미리보기`} source={{ uri: image.uri }} style={styles.thumbnail} />
-          <View style={styles.details}>
-            <Text numberOfLines={2} style={styles.fileName} testID="capture-file-name">
-              {image.fileName}
-            </Text>
-            <Text style={[
-              styles.status,
-              image.status === 'complete' && styles.statusComplete,
-              image.status === 'failed' && styles.statusFailed,
-            ]}>
-              {STATUS_LABEL[image.status]}
-            </Text>
-            {image.status === 'failed' && image.notes[0] && (
-              <Text numberOfLines={2} style={styles.failureNote}>{image.notes[0]}</Text>
-            )}
-          </View>
-          <View style={styles.controls}>
+          <View style={styles.actionRow} testID={`capture-action-row-${image.id}`}>
             <IconButton
               label={`${image.fileName} 위로 이동`}
               disabled={index === 0}
@@ -94,14 +96,18 @@ export function ImageQueueList({ images, onMove, onDelete }: ImageQueueListProps
 
 const styles = StyleSheet.create({
   list: { borderTopWidth: 1, borderTopColor: colors.border },
-  row: {
-    minHeight: 92,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  item: {
+    minHeight: 148,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  infoRow: {
+    width: '100%',
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   sequence: {
     width: 24,
@@ -119,7 +125,13 @@ const styles = StyleSheet.create({
   statusComplete: { color: colors.positive, fontWeight: '700' },
   statusFailed: { color: colors.caution, fontWeight: '700' },
   failureNote: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  controls: { flexDirection: 'row', alignItems: 'center' },
+  actionRow: {
+    minHeight: touchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+  },
   iconButton: {
     width: touchTarget,
     height: touchTarget,

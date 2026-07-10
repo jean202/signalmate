@@ -83,3 +83,70 @@
 - 복원된 초안에는 원본 picker URI가 저장되지 않는다. Android pending 중복 판정은 파일명, 크기, MIME fingerprint를 사용하므로 세 값이 완전히 같은 서로 다른 파일은 중복으로 간주될 수 있다.
 - Jest 환경의 Lucide `.mjs` 변환 제약 때문에 캡처 화면 테스트는 아이콘 렌더러만 단순 View로 대체한다. 접근성 레이블, 터치 영역, disabled 상태와 실제 화면/Provider 동작은 그대로 테스트한다.
 - 네이티브 시뮬레이터 스크린샷 QA는 이번 명령 집합에 포함하지 않았다.
+
+## Review Fix
+
+### Scope
+
+- picker와 Android pending 결과의 자산 처리를 단일 promise queue로 직렬화했다.
+- picker launch부터 자산 admission 완료까지 즉시 ref lock을 유지해 재진입을 막았다.
+- React render/effect를 기다리지 않는 `imagesRef`를 admission, 이동, 삭제, OCR 상태의 즉시 source of truth로 사용했다.
+- capacity를 캐시 복사 전에 계산하며, 방어적으로 복사됐지만 admission되지 않은 URI는 즉시 삭제한다.
+- `ImageDraftItem.sourceKey?: string`을 추가했다. 새 자산은 `assetId`가 있으면 `asset:<id>`, 없으면 `uri:<source-uri>`를 저장한다.
+- 캐시 삭제 실패 시 draft 항목과 URI를 유지하고 고정된 안전한 한국어 오류만 표시한다.
+- 캡처 목록을 정보 행과 44pt 제어 행으로 분리해 320pt 폭에서 파일 정보가 제어열과 폭을 경쟁하지 않게 했다.
+- picker/OCR 완료 전 unmount되면 로컬 state와 draft를 갱신하지 않으며, unmount 경계에서 이미 복사된 캐시는 정리한다.
+
+### RED
+
+Command:
+
+`cd signalmate-app && npm test -- app/__tests__/capture.test.tsx`
+
+Result: Exit 1. 15 tests 중 9 passed, 6 failed.
+
+- picker 재진입으로 `launchImageLibraryAsync`가 2회 호출됐다.
+- 이름/크기/MIME이 같은 다른 URI 2개 중 1개만 수용됐다.
+- 복원된 `sourceKey`와 같은 `assetId` pending 자산이 다시 추가됐다.
+- `deleteCachedImage` 실패 뒤 draft 항목이 제거됐다.
+- 정보와 3개 제어가 같은 수평 행에 있어 구조 testID를 찾지 못했다.
+- picker가 unmount 뒤 resolve되면 캐시 복사가 실행됐다.
+
+### GREEN
+
+1. `cd signalmate-app && npm test -- app/__tests__/capture.test.tsx`
+   - Exit 0. 1 suite, 15 tests passed.
+2. `cd signalmate-app && npm test -- app/__tests__/index.test.tsx app/__tests__/capture.test.tsx lib/analysis/__tests__/draft-storage.test.ts && npm run typecheck`
+   - Exit 0. 3 suites, 22 tests passed; `tsc --noEmit` passed.
+3. `cd signalmate-app && npm test`
+   - Exit 0. 12 suites, 91 tests passed.
+4. `cd signalmate-app && npm run typecheck`
+   - Exit 0.
+5. `git diff --check`
+   - Exit 0, no output.
+
+### Regression Coverage
+
+- deferred picker/pending overlap, 20장 상한, picker 재진입 방지, 중복/overflow 캐시 copy 없음
+- 동일 메타데이터지만 다른 source URI인 자산 2개 수용
+- persisted `assetId` pending 중복 거부와 draft storage `sourceKey` round trip
+- 누락 `fileSize` 거부와 고정 안내
+- 부분 cache copy 실패 후 성공 항목 순서/상태 보존
+- cache delete 성공 시 draft 제거, 실패 시 draft/URI 유지
+- picker/OCR unmount guard와 raw OCR logging 없음
+- 정보/제어 두 행, 항목 148pt 최소 높이, 아이콘 버튼 44x44pt
+
+### 320pt Self-review
+
+- 화면 좌우 20pt padding을 제외한 목록 폭은 280pt다.
+- 정보 행의 고정 폭은 index 24pt + thumbnail 54pt + gap 20pt = 98pt이며 파일 정보에 182pt가 남는다.
+- 파일명은 최대 2줄, 실패 안내는 최대 2줄이고 detail 영역은 `flex: 1`, `minWidth: 0`이라 긴 단어가 제어 영역을 밀어내지 않는다.
+- 이동/삭제 버튼은 별도 행에 44x44pt로 배치되어 정보 행 폭을 소비하지 않는다.
+- 항목 최소 높이 148pt는 68pt 정보 행 + 44pt 제어 행 + 간격/여백을 안정적으로 수용한다.
+- 별도 카드나 nested card를 추가하지 않고 기존 구분선 목록을 유지했다.
+
+### Remaining Concerns
+
+- 수정 전 저장된 이미지에는 optional `sourceKey`가 없다. 기존 draft 복원은 유지되지만 그 이미지에 대해서는 source identity 기반 중복 방지가 소급 적용되지 않는다.
+- `assetId`가 없는 provider 자산은 요구사항대로 source URI를 identity로 사용한다. provider가 동일 자산에 다른 URI를 발급하면 동일성을 판별할 추가 메타데이터가 없다.
+- 네이티브 시뮬레이터 screenshot은 실행하지 않았으며 320pt 검증은 고정 치수 산정과 구조/style 회귀 테스트로 수행했다.
