@@ -77,6 +77,7 @@ export default function CaptureScreen() {
   const pickerBusyRef = useRef(false);
   const processingRef = useRef(false);
   const assetQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const activeExtractionIdsRef = useRef<Set<string>>(new Set());
 
   if (lastDraftImagesRef.current !== draft.images) {
     lastDraftImagesRef.current = draft.images;
@@ -187,8 +188,22 @@ export default function CaptureScreen() {
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+    return () => {
+      mountedRef.current = false;
+      processingRef.current = false;
+      const activeIds = new Set(activeExtractionIdsRef.current);
+      activeExtractionIdsRef.current.clear();
+      if (activeIds.size === 0) return;
+      updateDraft((current) => ({
+        ...current,
+        images: current.images.map((image) => (
+          activeIds.has(image.id) && image.status === 'extracting'
+            ? { ...image, status: 'queued' }
+            : image
+        )),
+      }));
+    };
+  }, [updateDraft]);
 
   useEffect(() => {
     if (!hydrated || Platform.OS !== 'android' || pendingConsumed.current) return;
@@ -259,9 +274,14 @@ export default function CaptureScreen() {
     setProcessing(true);
     await runOcrQueue(items, async (image) => {
       if (!mountedRef.current) return null;
-      commitImages(imagesRef.current.map((item) => item.id === image.id
+      activeExtractionIdsRef.current.add(image.id);
+      const transitioned = commitImages(imagesRef.current.map((item) => item.id === image.id
         ? { ...item, status: 'extracting', errorCode: null }
         : item));
+      if (!transitioned) {
+        activeExtractionIdsRef.current.delete(image.id);
+        return null;
+      }
 
       try {
         const extracted = await extractImage(image.uri);
@@ -285,6 +305,8 @@ export default function CaptureScreen() {
             : item));
         }
         throw error;
+      } finally {
+        activeExtractionIdsRef.current.delete(image.id);
       }
     }, 2);
     processingRef.current = false;

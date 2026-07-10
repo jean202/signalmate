@@ -1,10 +1,11 @@
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import CaptureScreen from '../capture';
-import { AnalysisProvider } from '../../providers/analysis-provider';
+import { AnalysisProvider, useAnalysis } from '../../providers/analysis-provider';
 import { createEmptyDraft } from '../../lib/analysis/draft';
 import type { AnalysisDraft, ImageDraftItem } from '../../lib/analysis/types';
 import { cachePickedImage, deleteCachedImage } from '../../lib/analysis/image-cache';
@@ -107,6 +108,36 @@ function renderCapture(initialDraft = draftWith()) {
       insets: { top: 47, right: 0, bottom: 34, left: 0 },
     }}>
       <AnalysisProvider><CaptureScreen /></AnalysisProvider>
+    </SafeAreaProvider>,
+  );
+}
+
+function CaptureLifecycleHarness() {
+  const [visible, setVisible] = useState(true);
+  const { draft } = useAnalysis();
+  return (
+    <>
+      <Text testID="provider-ocr-status">{draft.images[0]?.status ?? 'missing'}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={visible ? '캡처 화면 숨기기' : '캡처 화면 다시 열기'}
+        onPress={() => setVisible((current) => !current)}
+      >
+        <Text>{visible ? '캡처 화면 숨기기' : '캡처 화면 다시 열기'}</Text>
+      </Pressable>
+      {visible && <CaptureScreen />}
+    </>
+  );
+}
+
+function renderCaptureLifecycle(initialDraft: AnalysisDraft) {
+  mockLoad.mockResolvedValue(initialDraft);
+  return render(
+    <SafeAreaProvider initialMetrics={{
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      insets: { top: 47, right: 0, bottom: 34, left: 0 },
+    }}>
+      <AnalysisProvider><CaptureLifecycleHarness /></AnalysisProvider>
     </SafeAreaProvider>,
   );
 }
@@ -436,5 +467,31 @@ describe('CaptureScreen', () => {
     expect(consoleLog).not.toHaveBeenCalled();
     consoleError.mockRestore();
     consoleLog.mockRestore();
+  });
+
+  test('CaptureScreen만 unmount하면 extracting을 queued로 복구하고 재마운트 후 다시 추출한다', async () => {
+    const firstExtraction = createDeferred<{ rawText: string; messageCount: number; notes: string[] }>();
+    mockedExtractImage
+      .mockReturnValueOnce(firstExtraction.promise)
+      .mockResolvedValueOnce({ rawText: '상대: 재추출 완료', messageCount: 1, notes: [] });
+    const screen = renderCaptureLifecycle(draftWith([
+      image({ id: 'recover', fileName: 'recover.png' }),
+    ]));
+    await screen.findByText('recover.png');
+
+    fireEvent.press(screen.getByRole('button', { name: '텍스트 추출' }));
+    await waitFor(() => expect(screen.getByTestId('provider-ocr-status').props.children).toBe('extracting'));
+    fireEvent.press(screen.getByRole('button', { name: '캡처 화면 숨기기' }));
+
+    await waitFor(() => expect(screen.getByTestId('provider-ocr-status').props.children).toBe('queued'));
+    await act(async () => firstExtraction.resolve({ rawText: '늦은 원문', messageCount: 1, notes: [] }));
+    expect(screen.getByTestId('provider-ocr-status').props.children).toBe('queued');
+
+    fireEvent.press(screen.getByRole('button', { name: '캡처 화면 다시 열기' }));
+    await screen.findByText('recover.png');
+    fireEvent.press(screen.getByRole('button', { name: '텍스트 추출' }));
+
+    await waitFor(() => expect(mockedExtractImage).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId('provider-ocr-status').props.children).toBe('complete'));
   });
 });
