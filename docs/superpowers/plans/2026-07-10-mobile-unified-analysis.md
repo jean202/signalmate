@@ -68,12 +68,13 @@ Run:
 
 ```bash
 cd signalmate-app
+npx expo install react-dom@19.1.0 react-native-web @expo/metro-runtime
 npx expo install expo-image-picker expo-file-system expo-clipboard react-native-svg
 npm install lucide-react-native
 npx expo install jest-expo jest @types/jest @testing-library/react-native -- --dev
 ```
 
-Expected: 설치가 종료 코드 0으로 끝나고 `package-lock.json`이 갱신된다.
+첫 명령은 `expo-router`의 선택적 peer가 최신 `react-dom`을 자동 선택해 React 19.1.0과 충돌하지 않도록 웹 런타임 버전을 직접 고정한다. Expected: 설치가 종료 코드 0으로 끝나고 `package-lock.json`이 갱신되며 `npm ls react react-dom`에 peer 충돌이 없다.
 
 - [ ] **Step 2: 테스트 설정과 사진 접근 문구를 추가한다**
 
