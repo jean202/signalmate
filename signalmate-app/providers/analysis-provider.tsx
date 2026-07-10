@@ -32,6 +32,9 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
   const hasCompletedInitialHydration = useRef(false);
   const skipNextPersist = useRef(false);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistenceQueue = useRef(Promise.resolve());
+  const mounted = useRef(true);
+  const generation = useRef(0);
 
   const cancelPendingPersist = useCallback(() => {
     if (persistTimer.current !== null) {
@@ -40,18 +43,38 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
+  const enqueueStorageOperation = useCallback(<T,>(operation: () => Promise<T>) => {
+    const queuedOperation = persistenceQueue.current.then(operation, operation);
+    persistenceQueue.current = queuedOperation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queuedOperation;
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      cancelPendingPersist();
+    };
+  }, [cancelPendingPersist]);
+
   useEffect(() => {
     let active = true;
+    const hydrationGeneration = generation.current;
 
     void draftStorage.load()
       .then((restoredDraft) => {
-        if (active && restoredDraft) setDraft(restoredDraft);
+        if (active && mounted.current && generation.current === hydrationGeneration && restoredDraft) {
+          setDraft(restoredDraft);
+        }
       })
       .catch(() => {
         // An unavailable local store must not prevent a new analysis from starting.
       })
       .finally(() => {
-        if (active) setHydrated(true);
+        if (active && mounted.current) setHydrated(true);
       });
 
     return () => { active = false; };
@@ -71,15 +94,19 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     }
 
     cancelPendingPersist();
+    const persistenceGeneration = generation.current;
     persistTimer.current = setTimeout(() => {
       persistTimer.current = null;
-      void draftStorage.save(draft).catch(() => {
+      void enqueueStorageOperation(async () => {
+        if (generation.current !== persistenceGeneration) return;
+        await draftStorage.save(draft);
+      }).catch(() => {
         // Saving locally is best effort; never expose draft content in logs.
       });
     }, PERSIST_DEBOUNCE_MS);
 
     return cancelPendingPersist;
-  }, [cancelPendingPersist, draft, hydrated]);
+  }, [cancelPendingPersist, draft, enqueueStorageOperation, hydrated]);
 
   const updateDraft = useCallback((updater: (currentDraft: AnalysisDraft) => AnalysisDraft) => {
     setDraft((currentDraft) => ({
@@ -89,11 +116,20 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
   }, []);
 
   const resetDraft = useCallback(async () => {
+    generation.current += 1;
     cancelPendingPersist();
+    hasCompletedInitialHydration.current = true;
+    skipNextPersist.current = true;
+
+    if (mounted.current) {
+      setDraft(createEmptyDraft());
+      setResult(null);
+      setHydrated(true);
+    }
 
     let cleanupError: unknown;
     try {
-      await draftStorage.clear();
+      await enqueueStorageOperation(async () => draftStorage.clear());
     } catch (error) {
       cleanupError = error;
     }
@@ -104,12 +140,8 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
       cleanupError ??= error;
     }
 
-    skipNextPersist.current = true;
-    setDraft(createEmptyDraft());
-    setResult(null);
-
     if (cleanupError) throw cleanupError;
-  }, [cancelPendingPersist]);
+  }, [cancelPendingPersist, enqueueStorageOperation]);
 
   const value = useMemo<AnalysisContextValue>(() => ({
     hydrated,

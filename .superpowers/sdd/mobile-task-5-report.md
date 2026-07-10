@@ -47,3 +47,29 @@ Complete. Commit pending at the time of writing.
 ## Concerns
 
 - `capture`, `ocr-review`, `situation`, and `review` are intentionally wired before their route files exist; their implementations belong to subsequent mobile tasks. The current root matches the Task 5 navigation contract.
+
+## Review Fix
+
+- Reset now increments a generation before clearing in-memory state. Hydration only applies a loaded draft when its captured generation still matches, so a delayed load cannot restore a discarded draft.
+- Storage mutations now use one serialized queue. A save that already started completes before reset's clear; saves queued from an older generation become no-ops, so stale content cannot be written after the clear.
+- Reset updates memory before awaiting cleanup and performs no state update after an await. The mounted guard prevents delayed hydration from updating an unmounted provider.
+- Root navigation now declares only the route files currently present: `index`, `analyze`, and `result`. `SafeAreaProvider` is installed at the root, `ScreenShell` uses the safe-area-context view, and `BottomAction` uses `Math.max(insets.bottom, 16)`.
+
+### RED evidence
+
+- `npm test -- providers/__tests__/analysis-provider.test.tsx components/ui/__tests__/bottom-action.test.tsx` failed before the fix:
+  - delayed hydration restored the saved draft after reset;
+  - clear executed while an in-flight save was unresolved;
+  - reset did not clear in-memory state before deferred cleanup;
+  - `BottomAction` had no safe-area footer test surface.
+
+### GREEN evidence
+
+- `npm test -- providers/__tests__/analysis-provider.test.tsx components/ui/__tests__/bottom-action.test.tsx components/ui/__tests__/segmented-control.test.tsx` passed: 3 suites, 11 tests.
+- The provider tests use deferred load, save, and clear boundaries to exercise real provider ordering; only storage and image-cache boundaries are mocked.
+
+### Final commands
+
+- `npm test` - PASS, 10 suites and 72 tests.
+- `npm run typecheck` - PASS (`tsc --noEmit`).
+- `git diff --check` - PASS with no whitespace errors.

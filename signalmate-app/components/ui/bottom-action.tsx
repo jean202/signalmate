@@ -1,5 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, touchTarget } from './theme';
+
+const BASE_BOTTOM_PADDING = 16;
 
 type Action = {
   label: string;
@@ -14,8 +17,13 @@ type BottomActionProps = {
 };
 
 export function BottomAction({ primary, secondary }: BottomActionProps) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
+    <View
+      testID="bottom-action"
+      style={[styles.container, { paddingBottom: Math.max(insets.bottom, BASE_BOTTOM_PADDING) }]}
+    >
       {secondary && (
         <Pressable
           accessibilityRole="button"
@@ -51,7 +59,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: BASE_BOTTOM_PADDING,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.background,
