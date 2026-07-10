@@ -69,12 +69,25 @@ export function recognizedChatCount(text: string): number {
   ).length;
 }
 
+const USER_GOAL = {
+  next_message: 'continue_chat',
+  ask_for_date: 'ask_for_date',
+  wait_or_send: 'evaluate_interest',
+  decide_to_stop: 'decide_to_stop',
+} as const;
+
+const isValidDesiredHelp = (value: unknown): value is keyof typeof USER_GOAL =>
+  typeof value === 'string' && Object.prototype.hasOwnProperty.call(USER_GOAL, value);
+
 export function validateDraft(draft: AnalysisDraft): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const chatText = buildMergedChatText(draft);
   if (!draft.primaryInput) errors.push('입력 방식을 선택해 주세요.');
   if (!draft.relationshipStage) errors.push('관계 단계를 선택해 주세요.');
   if (!draft.meetingChannel) errors.push('만난 경로를 선택해 주세요.');
+  if (!isValidDesiredHelp(draft.guidedAnswers.desiredHelp)) {
+    errors.push('원하는 도움을 선택해 주세요.');
+  }
   if (draft.guidedAnswers.freeText.trim().length > 2000) {
     errors.push('만남 후기는 2,000자 이하여야 해요.');
   }
@@ -89,24 +102,19 @@ export function validateDraft(draft: AnalysisDraft): { valid: boolean; errors: s
   return { valid: errors.length === 0, errors };
 }
 
-const USER_GOAL = {
-  next_message: 'continue_chat',
-  ask_for_date: 'ask_for_date',
-  wait_or_send: 'evaluate_interest',
-  decide_to_stop: 'decide_to_stop',
-} as const;
-
 export function buildConversationRequest(draft: AnalysisDraft) {
   const validation = validateDraft(draft);
-  if (!validation.valid || !draft.relationshipStage || !draft.meetingChannel) {
+  if (!validation.valid || !draft.relationshipStage || !draft.meetingChannel
+    || !isValidDesiredHelp(draft.guidedAnswers.desiredHelp)) {
     throw new Error(validation.errors[0] ?? '분석 입력이 완성되지 않았어요.');
   }
+  const userGoal = USER_GOAL[draft.guidedAnswers.desiredHelp];
   return {
     title: '모바일 분석',
     sourceType: draft.images.length > 0 ? 'mobile_capture' : 'mobile_manual',
     relationshipStage: draft.relationshipStage,
     meetingChannel: draft.meetingChannel,
-    userGoal: USER_GOAL[draft.guidedAnswers.desiredHelp],
+    userGoal,
     saveMode: 'temporary' as const,
     rawText: buildMergedChatText(draft),
     selfName: '나',
