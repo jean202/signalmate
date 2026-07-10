@@ -4,6 +4,7 @@ import {
   buildConversationRequest,
   buildMergedChatText,
   countReplacementChanges,
+  duplicateCandidateId,
   findDuplicateCandidates,
   validateDraft,
 } from '../input-builder';
@@ -106,6 +107,77 @@ test('중복 선택 후 앞줄이 삽입되면 다른 메시지를 조용히 제
   expect(buildMergedChatText(draft)).toBe(
     '나: 안녕\n상대: 반복\n나: 새 앞줄\n상대: 반복\n나: 다음',
   );
+});
+
+test('중복 선택 후 이전 이미지 마지막 줄이 바뀌면 현재 첫 줄을 유지한다', () => {
+  const draft = createEmptyDraft();
+  draft.images = [
+    { id: 'a', order: 0, uri: 'a', fileName: 'a.png', mimeType: 'image/png', fileSize: 1,
+      status: 'complete', extractedText: '', editedText: '나: 안녕\n상대: 반복', notes: [], errorCode: null, reviewed: true },
+    { id: 'b', order: 1, uri: 'b', fileName: 'b.png', mimeType: 'image/png', fileSize: 1,
+      status: 'complete', extractedText: '', editedText: '상대: 반복\n나: 다음', notes: [], errorCode: null, reviewed: true },
+  ];
+  draft.excludedDuplicateIds = findDuplicateCandidates([
+    { imageId: 'a', text: draft.images[0].editedText },
+    { imageId: 'b', text: draft.images[1].editedText },
+  ]).map((candidate) => candidate.id);
+
+  draft.images[0].editedText = '나: 안녕\n상대: 변경';
+
+  expect(buildMergedChatText(draft)).toBe('나: 안녕\n상대: 변경\n상대: 반복\n나: 다음');
+});
+
+test('중복 선택 후 이전 이미지를 삭제해 후보가 사라지면 현재 첫 줄을 유지한다', () => {
+  const draft = createEmptyDraft();
+  draft.images = [
+    { id: 'a', order: 0, uri: 'a', fileName: 'a.png', mimeType: 'image/png', fileSize: 1,
+      status: 'complete', extractedText: '', editedText: '나: 안녕\n상대: 반복', notes: [], errorCode: null, reviewed: true },
+    { id: 'b', order: 1, uri: 'b', fileName: 'b.png', mimeType: 'image/png', fileSize: 1,
+      status: 'complete', extractedText: '', editedText: '상대: 반복\n나: 다음', notes: [], errorCode: null, reviewed: true },
+  ];
+  draft.excludedDuplicateIds = findDuplicateCandidates([
+    { imageId: 'a', text: draft.images[0].editedText },
+    { imageId: 'b', text: draft.images[1].editedText },
+  ]).map((candidate) => candidate.id);
+
+  draft.images = [draft.images[1]];
+
+  expect(buildMergedChatText(draft)).toBe('상대: 반복\n나: 다음');
+});
+
+test('중복 선택 후 이전 이미지 경계를 치환해 후보가 사라지면 현재 첫 줄을 유지한다', () => {
+  const draft = createEmptyDraft();
+  draft.images = [
+    { id: 'a', order: 0, uri: 'a', fileName: 'a.png', mimeType: 'image/png', fileSize: 1,
+      status: 'complete', extractedText: '', editedText: '나: 안녕\n상대: 민수', notes: [], errorCode: null, reviewed: true },
+    { id: 'b', order: 1, uri: 'b', fileName: 'b.png', mimeType: 'image/png', fileSize: 1,
+      status: 'complete', extractedText: '', editedText: '상대: 민수\n나: 다음', notes: [], errorCode: null, reviewed: true },
+  ];
+  draft.excludedDuplicateIds = findDuplicateCandidates([
+    { imageId: 'a', text: draft.images[0].editedText },
+    { imageId: 'b', text: draft.images[1].editedText },
+  ]).map((candidate) => candidate.id);
+
+  draft.images[0].editedText = applyReplacementRules(draft.images[0].editedText, [
+    { id: 'name', source: '민수', replacement: '[이름]' },
+  ]);
+
+  expect(buildMergedChatText(draft)).toBe('나: 안녕\n상대: [이름]\n상대: 민수\n나: 다음');
+});
+
+test('임의 또는 stale 제외 ID는 현재 메시지를 제거하지 않는다', () => {
+  const draft = createEmptyDraft();
+  draft.images = [{
+    id: 'b', order: 0, uri: 'b', fileName: 'b.png', mimeType: 'image/png', fileSize: 1,
+    status: 'complete', extractedText: '', editedText: '상대: 유지\n나: 다음', notes: [], errorCode: null, reviewed: true,
+  }];
+  draft.excludedDuplicateIds = [
+    duplicateCandidateId('b', 0, '상대: 유지'),
+    'b:1',
+    'arbitrary-id',
+  ];
+
+  expect(buildMergedChatText(draft)).toBe('상대: 유지\n나: 다음');
 });
 
 test('만남 후기만 20자 이상이면 분석 가능하다', () => {

@@ -235,6 +235,27 @@ describe('OcrReviewScreen', () => {
     );
   });
 
+  test('중복 선택 후 이전 이미지 경계를 수정하면 이미지 2 제외 선택을 정리한다', async () => {
+    const screen = renderStatefulReview(draftWith({
+      images: [
+        image({ editedText: '나: 안녕\n상대: 반복' }),
+        image({ id: 'image-2', order: 1, editedText: '상대: 반복\n나: 다음' }),
+      ],
+    }));
+
+    fireEvent.press(screen.getByRole('checkbox', { name: '중복 제외: 상대: 반복' }));
+    await waitFor(() => expect(latestStatefulDraft.excludedDuplicateIds).toHaveLength(1));
+    fireEvent.changeText(
+      screen.getByLabelText('1번 캡처 추출 텍스트'),
+      '나: 안녕\n상대: 변경',
+    );
+
+    await waitFor(() => expect(latestStatefulDraft.excludedDuplicateIds).toEqual([]));
+    expect(buildMergedChatText(latestStatefulDraft)).toBe(
+      '나: 안녕\n상대: 변경\n상대: 반복\n나: 다음',
+    );
+  });
+
   test('전체 치환을 두 번 적용해도 중첩되지 않고 수동 수정과 extractedText를 보존한다', async () => {
     const screen = renderStatefulReview(draftWith({
       pastedText: '민수: 붙여넣기',

@@ -10,8 +10,8 @@ import { ScreenShell } from '../components/ui/screen-shell';
 import { colors, radius, touchTarget } from '../components/ui/theme';
 import {
   applyReplacementRules,
-  duplicateCandidateBelongsToImage,
   findDuplicateCandidates,
+  retainValidDuplicateIds,
 } from '../lib/analysis/input-builder';
 import type { ReplacementRule } from '../lib/analysis/types';
 import { useAnalysis } from '../providers/analysis-provider';
@@ -50,15 +50,16 @@ export default function OcrReviewScreen() {
   const changeCurrentText = (value: string) => {
     if (!currentImage) return;
     setEditedText(value);
-    updateDraft((current) => ({
-      ...current,
-      images: current.images.map((image) => image.id === currentImage.id
+    updateDraft((current) => {
+      const images = current.images.map((image) => image.id === currentImage.id
         ? { ...image, editedText: value, reviewed: false }
-        : image),
-      excludedDuplicateIds: current.excludedDuplicateIds.filter((candidateId) => (
-        !duplicateCandidateBelongsToImage(candidateId, currentImage.id)
-      )),
-    }));
+        : image);
+      return {
+        ...current,
+        images,
+        excludedDuplicateIds: retainValidDuplicateIds(images, current.excludedDuplicateIds),
+      };
+    });
   };
 
   const completeReview = () => {
@@ -77,23 +78,17 @@ export default function OcrReviewScreen() {
 
   const applyRules = (rules: ReplacementRule[]) => {
     updateDraft((current) => {
-      const changedImageIds = new Set<string>();
       const images = current.images.map((image) => {
         if (image.status !== 'complete') return image;
         const nextText = applyReplacementRules(image.editedText, rules);
         if (nextText === image.editedText) return image;
-        changedImageIds.add(image.id);
         return { ...image, editedText: nextText, reviewed: false };
       });
       return {
         ...current,
         images,
         pastedText: applyReplacementRules(current.pastedText, rules),
-        excludedDuplicateIds: current.excludedDuplicateIds.filter((candidateId) => (
-          ![...changedImageIds].some((imageId) => (
-            duplicateCandidateBelongsToImage(candidateId, imageId)
-          ))
-        )),
+        excludedDuplicateIds: retainValidDuplicateIds(images, current.excludedDuplicateIds),
       };
     });
   };

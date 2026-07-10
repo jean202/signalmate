@@ -13,11 +13,6 @@ export function duplicateCandidateId(imageId: string, lineIndex: number, text: s
   return `duplicate:${encodeURIComponent(imageId)}:${lineIndex}:${encodeURIComponent(normalizeLine(text))}`;
 }
 
-export function duplicateCandidateBelongsToImage(candidateId: string, imageId: string): boolean {
-  return candidateId.startsWith(`duplicate:${encodeURIComponent(imageId)}:`)
-    || candidateId.startsWith(`${imageId}:`);
-}
-
 function replacementResult(text: string, rules: readonly ReplacementRule[]) {
   const activeRules = rules.filter((rule) => rule.source.length > 0);
   const protectedCharactersByRule = new Map<ReplacementRule, boolean[]>();
@@ -100,12 +95,32 @@ export function findDuplicateCandidates(
   return result;
 }
 
+function completeImageInputs(images: AnalysisDraft['images']) {
+  return [...images]
+    .sort((a, b) => a.order - b.order)
+    .filter((image) => image.status === 'complete')
+    .map((image) => ({ imageId: image.id, text: image.editedText }));
+}
+
+export function retainValidDuplicateIds(
+  images: AnalysisDraft['images'],
+  excludedDuplicateIds: readonly string[],
+): string[] {
+  const validIds = new Set(
+    findDuplicateCandidates(completeImageInputs(images)).map((candidate) => candidate.id),
+  );
+  return excludedDuplicateIds.filter((candidateId) => validIds.has(candidateId));
+}
+
 export function buildMergedChatText(draft: AnalysisDraft): string {
+  const activeExcludedIds = new Set(
+    retainValidDuplicateIds(draft.images, draft.excludedDuplicateIds),
+  );
   const imageParts = [...draft.images]
     .sort((a, b) => a.order - b.order)
     .filter((image) => image.status === 'complete')
     .map((image) => image.editedText.split(/\r?\n/)
-      .filter((line, lineIndex) => !draft.excludedDuplicateIds.includes(
+      .filter((line, lineIndex) => !activeExcludedIds.has(
         duplicateCandidateId(image.id, lineIndex, line),
       ))
       .join('\n').trim())
