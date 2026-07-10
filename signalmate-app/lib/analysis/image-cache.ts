@@ -1,12 +1,15 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
-const CACHE_DIR = new Directory(Paths.cache, 'signalmate-analysis');
 const MIME_EXTENSION: Record<string, string> = {
   'image/png': '.png',
   'image/jpeg': '.jpg',
   'image/webp': '.webp',
   'image/gif': '.gif',
 };
+
+function cacheDirectory(): Directory {
+  return new Directory(Paths.cache, 'signalmate-analysis');
+}
 
 export function cacheFileName(id: string, fileName: string, mimeType: string): string {
   const sourceExtension = fileName.match(/\.(png|jpe?g|webp|gif)$/i)?.[0].toLowerCase();
@@ -20,9 +23,10 @@ export function cachePickedImage(
   fileName: string,
   mimeType: string,
 ): string {
-  CACHE_DIR.create({ idempotent: true, intermediates: true });
+  const directory = cacheDirectory();
+  directory.create({ idempotent: true, intermediates: true });
   const source = new File(sourceUri);
-  const target = new File(CACHE_DIR, cacheFileName(id, fileName, mimeType));
+  const target = new File(directory, cacheFileName(id, fileName, mimeType));
   if (target.exists) target.delete();
   source.copy(target);
   return target.uri;
@@ -34,5 +38,6 @@ export function deleteCachedImage(uri: string): void {
 }
 
 export function clearCachedImages(): void {
-  if (CACHE_DIR.exists) CACHE_DIR.delete();
+  const directory = cacheDirectory();
+  if (directory.exists) directory.delete();
 }

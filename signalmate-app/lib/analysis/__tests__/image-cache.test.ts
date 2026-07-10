@@ -13,6 +13,7 @@ const mockFileSystemState = {
   files: new Map<string, boolean>(),
   events: [] as FileSystemEvent[],
 };
+let directoryConstructionCount = 0;
 
 jest.mock('expo-file-system', () => {
   const joinUri = (parts: Array<string | { uri: string }>) => parts
@@ -23,6 +24,7 @@ jest.mock('expo-file-system', () => {
     uri: string;
 
     constructor(...parts: Array<string | { uri: string }>) {
+      directoryConstructionCount += 1;
       this.uri = `${joinUri(parts)}/`;
     }
 
@@ -77,9 +79,18 @@ import {
 
 describe('analysis image cache', () => {
   beforeEach(() => {
+    directoryConstructionCount = 0;
     mockFileSystemState.directories.clear();
     mockFileSystemState.files.clear();
     mockFileSystemState.events.length = 0;
+  });
+
+  test('모듈을 불러올 때는 캐시 디렉터리 객체를 만들지 않는다', () => {
+    jest.isolateModules(() => {
+      require('../image-cache');
+    });
+
+    expect(directoryConstructionCount).toBe(0);
   });
 
   test('캐시 파일명은 식별자와 허용 확장자만 사용한다', () => {
