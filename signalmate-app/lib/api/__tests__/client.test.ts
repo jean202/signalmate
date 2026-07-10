@@ -6,17 +6,18 @@ jest.mock('expo/fetch', () => ({
 }));
 
 jest.mock('expo-file-system', () => ({
-  File: class MockFile {
+  File: class MockFile extends Blob {
     uri: string;
 
     constructor(uri: string) {
+      super(['mock image bytes'], { type: 'image/png' });
       this.uri = uri;
       mockFileUris.push(uri);
     }
   },
 }));
 
-import type { AnalysisResult, AnalysisSignal, ConversationSnapshot } from '../../analysis/types';
+import type { AnalysisResult, AnalysisSignal } from '../../analysis/types';
 import {
   ApiError,
   createConversation,
@@ -24,6 +25,7 @@ import {
   reduceAnalysisEvent,
   streamAnalysis,
   type AnalysisStreamEvent,
+  type CreatedConversation,
 } from '../client';
 
 const validRequest = {
@@ -36,13 +38,15 @@ const validRequest = {
   rawText: '나: 안녕\n상대: 안녕',
 };
 
-const conversation: ConversationSnapshot = {
+const conversation: CreatedConversation = {
   id: 'conv-1',
   rawText: '나: 안녕\n상대: 안녕',
   situationContext: null,
   relationshipStage: 'before_meeting',
   meetingChannel: 'blind_date',
   userGoal: 'continue_chat',
+  saveMode: 'temporary',
+  messageCount: 2,
   messages: [
     { senderRole: 'self', messageText: '안녕', sentAt: null, sequenceNo: 1 },
     { senderRole: 'other', messageText: '안녕', sentAt: null, sequenceNo: 2 },
@@ -104,6 +108,26 @@ function streamResponse(parts: Uint8Array[], status = 200): Response {
   });
 }
 
+function trackedStreamResponse(parts: Uint8Array[], close = false) {
+  let canceled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const part of parts) controller.enqueue(part);
+      if (close) controller.close();
+    },
+    cancel() {
+      canceled = true;
+    },
+  });
+  return {
+    response: new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    }),
+    wasCanceled: () => canceled,
+  };
+}
+
 function encodeFrames(...events: AnalysisStreamEvent[]): Uint8Array {
   return new TextEncoder().encode(events.map((event) => (
     `event: progress\ndata: ${JSON.stringify(event)}\n\n`
@@ -129,22 +153,64 @@ describe('validated API envelopes', () => {
       notes: ['발신자 확인 필요'],
     });
     expect(mockFileUris).toEqual(['file://cache/chat.png']);
+    const request = mockFetch.mock.calls[0]?.[1] as { body?: FormData };
+    expect(request.body).toBeInstanceOf(FormData);
+    const imageFields = request.body?.getAll('image') ?? [];
+    expect(imageFields).toHaveLength(1);
+    expect(imageFields[0]).toBeInstanceOf(Blob);
   });
 
   test('대화 생성 성공 응답에서 data.conversation을 반환한다', async () => {
     mockFetch.mockResolvedValue(jsonResponse(201, {
       success: true,
       data: {
-        conversation: {
-          ...conversation,
-          saveMode: 'temporary',
-          messageCount: conversation.messages.length,
-        },
+        conversation,
       },
       error: null,
     }));
 
-    await expect(createConversation(validRequest)).resolves.toMatchObject(conversation);
+    await expect(createConversation(validRequest)).resolves.toEqual(conversation);
+  });
+
+  test.each([
+    ['잘못된 senderRole', {
+      ...conversation,
+      messages: [{ ...conversation.messages[0], senderRole: 'invalid' }],
+      messageCount: 1,
+    }],
+    ['소수 sequenceNo', {
+      ...conversation,
+      messages: [{ ...conversation.messages[0], sequenceNo: 1.5 }],
+      messageCount: 1,
+    }],
+    ['누락된 saveMode', (({ saveMode: _saveMode, ...value }) => value)(conversation)],
+    ['일치하지 않는 messageCount', { ...conversation, messageCount: 1 }],
+  ])('%s conversation 응답을 거부한다', async (_label, invalidConversation) => {
+    mockFetch.mockResolvedValue(jsonResponse(201, {
+      success: true,
+      data: { conversation: invalidConversation },
+      error: null,
+    }));
+
+    await expect(createConversation(validRequest)).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 'INVALID_RESPONSE',
+      status: 201,
+    });
+  });
+
+  test('success 응답의 error가 null이 아니면 응답 형식 오류를 던진다', async () => {
+    mockFetch.mockResolvedValue(jsonResponse(201, {
+      success: true,
+      data: { conversation },
+      error: { code: 'STALE_ERROR', message: '성공 응답에 남은 오류' },
+    }));
+
+    await expect(createConversation(validRequest)).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 'INVALID_RESPONSE',
+      status: 201,
+    });
   });
 
   test('success가 true여도 conversation이 없으면 응답 오류를 던진다', async () => {
@@ -287,7 +353,8 @@ describe('streamAnalysis', () => {
       },
       { type: 'complete', analysisId: 'analysis-1', modelName: 'hybrid-v1' },
     ];
-    mockFetch.mockResolvedValue(streamResponse([encodeFrames(...events)]));
+    const tracked = trackedStreamResponse([encodeFrames(...events)], true);
+    mockFetch.mockResolvedValue(tracked.response);
     const progress: AnalysisStreamEvent[] = [];
 
     await expect(streamAnalysis(conversation, (event) => progress.push(event))).resolves.toEqual({
@@ -301,6 +368,7 @@ describe('streamAnalysis', () => {
       warnings: ['기본 추천으로 이어갑니다.'],
     });
     expect(progress).toEqual(events);
+    expect(tracked.response.body?.locked).toBe(false);
   });
 
   test('UTF-8 문자가 바이트 청크 중간에서 갈려도 한글 결과를 복원한다', async () => {
@@ -335,7 +403,8 @@ describe('streamAnalysis', () => {
     const bytes = new TextEncoder().encode(
       'event: error\ndata: {"message":"분석 중 문제가 발생했습니다."}\n\n',
     );
-    mockFetch.mockResolvedValue(streamResponse([bytes]));
+    const tracked = trackedStreamResponse([bytes]);
+    mockFetch.mockResolvedValue(tracked.response);
 
     await expect(streamAnalysis(conversation)).rejects.toMatchObject({
       name: 'ApiError',
@@ -343,20 +412,90 @@ describe('streamAnalysis', () => {
       message: '분석 중 문제가 발생했습니다.',
       status: 502,
     });
+    expect(tracked.wasCanceled()).toBe(true);
+    expect(tracked.response.body?.locked).toBe(false);
+  });
+
+  test('잘못된 JSON 프레임에서 reader를 취소하고 lock을 해제한다', async () => {
+    const tracked = trackedStreamResponse([
+      new TextEncoder().encode('event: progress\ndata: {invalid-json}\n\n'),
+    ]);
+    mockFetch.mockResolvedValue(tracked.response);
+
+    await expect(streamAnalysis(conversation)).rejects.toBeInstanceOf(SyntaxError);
+    expect(tracked.wasCanceled()).toBe(true);
+    expect(tracked.response.body?.locked).toBe(false);
+  });
+
+  test('progress callback 예외에서 reader를 취소하고 lock을 해제한다', async () => {
+    const callbackError = new Error('progress callback failed');
+    const tracked = trackedStreamResponse([encodeFrames({
+      type: 'rule_complete',
+      signals: [signal('callback')],
+      overallSummary: '규칙 분석 요약',
+      positiveSignalCount: 1,
+      ambiguousSignalCount: 0,
+      cautionSignalCount: 0,
+      recommendedAction: 'keep_light',
+      recommendedActionReason: '가볍게 이어가세요.',
+      confidenceLevel: 'medium',
+    })]);
+    mockFetch.mockResolvedValue(tracked.response);
+
+    await expect(streamAnalysis(conversation, () => {
+      throw callbackError;
+    })).rejects.toBe(callbackError);
+    expect(tracked.wasCanceled()).toBe(true);
+    expect(tracked.response.body?.locked).toBe(false);
   });
 
   test('complete 프레임 없이 닫힌 스트림을 거부한다', async () => {
-    mockFetch.mockResolvedValue(streamResponse([encodeFrames({
+    const tracked = trackedStreamResponse([encodeFrames({
       type: 'stage_warning',
       stage: 'agent',
       message: '하이브리드 분석으로 이어갑니다.',
-    })]));
+    })], true);
+    mockFetch.mockResolvedValue(tracked.response);
 
     await expect(streamAnalysis(conversation)).rejects.toMatchObject({
       name: 'ApiError',
       code: 'INCOMPLETE_STREAM',
       status: 502,
     });
+    expect(tracked.response.body?.locked).toBe(false);
+  });
+
+  test.each([
+    ['누락된 rule_complete', [
+      { type: 'complete', analysisId: 'analysis-empty', modelName: 'hybrid-v1' },
+    ]],
+    ['잘못된 rule_complete', [
+      {
+        type: 'rule_complete',
+        signals: 'invalid',
+        overallSummary: '잘못된 규칙 분석',
+        positiveSignalCount: 0,
+        ambiguousSignalCount: 0,
+        cautionSignalCount: 0,
+        recommendedAction: '',
+        recommendedActionReason: '',
+        confidenceLevel: 'low',
+      },
+      { type: 'complete', analysisId: 'analysis-invalid', modelName: 'hybrid-v1' },
+    ]],
+  ])('%s 뒤 complete가 와도 빈 분석을 반환하지 않는다', async (_label, events) => {
+    const bytes = new TextEncoder().encode(events.map((event) => (
+      `event: progress\ndata: ${JSON.stringify(event)}\n\n`
+    )).join(''));
+    const tracked = trackedStreamResponse([bytes], true);
+    mockFetch.mockResolvedValue(tracked.response);
+
+    await expect(streamAnalysis(conversation)).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 'INCOMPLETE_STREAM',
+      status: 502,
+    });
+    expect(tracked.response.body?.locked).toBe(false);
   });
 
   test('형식이 잘못된 progress 이벤트는 callback과 결과에서 제외한다', async () => {
@@ -366,13 +505,28 @@ describe('streamAnalysis', () => {
     const complete: AnalysisStreamEvent = {
       type: 'complete', analysisId: 'analysis-valid', modelName: 'hybrid-v1',
     };
-    mockFetch.mockResolvedValue(streamResponse([invalid, encodeFrames(complete)]));
+    const ruleComplete: AnalysisStreamEvent = {
+      type: 'rule_complete',
+      signals: [signal('valid-before-invalid')],
+      overallSummary: '유효한 규칙 분석',
+      positiveSignalCount: 1,
+      ambiguousSignalCount: 0,
+      cautionSignalCount: 0,
+      recommendedAction: 'keep_light',
+      recommendedActionReason: '가볍게 이어가세요.',
+      confidenceLevel: 'medium',
+    };
+    mockFetch.mockResolvedValue(streamResponse([
+      encodeFrames(ruleComplete),
+      invalid,
+      encodeFrames(complete),
+    ]));
     const progress: AnalysisStreamEvent[] = [];
 
     await expect(streamAnalysis(conversation, (event) => progress.push(event))).resolves.toMatchObject({
       analysisId: 'analysis-valid',
       warnings: [],
     });
-    expect(progress).toEqual([complete]);
+    expect(progress).toEqual([ruleComplete, complete]);
   });
 });

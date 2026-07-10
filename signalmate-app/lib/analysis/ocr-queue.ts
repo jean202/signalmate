@@ -3,6 +3,8 @@ export async function runOcrQueue<T, R>(
   worker: (item: T) => Promise<R>,
   concurrency = 2,
 ): Promise<Array<PromiseSettledResult<R>>> {
+  if (items.length === 0) return [];
+
   const results: Array<PromiseSettledResult<R>> = new Array(items.length);
   let cursor = 0;
 
@@ -19,7 +21,7 @@ export async function runOcrQueue<T, R>(
     }
   }
 
-  const workerCount = Math.min(Math.max(1, Math.floor(concurrency)), items.length);
+  const workerCount = Math.min(2, Math.max(1, Math.floor(concurrency)), items.length);
   await Promise.all(Array.from({ length: workerCount }, consume));
   return results;
 }

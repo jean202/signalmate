@@ -22,6 +22,33 @@ describe('runOcrQueue', () => {
     ]);
   });
 
+  test('요청 동시성이 2보다 커도 동시에 두 건을 넘지 않는다', async () => {
+    let running = 0;
+    let maximum = 0;
+
+    await runOcrQueue(['a', 'b', 'c', 'd'], async (id) => {
+      running += 1;
+      maximum = Math.max(maximum, running);
+      await Promise.resolve();
+      running -= 1;
+      return id;
+    }, 10);
+
+    expect(maximum).toBe(2);
+  });
+
+  test('빈 입력은 worker를 실행하지 않고 빈 결과를 반환한다', async () => {
+    let calls = 0;
+
+    const results = await runOcrQueue([], async () => {
+      calls += 1;
+      return 'unused';
+    }, 10);
+
+    expect(results).toEqual([]);
+    expect(calls).toBe(0);
+  });
+
   test('완료 순서와 관계없이 입력 순서로 결과를 보존한다', async () => {
     let releaseFirst: (() => void) | undefined;
     const firstGate = new Promise<void>((resolve) => {

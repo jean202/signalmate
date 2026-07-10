@@ -57,7 +57,10 @@ export type ExtractedImage = {
   notes: string[];
 };
 
-export type CreatedConversation = ConversationSnapshot;
+export type CreatedConversation = ConversationSnapshot & {
+  saveMode: 'temporary' | 'saved';
+  messageCount: number;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -186,11 +189,13 @@ function parseAnalysisStreamEvent(value: unknown): AnalysisStreamEvent | null {
 
 function isConversationMessage(value: unknown): value is ConversationSnapshot['messages'][number] {
   if (!isRecord(value)) return false;
-  return typeof value.senderRole === 'string'
+  return (value.senderRole === 'self'
+      || value.senderRole === 'other'
+      || value.senderRole === 'unknown')
     && typeof value.messageText === 'string'
     && (value.sentAt === null || typeof value.sentAt === 'string')
     && typeof value.sequenceNo === 'number'
-    && Number.isFinite(value.sequenceNo);
+    && Number.isInteger(value.sequenceNo);
 }
 
 function isConversation(value: unknown): value is CreatedConversation {
@@ -201,8 +206,11 @@ function isConversation(value: unknown): value is CreatedConversation {
     && typeof value.relationshipStage === 'string'
     && typeof value.meetingChannel === 'string'
     && typeof value.userGoal === 'string'
+    && (value.saveMode === 'temporary' || value.saveMode === 'saved')
+    && isCount(value.messageCount)
     && Array.isArray(value.messages)
-    && value.messages.every(isConversationMessage);
+    && value.messages.every(isConversationMessage)
+    && value.messageCount === value.messages.length;
 }
 
 async function readEnvelope<T>(
@@ -234,6 +242,14 @@ async function readEnvelope<T>(
     throw new ApiError(
       body.error?.code ?? 'HTTP_ERROR',
       body.error?.message ?? '요청에 실패했어요.',
+      response.status,
+    );
+  }
+
+  if (body.error !== null) {
+    throw new ApiError(
+      'INVALID_RESPONSE',
+      '서버 응답 형식을 확인하지 못했어요.',
       response.status,
     );
   }
@@ -378,6 +394,14 @@ export async function streamAnalysis(
   const sseDecoder = new SseDecoder();
   let result = emptyAnalysisResult();
   let complete = false;
+  let ruleComplete = false;
+  let streamFinished = false;
+
+  const incompleteStreamError = () => new ApiError(
+    'INCOMPLETE_STREAM',
+    '분석 연결이 완료되기 전에 끊겼어요.',
+    502,
+  );
 
   const consumeFrames = (frames: SseFrame[]) => {
     for (const frame of frames) {
@@ -387,27 +411,39 @@ export async function streamAnalysis(
 
       const event = parseAnalysisStreamEvent(frame.data);
       if (!event) continue;
+      if (event.type === 'complete' && !ruleComplete) throw incompleteStreamError();
       onProgress?.(event);
       result = reduceAnalysisEvent(result, event);
+      if (event.type === 'rule_complete') ruleComplete = true;
       if (event.type === 'complete') complete = true;
     }
   };
 
-  while (true) {
-    const next = await reader.read();
-    if (next.done) break;
-    consumeFrames(sseDecoder.push(textDecoder.decode(next.value, { stream: true })));
-  }
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) {
+        streamFinished = true;
+        break;
+      }
+      consumeFrames(sseDecoder.push(textDecoder.decode(next.value, { stream: true })));
+    }
 
-  const trailingText = textDecoder.decode();
-  if (trailingText) consumeFrames(sseDecoder.push(trailingText));
+    const trailingText = textDecoder.decode();
+    if (trailingText) consumeFrames(sseDecoder.push(trailingText));
 
-  if (!complete) {
-    throw new ApiError(
-      'INCOMPLETE_STREAM',
-      '분석 연결이 완료되기 전에 끊겼어요.',
-      502,
-    );
+    if (!complete || !ruleComplete) throw incompleteStreamError();
+    return result;
+  } catch (error) {
+    if (!streamFinished) {
+      try {
+        await reader.cancel(error);
+      } catch {
+        // Preserve the analysis error when stream cancellation also fails.
+      }
+    }
+    throw error;
+  } finally {
+    reader.releaseLock();
   }
-  return result;
 }
