@@ -7,6 +7,8 @@
 - 개인정보 치환 규칙의 추가, 삭제, 일반 문자열 일치 건수 미리보기, 전체 적용을 구현했다.
 - 전체 적용은 완료 이미지의 `editedText`와 `pastedText`에만 반영하며 `extractedText`는 보존한다.
 - 연속 캡처 중복 후보를 체크박스로 표시하고 `excludedDuplicateIds`만 토글한다.
+- 중복 후보 ID는 이미지 ID, 원본 줄 인덱스, 정규화된 줄 내용을 함께 사용한다. 후보 표시와 최종 병합이 같은 ID 생성 함수를 사용하며, 텍스트 변경 시 해당 이미지의 기존 제외 선택을 정리한다.
+- 치환은 원문을 한 번만 스캔해 규칙 간 연쇄 적용을 막고, 이미 같은 치환값 안에 있는 source는 다시 감싸지 않는다.
 - `ocr-review` 라우트를 등록했다. 아직 없는 `situation` 및 `review` 화면은 추가하지 않았다.
 - Expo Web에서 모듈 import만으로 `Directory`를 생성하던 이미지 캐시를 지연 생성으로 바꿔 검수 화면의 브라우저 확인을 가능하게 했다.
 
@@ -16,6 +18,9 @@
 2. 검수 완료, 원본 불변, complete 필터링, 이전/다음, 다음 단계 조건, 전체 치환 범위, 중복 선택 토글 테스트를 먼저 작성했다.
 3. 빈 원문 거부, 치환 일치 건수, 규칙 추가/삭제/적용 테스트를 먼저 작성했다.
 4. 웹 렌더 오류를 재현한 뒤 이미지 캐시의 import 시 파일시스템 객체 생성 금지 테스트가 `Expected: 0, Received: 1`로 실패하는 것을 확인하고 지연 생성을 구현했다.
+5. 리뷰 수정 전 테스트에서 중복 선택 후 삽입한 `나: 새 앞줄`이 병합 결과에서 사라지는 실패를 확인했다.
+6. 치환 테스트에서 `민수와 친구`가 `[상대]와 [상대]`로 연쇄 치환되고, 재적용 결과가 `[[민수]]`가 되는 실패를 확인했다.
+7. 상태 누적 화면 harness로 중복 선택 후 앞줄 편집과 전체 치환 2회 적용을 연속 검증했다.
 
 ## UI 및 접근성 확인
 
@@ -27,8 +32,10 @@
 
 ## 검증 결과
 
-- 집중 테스트: 3 suites, 15 tests passed
-- 전체 테스트: 14 suites, 103 tests passed
+- 집중 테스트 명령: `npm test -- lib/analysis/__tests__/input-builder.test.ts components/review/__tests__/replacement-rule-editor.test.tsx app/__tests__/ocr-review.test.tsx`
+- 집중 테스트: 3 suites, 36 tests passed
+- 관련 회귀 테스트: 7 suites, 64 tests passed
+- 전체 테스트: 14 suites, 109 tests passed
 - `npm run typecheck`: passed, TypeScript errors 0
 - `git diff --check`: passed
 - Expo Web: `http://localhost:8091/ocr-review`에서 320pt 레이아웃 확인

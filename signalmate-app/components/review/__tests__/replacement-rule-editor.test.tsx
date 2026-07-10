@@ -67,4 +67,18 @@ describe('ReplacementRuleEditor', () => {
 
     expect(onApply).toHaveBeenCalledWith(rules);
   });
+
+  test('저장된 규칙 전체를 적용하기 직전 실제 변경 건수를 보여준다', () => {
+    const screen = render(
+      <ReplacementRuleEditor
+        text="민수와 영희, [민수]"
+        rules={[
+          { id: 'one', source: '민수', replacement: '[민수]' },
+          { id: 'two', source: '영희', replacement: '[상대]' },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('저장 규칙 전체 적용 시 2곳이 변경돼요')).toBeTruthy();
+  });
 });

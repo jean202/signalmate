@@ -8,7 +8,11 @@ import { ReplacementRuleEditor } from '../components/review/replacement-rule-edi
 import { BottomAction } from '../components/ui/bottom-action';
 import { ScreenShell } from '../components/ui/screen-shell';
 import { colors, radius, touchTarget } from '../components/ui/theme';
-import { applyReplacementRules, findDuplicateCandidates } from '../lib/analysis/input-builder';
+import {
+  applyReplacementRules,
+  duplicateCandidateBelongsToImage,
+  findDuplicateCandidates,
+} from '../lib/analysis/input-builder';
 import type { ReplacementRule } from '../lib/analysis/types';
 import { useAnalysis } from '../providers/analysis-provider';
 
@@ -51,6 +55,9 @@ export default function OcrReviewScreen() {
       images: current.images.map((image) => image.id === currentImage.id
         ? { ...image, editedText: value, reviewed: false }
         : image),
+      excludedDuplicateIds: current.excludedDuplicateIds.filter((candidateId) => (
+        !duplicateCandidateBelongsToImage(candidateId, currentImage.id)
+      )),
     }));
   };
 
@@ -69,17 +76,26 @@ export default function OcrReviewScreen() {
   };
 
   const applyRules = (rules: ReplacementRule[]) => {
-    updateDraft((current) => ({
-      ...current,
-      images: current.images.map((image) => {
+    updateDraft((current) => {
+      const changedImageIds = new Set<string>();
+      const images = current.images.map((image) => {
         if (image.status !== 'complete') return image;
         const nextText = applyReplacementRules(image.editedText, rules);
-        return nextText === image.editedText
-          ? image
-          : { ...image, editedText: nextText, reviewed: false };
-      }),
-      pastedText: applyReplacementRules(current.pastedText, rules),
-    }));
+        if (nextText === image.editedText) return image;
+        changedImageIds.add(image.id);
+        return { ...image, editedText: nextText, reviewed: false };
+      });
+      return {
+        ...current,
+        images,
+        pastedText: applyReplacementRules(current.pastedText, rules),
+        excludedDuplicateIds: current.excludedDuplicateIds.filter((candidateId) => (
+          ![...changedImageIds].some((imageId) => (
+            duplicateCandidateBelongsToImage(candidateId, imageId)
+          ))
+        )),
+      };
+    });
   };
 
   const toggleDuplicate = (candidateId: string) => {

@@ -1,9 +1,11 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import OcrReviewScreen from '../ocr-review';
 import { createEmptyDraft } from '../../lib/analysis/draft';
+import { buildMergedChatText } from '../../lib/analysis/input-builder';
 import type { AnalysisDraft, ImageDraftItem } from '../../lib/analysis/types';
 import { useAnalysis } from '../../providers/analysis-provider';
 
@@ -24,6 +26,7 @@ jest.mock('../../providers/analysis-provider', () => ({
 }));
 
 const mockedUseAnalysis = useAnalysis as jest.MockedFunction<typeof useAnalysis>;
+let latestStatefulDraft: AnalysisDraft;
 
 function image(overrides: Partial<ImageDraftItem> = {}): ImageDraftItem {
   const id = overrides.id ?? 'image-1';
@@ -70,6 +73,29 @@ function renderReview(draft = draftWith()) {
     updateDraft: mockUpdateDraft,
     setResult: jest.fn(),
     resetDraft: jest.fn(),
+  });
+  return render(
+    <SafeAreaProvider initialMetrics={{
+      frame: { x: 0, y: 0, width: 320, height: 700 },
+      insets: { top: 20, right: 0, bottom: 20, left: 0 },
+    }}>
+      <OcrReviewScreen />
+    </SafeAreaProvider>,
+  );
+}
+
+function renderStatefulReview(initialDraft: AnalysisDraft) {
+  mockedUseAnalysis.mockImplementation(() => {
+    const [draft, setDraft] = useState(initialDraft);
+    latestStatefulDraft = draft;
+    return {
+      hydrated: true,
+      draft,
+      result: null,
+      updateDraft: setDraft,
+      setResult: jest.fn(),
+      resetDraft: jest.fn(),
+    };
   });
   return render(
     <SafeAreaProvider initialMetrics={{
@@ -174,14 +200,61 @@ describe('OcrReviewScreen', () => {
     fireEvent.press(checkbox);
 
     const excludedDraft = lastUpdatedDraft(savedDraft);
-    expect(excludedDraft.excludedDuplicateIds).toEqual(['image-2:0']);
+    expect(excludedDraft.excludedDuplicateIds).toEqual([
+      expect.stringMatching(/^duplicate:image-2:0:/),
+    ]);
     expect(excludedDraft.images).toEqual(savedDraft.images);
 
     mockUpdateDraft.mockClear();
-    const selectedScreen = renderReview({ ...savedDraft, excludedDuplicateIds: ['image-2:0'] });
+    const selectedId = excludedDraft.excludedDuplicateIds[0];
+    const selectedScreen = renderReview({ ...savedDraft, excludedDuplicateIds: [selectedId] });
     fireEvent.press(selectedScreen.getByRole('checkbox', { name: '중복 제외: 상대: 반복' }));
-    expect(lastUpdatedDraft({ ...savedDraft, excludedDuplicateIds: ['image-2:0'] }).excludedDuplicateIds)
+    expect(lastUpdatedDraft({ ...savedDraft, excludedDuplicateIds: [selectedId] }).excludedDuplicateIds)
       .toEqual([]);
+  });
+
+  test('중복 선택 후 앞줄을 삽입하면 제외 선택을 정리하고 모든 메시지를 보존한다', async () => {
+    const screen = renderStatefulReview(draftWith({
+      images: [
+        image({ editedText: '나: 안녕\n상대: 반복' }),
+        image({ id: 'image-2', order: 1, editedText: '상대: 반복\n나: 다음' }),
+      ],
+    }));
+
+    fireEvent.press(screen.getByRole('checkbox', { name: '중복 제외: 상대: 반복' }));
+    await waitFor(() => expect(latestStatefulDraft.excludedDuplicateIds).toHaveLength(1));
+    fireEvent.press(screen.getByRole('button', { name: '다음 캡처' }));
+    fireEvent.changeText(
+      screen.getByLabelText('2번 캡처 추출 텍스트'),
+      '나: 새 앞줄\n상대: 반복\n나: 다음',
+    );
+
+    await waitFor(() => expect(latestStatefulDraft.excludedDuplicateIds).toEqual([]));
+    expect(buildMergedChatText(latestStatefulDraft)).toBe(
+      '나: 안녕\n상대: 반복\n나: 새 앞줄\n상대: 반복\n나: 다음',
+    );
+  });
+
+  test('전체 치환을 두 번 적용해도 중첩되지 않고 수동 수정과 extractedText를 보존한다', async () => {
+    const screen = renderStatefulReview(draftWith({
+      pastedText: '민수: 붙여넣기',
+      replacementRules: [{ id: 'rule-1', source: '민수', replacement: '[민수]' }],
+      images: [image({
+        extractedText: '민수: OCR 원본',
+        editedText: '민수: 수동 수정',
+      })],
+    }));
+    const applyButton = screen.getByRole('button', { name: '치환 규칙 전체 적용' });
+
+    fireEvent.press(applyButton);
+    await waitFor(() => expect(latestStatefulDraft.images[0].editedText).toBe('[민수]: 수동 수정'));
+    fireEvent.press(applyButton);
+
+    await waitFor(() => expect(latestStatefulDraft.images[0]).toMatchObject({
+      extractedText: '민수: OCR 원본',
+      editedText: '[민수]: 수동 수정',
+    }));
+    expect(latestStatefulDraft.pastedText).toBe('[민수]: 붙여넣기');
   });
 
   test('320pt 화면을 위한 고정 비율 미리보기와 최소 220pt 편집 영역을 제공한다', () => {

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ReplacementRule } from '../../lib/analysis/types';
+import { countReplacementChanges } from '../../lib/analysis/input-builder';
 import { colors, radius, touchTarget } from '../ui/theme';
 
 type ReplacementRuleEditorProps = {
@@ -11,11 +12,6 @@ type ReplacementRuleEditorProps = {
   onRulesChange?: (rules: ReplacementRule[]) => void;
   onApply?: (rules: ReplacementRule[]) => void;
 };
-
-function countMatches(text: string, source: string): number {
-  if (!source) return 0;
-  return text.split(source).length - 1;
-}
 
 export function ReplacementRuleEditor({
   text,
@@ -27,7 +23,10 @@ export function ReplacementRuleEditor({
   const [replacement, setReplacement] = useState('');
   const sequence = useRef(0);
   const sourceIsEmpty = source.trim().length === 0;
-  const matchCount = countMatches(text, source);
+  const matchCount = sourceIsEmpty ? 0 : countReplacementChanges(text, [{
+    id: 'pending-rule-preview', source, replacement,
+  }]);
+  const savedRuleMatchCount = countReplacementChanges(text, rules);
 
   const addRule = () => {
     if (sourceIsEmpty) return;
@@ -106,25 +105,30 @@ export function ReplacementRuleEditor({
       </View>
 
       {rules.length > 0 && (
-        <View style={styles.ruleList}>
-          {rules.map((rule) => (
-            <View key={rule.id} style={styles.ruleRow}>
-              <View style={styles.ruleText}>
-                <Text numberOfLines={2} style={styles.ruleSource}>{rule.source}</Text>
-                <Text style={styles.ruleArrow}>바꾸기</Text>
-                <Text numberOfLines={2} style={styles.ruleReplacement}>{rule.replacement || '(삭제)'}</Text>
+        <>
+          <View style={styles.ruleList}>
+            {rules.map((rule) => (
+              <View key={rule.id} style={styles.ruleRow}>
+                <View style={styles.ruleText}>
+                  <Text numberOfLines={2} style={styles.ruleSource}>{rule.source}</Text>
+                  <Text style={styles.ruleArrow}>바꾸기</Text>
+                  <Text numberOfLines={2} style={styles.ruleReplacement}>{rule.replacement || '(삭제)'}</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${rule.source} 치환 규칙 삭제`}
+                  onPress={() => removeRule(rule.id)}
+                  style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+                >
+                  <Trash2 color={colors.danger} size={19} strokeWidth={2} />
+                </Pressable>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${rule.source} 치환 규칙 삭제`}
-                onPress={() => removeRule(rule.id)}
-                style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-              >
-                <Trash2 color={colors.danger} size={19} strokeWidth={2} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+          <Text accessibilityLiveRegion="polite" style={styles.savedMatchCount}>
+            저장 규칙 전체 적용 시 {savedRuleMatchCount}곳이 변경돼요
+          </Text>
+        </>
       )}
 
       <Pressable
@@ -174,6 +178,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   matchCount: { color: colors.positive, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  savedMatchCount: { color: colors.muted, fontSize: 13, fontWeight: '600', lineHeight: 18 },
   addButton: {
     minHeight: touchTarget,
     flexDirection: 'row',

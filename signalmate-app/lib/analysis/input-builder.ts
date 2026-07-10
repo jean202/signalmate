@@ -9,11 +9,61 @@ export type DuplicateCandidate = {
 
 const normalizeLine = (line: string) => line.trim().replace(/\s+/g, ' ');
 
+export function duplicateCandidateId(imageId: string, lineIndex: number, text: string): string {
+  return `duplicate:${encodeURIComponent(imageId)}:${lineIndex}:${encodeURIComponent(normalizeLine(text))}`;
+}
+
+export function duplicateCandidateBelongsToImage(candidateId: string, imageId: string): boolean {
+  return candidateId.startsWith(`duplicate:${encodeURIComponent(imageId)}:`)
+    || candidateId.startsWith(`${imageId}:`);
+}
+
+function replacementResult(text: string, rules: readonly ReplacementRule[]) {
+  const activeRules = rules.filter((rule) => rule.source.length > 0);
+  const protectedCharactersByRule = new Map<ReplacementRule, boolean[]>();
+
+  for (const rule of activeRules) {
+    const protectedCharacters = Array.from({ length: text.length }, () => false);
+    protectedCharactersByRule.set(rule, protectedCharacters);
+    if (!rule.replacement) continue;
+    let position = text.indexOf(rule.replacement);
+    while (position !== -1) {
+      for (let index = position; index < position + rule.replacement.length; index += 1) {
+        protectedCharacters[index] = true;
+      }
+      position = text.indexOf(rule.replacement, position + rule.replacement.length);
+    }
+  }
+
+  let output = '';
+  let changes = 0;
+  let index = 0;
+  while (index < text.length) {
+    const rule = activeRules.find((candidate) => {
+      if (!text.startsWith(candidate.source, index)) return false;
+      const protectedCharacters = protectedCharactersByRule.get(candidate) ?? [];
+      return !protectedCharacters.slice(index, index + candidate.source.length).some(Boolean);
+    });
+    if (!rule) {
+      output += text[index];
+      index += 1;
+      continue;
+    }
+
+    output += rule.replacement;
+    if (rule.source !== rule.replacement) changes += 1;
+    index += rule.source.length;
+  }
+
+  return { output, changes };
+}
+
 export function applyReplacementRules(text: string, rules: ReplacementRule[]): string {
-  return rules.reduce((result, rule) => {
-    if (!rule.source) return result;
-    return result.split(rule.source).join(rule.replacement);
-  }, text);
+  return replacementResult(text, rules).output;
+}
+
+export function countReplacementChanges(text: string, rules: readonly ReplacementRule[]): number {
+  return replacementResult(text, rules).changes;
 }
 
 export function findDuplicateCandidates(
@@ -40,7 +90,7 @@ export function findDuplicateCandidates(
     for (let lineIndex = 0; lineIndex < overlap; lineIndex += 1) {
       const line = current[lineIndex];
       result.push({
-        id: `${items[index].imageId}:${line.lineIndex}`,
+        id: duplicateCandidateId(items[index].imageId, line.lineIndex, line.text),
         imageId: items[index].imageId,
         lineIndex: line.lineIndex,
         text: line.text,
@@ -55,7 +105,9 @@ export function buildMergedChatText(draft: AnalysisDraft): string {
     .sort((a, b) => a.order - b.order)
     .filter((image) => image.status === 'complete')
     .map((image) => image.editedText.split(/\r?\n/)
-      .filter((_, lineIndex) => !draft.excludedDuplicateIds.includes(`${image.id}:${lineIndex}`))
+      .filter((line, lineIndex) => !draft.excludedDuplicateIds.includes(
+        duplicateCandidateId(image.id, lineIndex, line),
+      ))
       .join('\n').trim())
     .filter(Boolean);
   const imageText = imageParts.join('\n');
