@@ -34,6 +34,7 @@
 - route는 top-level JSON이 plain object가 아니면 속성 접근 전에 400으로 거절한다.
 - `situationContext`와 `guidedAnswers`의 `null`/`undefined` 호환을 유지하면서 값이 있을 때만 타입, 길이, enum을 검증한다.
 - 실제 Provider와 deferred promise로 stream blur/unmount resolve/reject, 복수 Review create 경쟁, blur 재진입, late stream reject의 최신 상태 보존을 검증한다.
+- conversations POST는 required 문자열, optional nullable 문자열, saveMode, messages 배열과 메시지 필드 타입을 사용 전에 검증한다. 오류 응답과 로그에는 입력 원문을 포함하지 않는다.
 
 ## TDD 기록
 
@@ -48,17 +49,19 @@
 9. 실제 Provider 통합 테스트로 stream 실패 재시도와 복수 Review late resolve를 검증했다.
 10. top-level JSON `null` 예외와 nullable 상황 필드 400을 RED로 확인하고 route 경계에서 수정했다.
 11. 분석 경쟁 회귀 9개를 실제 Provider/deferred promise로 추가했으며 기존 실행 토큰 구현에서 모두 통과했다. act 경고는 숨기지 않았고 테스트 출력에 경고가 없음을 확인했다.
+12. 숫자/객체/배열 top-level 필드와 잘못된 messages 요소가 500 또는 201이 되는 11건을 RED로 확인하고 route 선행 validator로 수정했다.
 
 ## 검증 결과
 
 - 리뷰 후속 집중 테스트: 7 suites, 65 tests passed
 - 앱 전체 `npm test`: 19 suites, 174 tests passed
 - 앱 `npm run typecheck`: 통과
-- landing route 테스트: 1 file, 31 tests passed
+- landing route 테스트: 1 file, 53 tests passed
 - landing `npx tsc --noEmit`: 통과
 - `git diff --check`: 통과
 
 ## 남은 위험
 
 - 실제 iOS/Android 기기의 키보드, 시스템 큰 글자, VoiceOver/TalkBack 동작은 자동화 테스트 범위 밖이라 기기 검증이 남아 있다.
+- ChoiceChips의 제품 스타일은 유지했다. 실제 font scale에서 320pt 줄바꿈과 chip 높이는 iOS/Android 기기 및 브라우저 확대 환경에서 최종 시각 검증해야 한다.
 - 작업 9 전까지 `/result`는 기존 화면이며, 신호 우선 결과 화면 교체는 포함하지 않았다.

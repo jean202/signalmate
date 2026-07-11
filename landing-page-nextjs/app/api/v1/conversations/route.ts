@@ -9,27 +9,27 @@ import {
 } from "@/lib/situation-input";
 
 type ConversationMessageInput = {
-  senderRole?: "self" | "other" | "unknown";
-  messageText?: string;
+  senderRole?: "self" | "other" | "unknown" | null;
+  messageText?: string | null;
   sentAt?: string | null;
-  sequenceNo?: number;
+  sequenceNo?: number | null;
 };
 
 type ConversationCreateBody = {
-  title?: string;
-  sourceType?: string;
+  title?: string | null;
+  sourceType?: string | null;
   relationshipStage?: string;
   meetingChannel?: string;
   userGoal?: string;
-  saveMode?: string;
-  rawText?: string;
+  saveMode?: SaveMode | null;
+  rawText?: string | null;
   /** Hint for which sender name is "self" in auto-parsed chat */
-  selfName?: string;
+  selfName?: string | null;
   /** Mode A: 자유 텍스트 상황 설명 */
   situationContext?: string | null;
   /** Mode B: 가이드 질문 응답 */
   guidedAnswers?: GuidedAnswers | null;
-  messages?: ConversationMessageInput[];
+  messages?: ConversationMessageInput[] | null;
 };
 
 export const runtime = "nodejs";
@@ -51,6 +51,27 @@ const otherStyleValues = [
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isOptionalNullableString(value: unknown): value is string | null | undefined {
+  return value == null || typeof value === "string";
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isMessageInput(value: unknown): value is ConversationMessageInput {
+  if (!isRecord(value)) return false;
+  return (value.senderRole == null || (
+    typeof value.senderRole === "string"
+    && validSenderRoles.includes(value.senderRole as SenderRole)
+  ))
+    && isOptionalNullableString(value.messageText)
+    && isOptionalNullableString(value.sentAt)
+    && (value.sequenceNo == null || (
+      typeof value.sequenceNo === "number" && Number.isInteger(value.sequenceNo)
+    ));
 }
 
 function isOptionalEnum(value: unknown, allowed: readonly string[]): boolean {
@@ -87,7 +108,9 @@ export async function POST(request: Request) {
   }
   const body = parsedBody as ConversationCreateBody;
 
-  if (!body.relationshipStage || !body.meetingChannel || !body.userGoal) {
+  if (!isNonEmptyString(body.relationshipStage)
+    || !isNonEmptyString(body.meetingChannel)
+    || !isNonEmptyString(body.userGoal)) {
     return errorResponse(
       400,
       "VALIDATION_ERROR",
@@ -95,8 +118,22 @@ export async function POST(request: Request) {
     );
   }
 
-  if (body.situationContext != null && typeof body.situationContext !== "string") {
-    return errorResponse(400, "VALIDATION_ERROR", "situationContext must be a string.");
+  if (!isOptionalNullableString(body.title)
+    || !isOptionalNullableString(body.sourceType)
+    || !isOptionalNullableString(body.rawText)
+    || !isOptionalNullableString(body.selfName)
+    || !isOptionalNullableString(body.situationContext)) {
+    return errorResponse(400, "VALIDATION_ERROR", "Optional text fields must be strings or null.");
+  }
+  if (body.saveMode != null && (
+    typeof body.saveMode !== "string" || !validSaveModes.includes(body.saveMode as SaveMode)
+  )) {
+    return errorResponse(400, "VALIDATION_ERROR", "saveMode must be temporary or saved.");
+  }
+  if (body.messages != null && (
+    !Array.isArray(body.messages) || !body.messages.every(isMessageInput)
+  )) {
+    return errorResponse(400, "VALIDATION_ERROR", "messages has an invalid format.");
   }
   if (body.situationContext && body.situationContext.length > 2000) {
     return errorResponse(400, "VALIDATION_ERROR", "situationContext must be 2000 characters or less.");
@@ -142,7 +179,7 @@ export async function POST(request: Request) {
       .sort((left, right) => left.sequenceNo - right.sequenceNo);
   } else if (body.rawText?.trim()) {
     // Mode 2: Auto-parse from rawText
-    const parseResult = parseChatText(body.rawText, body.selfName);
+    const parseResult = parseChatText(body.rawText, body.selfName ?? undefined);
     normalizedMessages = parseResult.messages.map((m) => ({
       senderRole: m.senderRole as SenderRole,
       messageText: m.messageText,
@@ -151,10 +188,6 @@ export async function POST(request: Request) {
     }));
   } else {
     normalizedMessages = [];
-  }
-
-  if (body.saveMode && !validSaveModes.includes(body.saveMode as SaveMode)) {
-    return errorResponse(400, "VALIDATION_ERROR", "saveMode must be temporary or saved.");
   }
 
   if (normalizedMessages.length === 0 && !allowsSituationOnly) {

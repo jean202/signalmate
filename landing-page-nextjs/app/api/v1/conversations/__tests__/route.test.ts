@@ -104,6 +104,120 @@ describe("POST /api/v1/conversations", () => {
     expect(createConversationMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["rawText number", { rawText: 42 }],
+    ["title number", { title: 42 }],
+    ["sourceType object", { sourceType: {} }],
+    ["selfName array", { selfName: [] }],
+    ["messages object", { messages: {} }],
+    ["saveMode object", { saveMode: {} }],
+    ["saveMode invalid enum", { saveMode: "forever" }],
+  ])("rejects invalid top-level field: %s", async (_label, invalidField) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText: "나: 안녕하세요\n상대: 반가워요",
+      ...invalidField,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["relationshipStage", { relationshipStage: 42 }],
+    ["relationshipStage empty", { relationshipStage: "" }],
+    ["relationshipStage whitespace", { relationshipStage: "   " }],
+    ["meetingChannel", { meetingChannel: {} }],
+    ["userGoal", { userGoal: [] }],
+  ])("rejects invalid required field: %s", async (_label, invalidField) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText: "나: 안녕하세요\n상대: 반가워요",
+      ...invalidField,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["null message", [null]],
+    ["array message", [[]]],
+    ["senderRole number", [{ senderRole: 1 }]],
+    ["senderRole invalid enum", [{ senderRole: "me" }]],
+    ["messageText number", [{ messageText: 42 }]],
+    ["sentAt object", [{ sentAt: {} }]],
+    ["sequenceNo string", [{ sequenceNo: "1" }]],
+    ["sequenceNo decimal", [{ sequenceNo: 1.5 }]],
+  ])("rejects invalid message input: %s", async (_label, messages) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText: "나: 안녕하세요\n상대: 반가워요",
+      messages,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps null optional fields and null message selections compatible", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      title: null,
+      sourceType: null,
+      rawText: null,
+      selfName: null,
+      situationContext: null,
+      guidedAnswers: null,
+      saveMode: null,
+      messages: [{
+        senderRole: null,
+        messageText: "안녕하세요",
+        sentAt: null,
+        sequenceNo: null,
+      }],
+    }));
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: null,
+      sourceType: "manual",
+      rawText: "",
+      saveMode: "temporary",
+      messages: [{
+        senderRole: "unknown",
+        messageText: "안녕하세요",
+        sentAt: null,
+        sequenceNo: 1,
+      }],
+    }));
+  });
+
+  it("treats null messages as omitted when rawText is valid", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText: "나: 안녕하세요\n상대: 반가워요",
+      messages: null,
+    }));
+
+    expect(response.status).toBe(201);
+  });
+
   it("creates a conversation from situation-only meeting text", async () => {
     const { POST } = await import("../route");
     const response = await POST(
