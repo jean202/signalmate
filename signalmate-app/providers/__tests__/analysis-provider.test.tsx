@@ -223,10 +223,8 @@ describe('AnalysisProvider', () => {
     expect(result.current.result).toBeNull();
   });
 
-  test('정리 작업이 실패하면 기존 draft와 result를 유지한다', async () => {
-    const cleanupError = new Error('cache unavailable');
-    mockedDraftStorage.clear.mockResolvedValue(undefined);
-    mockedClearCachedImages.mockImplementation(() => { throw cleanupError; });
+  test('저장소 clear가 실패하면 cache를 지우지 않고 메모리를 유지한다', async () => {
+    mockedDraftStorage.clear.mockRejectedValue(new Error('private clear error'));
     const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '지울 대화' })));
@@ -235,18 +233,105 @@ describe('AnalysisProvider', () => {
       recommendedAction: '', recommendedActionReason: '', confidenceLevel: 'low', warnings: [],
     }));
 
-    let receivedError: unknown;
+    let resetError: unknown;
+    await act(async () => {
+      try { await result.current.resetDraft(); } catch (error) { resetError = error; }
+    });
+    expect(resetError).toMatchObject({
+      name: 'DraftResetError',
+      code: 'RESET_FAILED',
+      message: '새 분석을 준비하지 못했어요.',
+    });
+
+    expect(mockedClearCachedImages).not.toHaveBeenCalled();
+    expect(result.current.draft.pastedText).toBe('지울 대화');
+    expect(result.current.result?.analysisId).toBe('result-to-keep');
+  });
+
+  test('cache 정리가 실패하면 reset 시작 시점의 draft snapshot을 보상 저장한다', async () => {
+    const operations: string[] = [];
+    mockedDraftStorage.clear.mockImplementation(async () => { operations.push('clear'); });
+    mockedClearCachedImages.mockImplementation(() => {
+      operations.push('cache');
+      throw new Error('private cache error');
+    });
+    mockedDraftStorage.save.mockImplementation(async () => { operations.push('save'); });
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '보상할 대화' })));
+    const snapshot = result.current.draft;
+
+    let resetError: unknown;
+    await act(async () => {
+      try { await result.current.resetDraft(); } catch (error) { resetError = error; }
+    });
+    expect(resetError).toMatchObject({
+      name: 'DraftResetError', code: 'RESET_FAILED',
+    });
+
+    expect(operations).toEqual(['clear', 'cache', 'save']);
+    expect(mockedDraftStorage.clear).toHaveBeenCalledTimes(1);
+    expect(mockedDraftStorage.save).toHaveBeenCalledTimes(1);
+    expect(mockedDraftStorage.save).toHaveBeenCalledWith(snapshot);
+    expect(result.current.draft.pastedText).toBe('보상할 대화');
+  });
+
+  test('보상 save까지 실패해도 일관된 오류로 reject하고 메모리를 유지한다', async () => {
+    mockedClearCachedImages.mockImplementation(() => { throw new Error('private cache error'); });
+    mockedDraftStorage.save.mockRejectedValue(new Error('private compensation error'));
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '메모리에 남길 대화' })));
+
+    let resetError: unknown;
     await act(async () => {
       try {
         await result.current.resetDraft();
       } catch (error) {
-        receivedError = error;
+        resetError = error;
       }
     });
 
-    expect(receivedError).toBe(cleanupError);
-    expect(result.current.draft.pastedText).toBe('지울 대화');
-    expect(result.current.result?.analysisId).toBe('result-to-keep');
+    expect(resetError).toMatchObject({
+      name: 'DraftResetError', code: 'RESET_FAILED', message: '새 분석을 준비하지 못했어요.',
+    });
+    expect(String(resetError)).not.toContain('private');
+    expect(result.current.draft.pastedText).toBe('메모리에 남길 대화');
+  });
+
+  test('reset 실패 뒤 재시도하면 정상적으로 빈 상태가 된다', async () => {
+    mockedDraftStorage.clear
+      .mockRejectedValueOnce(new Error('private clear error'))
+      .mockResolvedValueOnce(undefined);
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '재시도할 대화' })));
+
+    await act(async () => {
+      try { await result.current.resetDraft(); } catch { /* retry below */ }
+    });
+    await act(async () => result.current.resetDraft());
+
+    expect(mockedDraftStorage.clear).toHaveBeenCalledTimes(2);
+    expect(mockedClearCachedImages).toHaveBeenCalledTimes(1);
+    expect(result.current.draft.pastedText).toBe('');
+    expect(result.current.result).toBeNull();
+  });
+
+  test('reset 실패 뒤 draft를 수정하면 저장 큐가 새 값을 저장한다', async () => {
+    mockedDraftStorage.clear.mockRejectedValueOnce(new Error('private clear error'));
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '기존 대화' })));
+
+    await act(async () => {
+      try { await result.current.resetDraft(); } catch { /* edit after failure */ }
+    });
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '실패 뒤 수정한 대화' })));
+    act(() => jest.advanceTimersByTime(150));
+    await waitFor(() => expect(mockedDraftStorage.save).toHaveBeenCalledWith(expect.objectContaining({
+      pastedText: '실패 뒤 수정한 대화',
+    })));
   });
 
   test('지연된 reset은 정리 성공 전까지 메모리를 유지하고 unmount 뒤 상태를 갱신하지 않는다', async () => {

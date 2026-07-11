@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnalysisProvider } from '../../providers/analysis-provider';
@@ -7,6 +7,9 @@ import HomeScreen from '../index';
 
 const mockPush = jest.fn();
 const mockLoad = jest.fn();
+const mockSave = jest.fn();
+const mockClear = jest.fn();
+const mockClearCachedImages = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -14,13 +17,29 @@ jest.mock('expo-router', () => ({
 jest.mock('../../lib/analysis/draft-storage', () => ({
   draftStorage: {
     load: () => mockLoad(),
-    save: jest.fn().mockResolvedValue(undefined),
-    clear: jest.fn().mockResolvedValue(undefined),
+    save: (...args: unknown[]) => mockSave(...args),
+    clear: () => mockClear(),
   },
 }));
 jest.mock('../../lib/analysis/image-cache', () => ({
-  clearCachedImages: jest.fn(),
+  clearCachedImages: () => mockClearCachedImages(),
 }));
+
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+const restoredDraft = {
+  ...createEmptyDraft(),
+  primaryInput: 'text' as const,
+  pastedText: '저장된 대화',
+};
 
 function renderHome() {
   return render(
@@ -35,7 +54,12 @@ function renderHome() {
 
 describe('HomeScreen', () => {
   beforeEach(() => {
-    mockPush.mockClear();
+    jest.clearAllMocks();
+    mockPush.mockReset();
+    mockLoad.mockReset();
+    mockSave.mockReset().mockResolvedValue(undefined);
+    mockClear.mockReset().mockResolvedValue(undefined);
+    mockClearCachedImages.mockReset();
     mockLoad.mockResolvedValue(null);
   });
 
@@ -79,16 +103,80 @@ describe('HomeScreen', () => {
   });
 
   test('저장된 초안이 있으면 이어서 작성과 새로 시작 명령을 표시한다', async () => {
-    mockLoad.mockResolvedValue({
-      ...createEmptyDraft(),
-      primaryInput: 'text',
-      pastedText: '저장된 대화',
-    });
+    mockLoad.mockResolvedValue(restoredDraft);
 
     const screen = renderHome();
 
     expect(await screen.findByRole('button', { name: '이어서 작성' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '새로 시작' })).toBeTruthy();
     expect(screen.queryByText('채팅 분석 시작하기')).toBeNull();
+  });
+
+  test('새로 시작 중에는 중복 탭을 차단하고 접근성 상태를 표시한다', async () => {
+    const clear = deferred();
+    mockLoad.mockResolvedValue(restoredDraft);
+    mockClear.mockReturnValue(clear.promise);
+    const screen = renderHome();
+    const button = await screen.findByRole('button', { name: '새로 시작' });
+
+    fireEvent.press(button);
+    fireEvent.press(button);
+
+    expect(button).toBeDisabled();
+    expect(button.props.accessibilityState).toEqual({ busy: true, disabled: true });
+    await waitFor(() => expect(mockClear).toHaveBeenCalledTimes(1));
+
+    await act(async () => clear.resolve());
+    expect(mockClear).toHaveBeenCalledTimes(1);
+  });
+
+  test('새로 시작 실패 시 기존 초안과 이어서 작성을 유지하고 재시도를 제공한다', async () => {
+    mockLoad.mockResolvedValue(restoredDraft);
+    mockClear.mockRejectedValueOnce(new Error('private clear error'));
+    const screen = renderHome();
+
+    fireEvent.press(await screen.findByRole('button', { name: '새로 시작' }));
+
+    expect(await screen.findByText('새로 시작하지 못했어요')).toBeTruthy();
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '이어서 작성' })).toBeTruthy();
+    expect(screen.getByDisplayValue('저장된 대화')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '새로 시작 다시 시도' })).toBeTruthy();
+    expect(screen.queryByText('private clear error')).toBeNull();
+  });
+
+  test('새로 시작 재시도 성공 시 실패 안내와 기존 초안을 비운다', async () => {
+    mockLoad.mockResolvedValue(restoredDraft);
+    mockClear
+      .mockRejectedValueOnce(new Error('private clear error'))
+      .mockResolvedValueOnce(undefined);
+    const screen = renderHome();
+
+    fireEvent.press(await screen.findByRole('button', { name: '새로 시작' }));
+    const retry = await screen.findByRole('button', { name: '새로 시작 다시 시도' });
+    fireEvent.press(retry);
+
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(screen.queryByRole('button', { name: '이어서 작성' })).toBeNull();
+    expect(screen.queryByDisplayValue('저장된 대화')).toBeNull();
+    expect(mockClear).toHaveBeenCalledTimes(2);
+  });
+
+  test.each(['resolve', 'reject'] as const)('unmount 뒤 reset %s는 상태나 오류 원문을 기록하지 않는다', async (settle) => {
+    const clear = deferred();
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockLoad.mockResolvedValue(restoredDraft);
+    mockClear.mockReturnValue(clear.promise);
+    const screen = renderHome();
+
+    fireEvent.press(await screen.findByRole('button', { name: '새로 시작' }));
+    screen.unmount();
+    await act(async () => {
+      if (settle === 'resolve') clear.resolve();
+      else clear.reject(new Error('private clear error'));
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

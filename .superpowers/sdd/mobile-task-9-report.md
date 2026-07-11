@@ -21,6 +21,14 @@
 - caution 색을 `#98600D`로 조정했다. 대비는 흰 배경 5.2316:1, `cautionSurface` 4.9131:1이다.
 - `tsconfig`에 `dist`, `node_modules`, 구성 파일, `android`, `ios` 제외를 명시해 Expo base 제외 범위를 보존했다.
 
+## 초기화 일관성 재검토
+
+- `AnalysisProvider.resetDraft()`가 reset 시작 시 draft/result/generation snapshot을 캡처하고 기존 저장 큐 뒤에서 storage clear, cache clear를 직렬 실행하도록 변경했다.
+- storage clear가 실패하면 cache를 호출하지 않고 메모리를 유지한다. cache clear가 실패하면 reset 시작 시점의 draft를 storage에 보상 저장하며, 보상 저장 실패도 원문 오류를 노출하거나 기록하지 않고 일관된 `DraftResetError`로 처리한다.
+- 모든 정리가 성공한 경우에만 메모리 draft/result를 비운다. 실패 후 draft 수정 저장, reset 재시도, 보상 저장 실패 경로를 Provider 테스트에 추가했다.
+- 홈의 `void resetDraft()` 미처리 rejection을 제거하고 전역 ref lock, 실행 중 disabled/busy 접근성 상태, 실패 안내, 명시적인 재시도 명령, unmount 이후 상태 갱신 방지를 추가했다.
+- 홈 테스트에 빠른 중복 탭, 기존 초안 유지, 실패 후 성공 재시도, unmount 이후 resolve/reject 경로를 추가했다.
+
 리뷰 RED에서는 복사 중 Clipboard가 2회 호출되고 두 번째 추천 버튼이 없으며 `usePreventRemove` 호출이 없음을 확인했다. Provider 실패 테스트에서는 결과가 조기에 사라지고, 기존 caution 대비는 흰 배경에서 4.4177:1로 실패했다.
 
 ## TDD
@@ -59,6 +67,8 @@ exit 0
 ```
 
 `rg`로 URL 결과 파싱, `/analyze`, 구형 `lib/api` import, `console.log/error/warn/info/debug` 잔재가 없고 `lib/api/client.ts`가 유지된 것을 확인했다.
+
+초기화 일관성 재검토의 집중 Provider 테스트는 17개가 통과했다. 홈 집중 테스트의 직전 실행에서는 9개 중 8개가 통과했고, 실패 안내 View에 `accessibilityRole="alert"`가 렌더링되어 있음에도 React Native Testing Library의 `getByRole('alert')` 조회 1건이 실패했다. 사용자 지시에 따라 추가 수정이나 재실행 없이 현재 상태를 커밋했다.
 
 ## 시각 검수
 

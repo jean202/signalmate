@@ -30,10 +30,19 @@ type AnalysisContextValue = {
 const AnalysisContext = createContext<AnalysisContextValue | null>(null);
 const PERSIST_DEBOUNCE_MS = 150;
 
+export class DraftResetError extends Error {
+  readonly code = 'RESET_FAILED';
+
+  constructor() {
+    super('새 분석을 준비하지 못했어요.');
+    this.name = 'DraftResetError';
+  }
+}
+
 export function AnalysisProvider({ children }: PropsWithChildren) {
   const [hydrated, setHydrated] = useState(false);
   const [draft, setDraft] = useState<AnalysisDraft>(() => createEmptyDraft());
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [result, setResultState] = useState<AnalysisResult | null>(null);
   const hasCompletedInitialHydration = useRef(false);
   const skipNextPersist = useRef(false);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,6 +50,7 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
   const mounted = useRef(true);
   const generation = useRef(0);
   const draftRef = useRef(draft);
+  const resultRef = useRef(result);
   const analysisRunGeneration = useRef(0);
 
   const cancelPendingPersist = useCallback(() => {
@@ -134,6 +144,11 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
+  const setResult = useCallback((nextResult: AnalysisResult | null) => {
+    resultRef.current = nextResult;
+    setResultState(nextResult);
+  }, []);
+
   const beginAnalysisRun = useCallback(() => {
     analysisRunGeneration.current += 1;
     return analysisRunGeneration.current;
@@ -152,33 +167,48 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
   ), []);
 
   const resetDraft = useCallback(async () => {
-    generation.current += 1;
+    const snapshot = {
+      draft: draftRef.current,
+      result: resultRef.current,
+      generation: generation.current,
+    };
+    generation.current = snapshot.generation + 1;
     const resetGeneration = generation.current;
     analysisRunGeneration.current += 1;
     cancelPendingPersist();
 
-    let cleanupError: unknown;
     try {
-      await enqueueStorageOperation(async () => draftStorage.clear());
+      await enqueueStorageOperation(async () => {
+        try {
+          await draftStorage.clear();
+        } catch {
+          throw new DraftResetError();
+        }
+
+        try {
+          clearCachedImages();
+        } catch {
+          try {
+            await draftStorage.save(snapshot.draft);
+          } catch {
+            // Keep the in-memory snapshot and expose only a stable reset error.
+          }
+          throw new DraftResetError();
+        }
+      });
     } catch (error) {
-      cleanupError = error;
+      throw error instanceof DraftResetError ? error : new DraftResetError();
     }
 
-    try {
-      clearCachedImages();
-    } catch (error) {
-      cleanupError ??= error;
-    }
-
-    if (cleanupError) throw cleanupError;
     if (!mounted.current || generation.current !== resetGeneration) return;
 
     hasCompletedInitialHydration.current = true;
     skipNextPersist.current = true;
     const emptyDraft = createEmptyDraft();
     draftRef.current = emptyDraft;
+    resultRef.current = null;
     setDraft(emptyDraft);
-    setResult(null);
+    setResultState(null);
     setHydrated(true);
   }, [cancelPendingPersist, enqueueStorageOperation]);
 

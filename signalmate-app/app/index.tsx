@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BottomAction } from '../components/ui/bottom-action';
@@ -15,16 +15,39 @@ const inputOptions = [
   { value: 'meeting_note', label: '만남 후기' },
 ] as const;
 
+type ResetState = 'idle' | 'running' | 'failed';
+
 export default function HomeScreen() {
   const router = useRouter();
   const { draft, hydrated, resetDraft, updateDraft } = useAnalysis();
   const selectedInput = draft.primaryInput ?? 'capture';
+  const mounted = useRef(true);
+  const resetting = useRef(false);
+  const [resetState, setResetState] = useState<ResetState>('idle');
   const hasSavedDraft = useMemo(() => (
     draft.images.length > 0
     || draft.pastedText.trim().length > 0
     || draft.relationshipStage !== null
     || draft.meetingChannel !== null
   ), [draft]);
+
+  useEffect(() => () => {
+    mounted.current = false;
+  }, []);
+
+  const startFresh = async () => {
+    if (resetting.current) return;
+    resetting.current = true;
+    setResetState('running');
+    try {
+      await resetDraft();
+      if (mounted.current) setResetState('idle');
+    } catch {
+      if (mounted.current) setResetState('failed');
+    } finally {
+      resetting.current = false;
+    }
+  };
 
   const selectInput = (primaryInput: PrimaryInput) => {
     updateDraft((current) => ({ ...current, primaryInput }));
@@ -66,12 +89,32 @@ export default function HomeScreen() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="새로 시작"
-              onPress={() => { void resetDraft(); }}
-              style={({ pressed }) => [styles.command, pressed && styles.commandPressed]}
+              accessibilityLabel={resetState === 'failed' ? '새로 시작 다시 시도' : '새로 시작'}
+              accessibilityState={{
+                busy: resetState === 'running',
+                disabled: resetState === 'running',
+              }}
+              disabled={resetState === 'running'}
+              onPress={() => { void startFresh(); }}
+              style={({ pressed }) => [
+                styles.command,
+                pressed && styles.commandPressed,
+                resetState === 'running' && styles.commandDisabled,
+              ]}
             >
-              <Text style={styles.commandText}>새로 시작</Text>
+              <Text style={styles.commandText}>
+                {resetState === 'running'
+                  ? '새로 시작 중'
+                  : resetState === 'failed' ? '새로 시작 다시 시도' : '새로 시작'}
+              </Text>
             </Pressable>
+          </View>
+        )}
+
+        {resetState === 'failed' && (
+          <View accessibilityRole="alert" style={styles.resetFailure}>
+            <Text style={styles.resetFailureTitle}>새로 시작하지 못했어요</Text>
+            <Text style={styles.resetFailureText}>기존 초안은 유지했습니다. 잠시 후 다시 시도해 주세요.</Text>
           </View>
         )}
 
@@ -149,8 +192,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
   },
   commandPressed: { backgroundColor: colors.surface },
+  commandDisabled: { opacity: 0.48 },
   commandPrimary: { color: colors.positive, fontSize: 14, fontWeight: '700', lineHeight: 20 },
   commandText: { color: colors.muted, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  resetFailure: {
+    gap: 3,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: radius.panel,
+    backgroundColor: colors.cautionSurface,
+  },
+  resetFailureTitle: { color: colors.caution, fontSize: 15, fontWeight: '800', lineHeight: 22 },
+  resetFailureText: { color: colors.text, fontSize: 14, lineHeight: 21 },
   heading: { gap: 6, marginBottom: 20 },
   eyebrow: { color: colors.positive, fontSize: 13, fontWeight: '700', lineHeight: 18 },
   title: { color: colors.text, fontSize: 24, fontWeight: '800', lineHeight: 32 },
