@@ -111,6 +111,46 @@ describe("parseChatText", () => {
       expect(result.detectedFormat).toBe("generic-time");
       expect(result.messages).toHaveLength(2);
     });
+
+    it("parses OCR time-prefixed self and other messages", () => {
+      const raw = `
+2026년 6월 28일 일요일
+[오후 8:35] 나: 강호님 안녕하세요
+[오후 8:43] 상대: 주말 마무리 잘 하고 계신가요?
+[오후 8:50] 나: 카페에 나와있어요
+      `.trim();
+
+      const result = parseChatText(raw, "나");
+
+      expect(result.detectedFormat).toBe("ocr-time-role");
+      expect(result.messages).toHaveLength(3);
+      expect(result.messages.map((message) => message.senderRole)).toEqual([
+        "self",
+        "other",
+        "self",
+      ]);
+      expect(result.messages[0].senderName).toBe("나");
+      expect(result.messages[0].messageText).toBe("강호님 안녕하세요");
+      expect(result.messages[0].sentAt).toMatch(/2026-06-28T20:35/);
+    });
+
+    it("parses Kakao export lines that use full-width colons", () => {
+      const raw = [
+        "2026년 7월 10일 오후 8:10, 민수 ： 안녕",
+        "2026년 7월 10일 오후 8:11, 진하 ： 반가워",
+        "2026. 7. 10. 8:12 PM, 민수 ： 다음에 봐",
+      ].join("\n");
+
+      const result = parseChatText(raw, "진하");
+
+      expect(result.messages).toHaveLength(3);
+      expect(result.messages.map((message) => message.messageText)).toEqual([
+        "안녕",
+        "반가워",
+        "다음에 봐",
+      ]);
+      expect(result.messages[1].senderRole).toBe("self");
+    });
   });
 
   describe("sender role assignment", () => {
