@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { createEmptyDraft } from '../../lib/analysis/draft';
+import { analysisInputFingerprint } from '../../lib/analysis/fingerprint';
 import { duplicateCandidateId } from '../../lib/analysis/input-builder';
 import type { AnalysisDraft, AnalysisResult, ConversationSnapshot } from '../../lib/analysis/types';
 import { createConversation, streamAnalysis } from '../../lib/api/client';
@@ -14,9 +15,34 @@ const mockReplace = jest.fn();
 const mockUpdateDraft = jest.fn();
 const mockSetResult = jest.fn();
 const mockResetDraft = jest.fn();
+let activeRunId = 0;
+let externalUpdateDraft: ((updater: (draft: AnalysisDraft) => AnalysisDraft) => void) | null = null;
+const mockFocusCleanups = new Set<() => void>();
+const mockFocusEffects = new Set<() => void | (() => void)>();
+const mockBeginAnalysisRun = () => { activeRunId += 1; return activeRunId; };
+const mockIsAnalysisRunActive = (runId: number) => runId === activeRunId;
+const mockCancelAnalysisRun = (runId: number) => { if (runId === activeRunId) activeRunId += 1; };
+const mockIsDraftFingerprintCurrent = (fingerprint: string) => (
+  analysisInputFingerprint(latestDraft) === fingerprint
+);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const React = require('react');
+    React.useEffect(() => {
+      mockFocusEffects.add(effect);
+      const cleanup = effect();
+      if (cleanup) mockFocusCleanups.add(cleanup);
+      return () => {
+        if (cleanup) {
+          mockFocusCleanups.delete(cleanup);
+          cleanup();
+        }
+        mockFocusEffects.delete(effect);
+      };
+    }, [effect]);
+  },
 }));
 jest.mock('../../providers/analysis-provider', () => ({
   useAnalysis: jest.fn(),
@@ -65,6 +91,7 @@ function renderReview(initialDraft = validSituationDraft()) {
   mockedUseAnalysis.mockImplementation(() => {
     const [draft, setDraft] = useState(initialDraft);
     latestDraft = draft;
+    externalUpdateDraft = setDraft;
     return {
       hydrated: true,
       draft,
@@ -75,6 +102,10 @@ function renderReview(initialDraft = validSituationDraft()) {
       },
       setResult: mockSetResult,
       resetDraft: mockResetDraft,
+      beginAnalysisRun: mockBeginAnalysisRun,
+      isAnalysisRunActive: mockIsAnalysisRunActive,
+      cancelAnalysisRun: mockCancelAnalysisRun,
+      isDraftFingerprintCurrent: mockIsDraftFingerprintCurrent,
     };
   });
   return render(
@@ -90,6 +121,10 @@ function renderReview(initialDraft = validSituationDraft()) {
 describe('ReviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    activeRunId = 0;
+    externalUpdateDraft = null;
+    mockFocusCleanups.clear();
+    mockFocusEffects.clear();
     mockedCreateConversation.mockResolvedValue(conversation as Awaited<ReturnType<typeof createConversation>>);
     mockedStreamAnalysis.mockResolvedValue(result);
   });
@@ -123,6 +158,7 @@ describe('ReviewScreen', () => {
       { id: 'empty', source: '', replacement: '[빈값]' },
     ];
     draft.excludedDuplicateIds = [
+      duplicateCandidateId('image-2', 0, '상대: 반복'),
       duplicateCandidateId('image-2', 0, '상대: 반복'),
       'duplicate:stale:0:old',
     ];
@@ -215,6 +251,7 @@ describe('ReviewScreen', () => {
   test('Provider에 저장된 conversation이 있으면 생성하지 않고 바로 재시도한다', async () => {
     const draft = validSituationDraft();
     draft.createdConversation = conversation;
+    draft.createdConversationFingerprint = analysisInputFingerprint(draft);
     const screen = renderReview(draft);
 
     fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
@@ -222,6 +259,83 @@ describe('ReviewScreen', () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/result'));
     expect(mockedCreateConversation).not.toHaveBeenCalled();
     expect(mockedStreamAnalysis).toHaveBeenCalledWith(conversation, expect.any(Function));
+  });
+
+  test('저장 conversation fingerprint가 현재 입력과 다르면 새 대화를 생성한다', async () => {
+    const draft = validSituationDraft();
+    draft.createdConversation = conversation;
+    draft.createdConversationFingerprint = 'analysis-input-v1:stale';
+    const screen = renderReview(draft);
+
+    fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/result'));
+    expect(mockedCreateConversation).toHaveBeenCalledTimes(1);
+  });
+
+  test('create 대기 중 입력 fingerprint가 바뀌면 snapshot 저장과 stream을 중단한다', async () => {
+    let resolveCreate!: (value: Awaited<ReturnType<typeof createConversation>>) => void;
+    mockedCreateConversation.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    const screen = renderReview();
+    fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
+
+    act(() => externalUpdateDraft?.((draft) => ({
+      ...draft,
+      guidedAnswers: { ...draft.guidedAnswers, freeText: `${draft.guidedAnswers.freeText} 변경` },
+    })));
+    await act(async () => { resolveCreate(conversation as Awaited<ReturnType<typeof createConversation>>); });
+
+    expect(mockUpdateDraft).not.toHaveBeenCalled();
+    expect(mockedStreamAnalysis).not.toHaveBeenCalled();
+    expect(mockSetResult).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  test.each(['resolve', 'reject'] as const)(
+    'blur 뒤 create %s는 UI, draft, result, router를 갱신하지 않는다',
+    async (settlement) => {
+      let resolveCreate!: (value: Awaited<ReturnType<typeof createConversation>>) => void;
+      let rejectCreate!: (reason: unknown) => void;
+      mockedCreateConversation.mockReturnValue(new Promise((resolve, reject) => {
+        resolveCreate = resolve;
+        rejectCreate = reject;
+      }));
+      const screen = renderReview();
+      fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
+
+      act(() => { [...mockFocusCleanups].forEach((cleanup) => cleanup()); });
+      await act(async () => {
+        if (settlement === 'resolve') {
+          resolveCreate(conversation as Awaited<ReturnType<typeof createConversation>>);
+        } else {
+          rejectCreate(new Error('late failure'));
+          await Promise.resolve();
+        }
+      });
+
+      expect(mockUpdateDraft).not.toHaveBeenCalled();
+      expect(mockedStreamAnalysis).not.toHaveBeenCalled();
+      expect(mockSetResult).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: '분석 다시 시도' })).toBeNull();
+    },
+  );
+
+  test('실행 중 blur 뒤 다시 focus하면 취소된 running 상태를 해제한다', async () => {
+    mockedCreateConversation.mockReturnValue(new Promise(() => {}));
+    const screen = renderReview();
+    fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
+    expect(screen.getByRole('button', { name: '분석하기' })).toBeDisabled();
+
+    act(() => { [...mockFocusCleanups].forEach((cleanup) => cleanup()); });
+    act(() => {
+      [...mockFocusEffects].forEach((effect) => {
+        const cleanup = effect();
+        if (cleanup) mockFocusCleanups.add(cleanup);
+      });
+    });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '분석하기' })).toBeEnabled());
   });
 
   test('연속 탭으로 분석을 동시에 실행하지 않는다', async () => {

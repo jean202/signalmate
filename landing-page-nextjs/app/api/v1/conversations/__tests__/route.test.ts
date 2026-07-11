@@ -267,6 +267,55 @@ describe("POST /api/v1/conversations", () => {
     expect(createConversationMock).not.toHaveBeenCalled();
   });
 
+  it("accepts exactly 2000 guided freeText characters plus generated guidance", async () => {
+    const { POST } = await import("../route");
+    const freeText = "가".repeat(2000);
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        guidedAnswers: {
+          inputFocus: "meeting_note",
+          meetingCount: "once",
+          meetingVibe: "good",
+          afterMeetingContact: "ongoing",
+          desiredHelp: "next_message",
+          freeText,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(expect.objectContaining({
+      situationContext: expect.stringContaining(freeText),
+    }));
+    const stored = createConversationMock.mock.calls[0]?.[0].situationContext as string;
+    expect(stored.length).toBeGreaterThan(2000);
+  });
+
+  it.each([
+    ["non-string top-level situationContext", { situationContext: 42 }],
+    ["non-object guidedAnswers", { guidedAnswers: "meeting_note" }],
+    ["non-string guided freeText", { guidedAnswers: { inputFocus: "meeting_note", freeText: 42 } }],
+    ["non-array guided otherStyle", { guidedAnswers: { inputFocus: "meeting_note", otherStyle: "fast_reply" } }],
+  ])("rejects %s without throwing", async (_label, invalidInput) => {
+    const { POST } = await import("../route");
+    const response = await POST(
+      request({
+        relationshipStage: "after_first_date",
+        meetingChannel: "blind_date",
+        userGoal: "continue_chat",
+        messages: [],
+        ...invalidInput,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
   it("keeps rejecting completely empty input", async () => {
     const { POST } = await import("../route");
     const response = await POST(

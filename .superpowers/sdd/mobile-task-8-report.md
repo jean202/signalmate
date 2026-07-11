@@ -17,8 +17,20 @@
 - 검증 오류는 `/`, `/ocr-review`, `/situation` 중 실제 수정 가능한 화면 명령과 연결한다.
 - submit 순서는 요청 생성, 대화 생성, draft 저장, SSE 분석, 결과 저장, `/result` 교체다.
 - 같은 submit에서는 방금 생성한 로컬 conversation을 사용하고, 재시도에서는 Provider의 `createdConversation`을 사용한다.
-- running ref로 연속 탭을 막고 mounted ref로 unmount 뒤 상태 및 라우터 갱신을 막는다.
+- 로컬 running ref로 연속 탭을 막고 Provider 실행 토큰과 화면 focus로 늦은 상태 및 라우터 갱신을 막는다.
 - 실패 상세와 원문은 화면이나 console에 기록하지 않는다.
+
+## 리뷰 후속 수정
+
+- 서버는 top-level `situationContext`와 `guidedAnswers.freeText` 사용자 입력을 각각 2,000자로 제한한다. 자동 생성 안내 문구가 더해진 병합 결과 길이는 거절 조건에서 제외했다.
+- GuidedAnswers의 필드 타입과 enum 값을 route 경계에서 검증해 비정상 `freeText`/`otherStyle` 등이 예외를 만들지 않게 했다.
+- 실제 분석 request를 결정하는 입력을 고정 순서로 해시한 `analysisInputFingerprint()`를 추가했다. 원문, `createdConversation`, 저장 fingerprint, `updatedAt`, UI 메타데이터는 fingerprint 문자열에 포함하지 않는다.
+- Provider는 입력 fingerprint 변경 시 저장 conversation과 fingerprint를 자동 무효화한다.
+- Review는 현재 fingerprint와 저장 fingerprint가 같은 경우에만 snapshot을 재사용하며, create 직후 사용한 fingerprint를 snapshot과 함께 저장한다.
+- Provider 단일 실행 토큰과 Expo Router `useFocusEffect`를 사용해 새 실행, blur, unmount 뒤의 이전 진행/결과/라우팅 갱신을 차단한다.
+- 실행 중 blur 후 재진입하면 취소된 `running` UI 상태를 복원한다.
+- 실제 Provider 누적 테스트로 입력 미변경 재시도는 create 1회, 입력 변경 재시도는 create 2회임을 검증했다.
+- 입력 요약의 중복 제외 수는 유일 ID 기준이며, ChoiceChips는 320pt와 큰 글자에서 축소/줄바꿈하고 선택 전후 1px border 폭을 유지한다.
 
 ## TDD 기록
 
@@ -27,12 +39,18 @@
 3. `review.test.tsx`를 먼저 추가하고 `Cannot find module '../review'` 실패를 확인했다.
 4. 입력 요약과 분석 실행을 구현했다. 첫 GREEN 실행에서 테스트 픽스처의 한글 길이 기대값 오류 1건을 확인해 31자를 실제 32자로 수정했다.
 5. 집중 테스트 17개와 타입 검사 통과 후 전체 회귀 테스트를 실행했다.
+6. route 테스트에서 2,000자 자유 입력+자동 문구 400과 비정상 타입 예외 3건을 RED로 확인했다.
+7. fingerprint 모듈 부재, Provider snapshot 미무효화/토큰 부재, Review stale snapshot·입력 변경·blur 경쟁을 각각 RED로 확인했다.
+8. 중복 ID 이중 집계, 긴 chip 폭 제약 부재, 선택 border 3px 변경을 RED로 확인했다.
+9. 실제 Provider 통합 테스트로 stream 실패 재시도와 복수 Review late resolve를 검증했다.
 
 ## 검증 결과
 
-- 집중 테스트: 2 suites, 17 tests passed
-- 전체 `npm test`: 16 suites, 135 tests passed
-- `npm run typecheck`: 통과
+- 리뷰 후속 집중 테스트: 7 suites, 65 tests passed
+- 앱 전체 `npm test`: 19 suites, 165 tests passed
+- 앱 `npm run typecheck`: 통과
+- landing route 테스트: 1 file, 17 tests passed
+- landing `npx tsc --noEmit`: 통과
 - `git diff --check`: 통과
 
 ## 남은 위험

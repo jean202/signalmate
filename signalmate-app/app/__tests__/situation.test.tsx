@@ -30,6 +30,10 @@ function renderSituation(initialDraft: AnalysisDraft) {
       updateDraft: setDraft,
       setResult: jest.fn(),
       resetDraft: jest.fn(),
+      beginAnalysisRun: jest.fn(() => 1),
+      isAnalysisRunActive: jest.fn(() => true),
+      cancelAnalysisRun: jest.fn(),
+      isDraftFingerprintCurrent: jest.fn(() => true),
     };
   });
 

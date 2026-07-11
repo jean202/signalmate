@@ -72,6 +72,9 @@ const styles = StyleSheet.create({
   container: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     minHeight: touchTarget,
+    maxWidth: '100%',
+    flexShrink: 1,
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -82,11 +85,17 @@ const styles = StyleSheet.create({
   },
   chipSelected: {
     borderColor: colors.positive,
-    borderLeftWidth: 3,
     backgroundColor: colors.positiveSurface,
   },
   chipPressed: { backgroundColor: colors.surface },
   chipDisabled: { opacity: 0.45 },
-  label: { color: colors.text, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  label: {
+    maxWidth: '100%',
+    flexShrink: 1,
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
   labelSelected: { color: colors.positive, fontWeight: '700' },
 });

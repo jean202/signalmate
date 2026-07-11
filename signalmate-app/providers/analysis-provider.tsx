@@ -11,6 +11,7 @@ import {
 import { createEmptyDraft } from '../lib/analysis/draft';
 import { draftStorage } from '../lib/analysis/draft-storage';
 import { clearCachedImages } from '../lib/analysis/image-cache';
+import { analysisInputFingerprint } from '../lib/analysis/fingerprint';
 import type { AnalysisDraft, AnalysisResult } from '../lib/analysis/types';
 
 type AnalysisContextValue = {
@@ -20,6 +21,10 @@ type AnalysisContextValue = {
   updateDraft: (updater: (draft: AnalysisDraft) => AnalysisDraft) => void;
   setResult: (result: AnalysisResult | null) => void;
   resetDraft: () => Promise<void>;
+  beginAnalysisRun: () => number;
+  isAnalysisRunActive: (runId: number) => boolean;
+  cancelAnalysisRun: (runId: number) => void;
+  isDraftFingerprintCurrent: (fingerprint: string) => boolean;
 };
 
 const AnalysisContext = createContext<AnalysisContextValue | null>(null);
@@ -35,6 +40,8 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
   const persistenceQueue = useRef(Promise.resolve());
   const mounted = useRef(true);
   const generation = useRef(0);
+  const draftRef = useRef(draft);
+  const analysisRunGeneration = useRef(0);
 
   const cancelPendingPersist = useCallback(() => {
     if (persistTimer.current !== null) {
@@ -67,6 +74,7 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     void draftStorage.load()
       .then((restoredDraft) => {
         if (active && mounted.current && generation.current === hydrationGeneration && restoredDraft) {
+          draftRef.current = restoredDraft;
           setDraft(restoredDraft);
         }
       })
@@ -109,20 +117,51 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
   }, [cancelPendingPersist, draft, enqueueStorageOperation, hydrated]);
 
   const updateDraft = useCallback((updater: (currentDraft: AnalysisDraft) => AnalysisDraft) => {
-    setDraft((currentDraft) => ({
-      ...updater(currentDraft),
-      updatedAt: new Date().toISOString(),
-    }));
+    setDraft((currentDraft) => {
+      const currentFingerprint = analysisInputFingerprint(currentDraft);
+      const updatedDraft = updater(currentDraft);
+      const inputChanged = analysisInputFingerprint(updatedDraft) !== currentFingerprint;
+      const nextDraft = {
+        ...updatedDraft,
+        createdConversation: inputChanged ? null : updatedDraft.createdConversation,
+        createdConversationFingerprint: inputChanged
+          ? null
+          : updatedDraft.createdConversationFingerprint,
+        updatedAt: new Date().toISOString(),
+      };
+      draftRef.current = nextDraft;
+      return nextDraft;
+    });
   }, []);
+
+  const beginAnalysisRun = useCallback(() => {
+    analysisRunGeneration.current += 1;
+    return analysisRunGeneration.current;
+  }, []);
+
+  const isAnalysisRunActive = useCallback((runId: number) => (
+    mounted.current && analysisRunGeneration.current === runId
+  ), []);
+
+  const cancelAnalysisRun = useCallback((runId: number) => {
+    if (analysisRunGeneration.current === runId) analysisRunGeneration.current += 1;
+  }, []);
+
+  const isDraftFingerprintCurrent = useCallback((fingerprint: string) => (
+    analysisInputFingerprint(draftRef.current) === fingerprint
+  ), []);
 
   const resetDraft = useCallback(async () => {
     generation.current += 1;
+    analysisRunGeneration.current += 1;
     cancelPendingPersist();
     hasCompletedInitialHydration.current = true;
     skipNextPersist.current = true;
 
     if (mounted.current) {
-      setDraft(createEmptyDraft());
+      const emptyDraft = createEmptyDraft();
+      draftRef.current = emptyDraft;
+      setDraft(emptyDraft);
       setResult(null);
       setHydrated(true);
     }
@@ -150,7 +189,21 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     updateDraft,
     setResult,
     resetDraft,
-  }), [draft, hydrated, resetDraft, result, updateDraft]);
+    beginAnalysisRun,
+    isAnalysisRunActive,
+    cancelAnalysisRun,
+    isDraftFingerprintCurrent,
+  }), [
+    beginAnalysisRun,
+    cancelAnalysisRun,
+    draft,
+    hydrated,
+    isAnalysisRunActive,
+    isDraftFingerprintCurrent,
+    resetDraft,
+    result,
+    updateDraft,
+  ]);
 
   return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>;
 }

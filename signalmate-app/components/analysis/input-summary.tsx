@@ -66,7 +66,9 @@ export function InputSummary({ draft, onNavigate }: InputSummaryProps) {
   const activeRules = draft.replacementRules.filter((rule) => (
     rule.source.trim().length > 0 && rule.replacement.trim().length > 0
   ));
-  const activeDuplicateIds = retainValidDuplicateIds(draft.images, draft.excludedDuplicateIds);
+  const activeDuplicateIds = new Set(
+    retainValidDuplicateIds(draft.images, draft.excludedDuplicateIds),
+  );
   const validation = validateDraft(draft);
 
   return (
@@ -78,7 +80,7 @@ export function InputSummary({ draft, onNavigate }: InputSummaryProps) {
         <SummaryRow label="관계" value={`관계 단계 ${draft.relationshipStage ? RELATIONSHIP_LABELS[draft.relationshipStage] : '미선택'}`} />
         <SummaryRow label="경로" value={`만난 경로 ${draft.meetingChannel ? CHANNEL_LABELS[draft.meetingChannel] : '미선택'}`} />
         <SummaryRow label="개인정보" value={`치환 규칙 ${activeRules.length}개`} />
-        <SummaryRow label="중복" value={`중복 제외 ${activeDuplicateIds.length}개`} />
+        <SummaryRow label="중복" value={`중복 제외 ${activeDuplicateIds.size}개`} />
       </View>
 
       {!validation.valid && (

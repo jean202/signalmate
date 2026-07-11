@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { InputSummary, type AnalysisEditRoute } from '../components/analysis/input-summary';
@@ -7,6 +7,7 @@ import { BottomAction } from '../components/ui/bottom-action';
 import { ScreenShell } from '../components/ui/screen-shell';
 import { colors, radius, touchTarget } from '../components/ui/theme';
 import { buildConversationRequest, validateDraft } from '../lib/analysis/input-builder';
+import { analysisInputFingerprint } from '../lib/analysis/fingerprint';
 import { createConversation, streamAnalysis, type AnalysisStreamEvent } from '../lib/api/client';
 import { useAnalysis } from '../providers/analysis-provider';
 
@@ -25,47 +26,78 @@ function progressForEvent(event: AnalysisStreamEvent): ProgressCopy | null {
 
 export default function ReviewScreen() {
   const router = useRouter();
-  const { draft, hydrated, setResult, updateDraft } = useAnalysis();
+  const {
+    beginAnalysisRun,
+    cancelAnalysisRun,
+    draft,
+    hydrated,
+    isAnalysisRunActive,
+    isDraftFingerprintCurrent,
+    setResult,
+    updateDraft,
+  } = useAnalysis();
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle');
   const [progressCopy, setProgressCopy] = useState<ProgressCopy>('대화를 정리하는 중');
-  const mounted = useRef(true);
+  const focused = useRef(false);
   const submitting = useRef(false);
+  const runIdRef = useRef<number | null>(null);
   const validation = validateDraft(draft);
 
-  useEffect(() => () => {
-    mounted.current = false;
-  }, []);
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    setSubmissionState((current) => current === 'running' ? 'idle' : current);
+    return () => {
+      focused.current = false;
+      submitting.current = false;
+      if (runIdRef.current !== null) cancelAnalysisRun(runIdRef.current);
+      runIdRef.current = null;
+    };
+  }, [cancelAnalysisRun]));
 
   const navigate = (route: AnalysisEditRoute | '/capture') => router.push(route);
 
   const submit = async () => {
     if (submitting.current || !validation.valid) return;
     submitting.current = true;
+    const runId = beginAnalysisRun();
+    runIdRef.current = runId;
+    const inputFingerprint = analysisInputFingerprint(draft);
+    const canContinue = () => (
+      focused.current
+      && isAnalysisRunActive(runId)
+      && isDraftFingerprintCurrent(inputFingerprint)
+    );
     setSubmissionState('running');
     setProgressCopy('대화를 정리하는 중');
 
     try {
-      let conversation = draft.createdConversation;
+      let conversation = draft.createdConversationFingerprint === inputFingerprint
+        ? draft.createdConversation
+        : null;
       if (!conversation) {
         const request = buildConversationRequest(draft);
         const createdConversation = await createConversation(request);
-        if (!mounted.current) return;
+        if (!canContinue()) return;
         conversation = createdConversation;
-        updateDraft((current) => ({ ...current, createdConversation }));
+        updateDraft((current) => ({
+          ...current,
+          createdConversation,
+          createdConversationFingerprint: inputFingerprint,
+        }));
       }
 
       const analysisResult = await streamAnalysis(conversation, (event) => {
-        if (!mounted.current) return;
+        if (!canContinue()) return;
         const nextCopy = progressForEvent(event);
         if (nextCopy) setProgressCopy(nextCopy);
       });
-      if (!mounted.current) return;
+      if (!canContinue()) return;
       setResult(analysisResult);
       router.replace('/result');
     } catch {
-      if (mounted.current) setSubmissionState('failed');
+      if (canContinue()) setSubmissionState('failed');
     } finally {
-      submitting.current = false;
+      if (runIdRef.current === runId) submitting.current = false;
     }
   };
 

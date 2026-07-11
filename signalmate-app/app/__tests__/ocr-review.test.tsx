@@ -73,6 +73,10 @@ function renderReview(draft = draftWith()) {
     updateDraft: mockUpdateDraft,
     setResult: jest.fn(),
     resetDraft: jest.fn(),
+    beginAnalysisRun: jest.fn(() => 1),
+    isAnalysisRunActive: jest.fn(() => true),
+    cancelAnalysisRun: jest.fn(),
+    isDraftFingerprintCurrent: jest.fn(() => true),
   });
   return render(
     <SafeAreaProvider initialMetrics={{
@@ -95,6 +99,10 @@ function renderStatefulReview(initialDraft: AnalysisDraft) {
       updateDraft: setDraft,
       setResult: jest.fn(),
       resetDraft: jest.fn(),
+      beginAnalysisRun: jest.fn(() => 1),
+      isAnalysisRunActive: jest.fn(() => true),
+      cancelAnalysisRun: jest.fn(),
+      isDraftFingerprintCurrent: jest.fn(() => true),
     };
   });
   return render(

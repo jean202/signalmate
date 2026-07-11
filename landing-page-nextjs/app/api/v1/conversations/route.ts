@@ -37,6 +37,42 @@ export const dynamic = "force-dynamic";
 
 const validSenderRoles: SenderRole[] = ["self", "other", "unknown"];
 const validSaveModes: SaveMode[] = ["temporary", "saved"];
+const guidedAnswerValues = {
+  inputFocus: ["chat", "meeting_note", "mixed", "follow_up"],
+  meetingCount: ["none", "once", "2_3_times", "4_plus"],
+  meetingVibe: ["none", "awkward", "normal", "good", "great"],
+  otherInitiative: ["low", "medium", "high", "unknown"],
+  afterMeetingContact: ["none", "self_first", "other_first", "slower", "ongoing", "not_applicable"],
+  desiredHelp: ["next_message", "ask_for_date", "wait_or_send", "decide_to_stop"],
+} as const;
+const otherStyleValues = [
+  "fast_reply", "slow_reply", "short_messages", "long_messages", "uses_emoji", "unknown",
+] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isOptionalEnum(value: unknown, allowed: readonly string[]): boolean {
+  return value === undefined || (typeof value === "string" && allowed.includes(value));
+}
+
+function isGuidedAnswers(value: unknown): value is GuidedAnswers {
+  if (!isRecord(value)) return false;
+  return isOptionalEnum(value.inputFocus, guidedAnswerValues.inputFocus)
+    && isOptionalEnum(value.meetingCount, guidedAnswerValues.meetingCount)
+    && isOptionalEnum(value.meetingVibe, guidedAnswerValues.meetingVibe)
+    && isOptionalEnum(value.otherInitiative, guidedAnswerValues.otherInitiative)
+    && isOptionalEnum(value.afterMeetingContact, guidedAnswerValues.afterMeetingContact)
+    && isOptionalEnum(value.desiredHelp, guidedAnswerValues.desiredHelp)
+    && (value.freeText === undefined || typeof value.freeText === "string")
+    && (value.otherStyle === undefined || (
+      Array.isArray(value.otherStyle)
+      && value.otherStyle.every((style) => (
+        typeof style === "string" && otherStyleValues.includes(style as typeof otherStyleValues[number])
+      ))
+    ));
+}
 
 export async function POST(request: Request) {
   let body: ConversationCreateBody;
@@ -55,11 +91,21 @@ export async function POST(request: Request) {
     );
   }
 
-  // situationContext: Mode A(자유 텍스트) + Mode B(가이드 응답) 병합. 길이 제한은 아래에서 검증한다.
-  const situationContext = mergeSituationContext(body.situationContext, body.guidedAnswers);
-  if (situationContext && situationContext.length > 2000) {
+  if (body.situationContext !== undefined && typeof body.situationContext !== "string") {
+    return errorResponse(400, "VALIDATION_ERROR", "situationContext must be a string.");
+  }
+  if (body.situationContext && body.situationContext.length > 2000) {
     return errorResponse(400, "VALIDATION_ERROR", "situationContext must be 2000 characters or less.");
   }
+  if (body.guidedAnswers !== undefined && !isGuidedAnswers(body.guidedAnswers)) {
+    return errorResponse(400, "VALIDATION_ERROR", "guidedAnswers has an invalid format.");
+  }
+  if (body.guidedAnswers?.freeText && body.guidedAnswers.freeText.length > 2000) {
+    return errorResponse(400, "VALIDATION_ERROR", "guidedAnswers.freeText must be 2000 characters or less.");
+  }
+
+  // User-authored fields are limited independently; generated guidance may make the merged value longer.
+  const situationContext = mergeSituationContext(body.situationContext, body.guidedAnswers);
 
   const allowsSituationOnly = hasEnoughSituationInput({
     rawText: body.rawText,

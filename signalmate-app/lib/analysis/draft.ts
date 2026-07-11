@@ -17,14 +17,22 @@ export function createEmptyDraft(now = new Date().toISOString()): AnalysisDraft 
     },
     inputFocusTouched: false,
     createdConversation: null,
+    createdConversationFingerprint: null,
     updatedAt: now,
   };
 }
 
 export function normalizeRestoredDraft(draft: AnalysisDraft): AnalysisDraft {
+  const hasReusableConversation = Boolean(
+    draft.createdConversation && typeof draft.createdConversationFingerprint === 'string',
+  );
   return {
     ...draft,
     inputFocusTouched: draft.inputFocusTouched ?? false,
+    createdConversation: hasReusableConversation ? draft.createdConversation : null,
+    createdConversationFingerprint: hasReusableConversation
+      ? draft.createdConversationFingerprint
+      : null,
     images: draft.images.map((image) => ({
       ...image,
       status: image.status === 'extracting' ? 'queued' : image.status,

@@ -1,6 +1,7 @@
 import { Text } from 'react-native';
 import { act, render, renderHook, waitFor } from '@testing-library/react-native';
 import { createEmptyDraft } from '../../lib/analysis/draft';
+import { analysisInputFingerprint } from '../../lib/analysis/fingerprint';
 import type { AnalysisDraft } from '../../lib/analysis/types';
 
 jest.mock('../../lib/analysis/draft-storage', () => ({
@@ -104,6 +105,74 @@ describe('AnalysisProvider', () => {
     act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '새 대화' })));
 
     expect(result.current.draft.updatedAt).toBe('2026-07-11T09:30:00.000Z');
+  });
+
+  test('분석 request 입력이 바뀌면 저장된 conversation과 fingerprint를 무효화한다', async () => {
+    const restored = createEmptyDraft();
+    restored.primaryInput = 'text';
+    restored.pastedText = '나: 안녕\n상대: 반가워';
+    restored.createdConversation = {
+      id: 'conversation-1', rawText: restored.pastedText, situationContext: null,
+      relationshipStage: 'before_meeting', meetingChannel: 'dating_app', userGoal: 'continue_chat',
+      messages: [],
+    };
+    restored.createdConversationFingerprint = analysisInputFingerprint(restored);
+    mockedDraftStorage.load.mockResolvedValue(restored);
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.draft.createdConversation).not.toBeNull());
+
+    act(() => result.current.updateDraft((draft) => ({
+      ...draft,
+      pastedText: `${draft.pastedText}\n나: 다음에 봐`,
+    })));
+
+    expect(result.current.draft.createdConversation).toBeNull();
+    expect(result.current.draft.createdConversationFingerprint).toBeNull();
+  });
+
+  test('request와 무관한 UI 메타데이터 변경은 저장 conversation을 유지한다', async () => {
+    const restored = createEmptyDraft();
+    restored.primaryInput = 'text';
+    restored.pastedText = '나: 안녕\n상대: 반가워';
+    restored.createdConversation = {
+      id: 'conversation-1', rawText: restored.pastedText, situationContext: null,
+      relationshipStage: 'before_meeting', meetingChannel: 'dating_app', userGoal: 'continue_chat',
+      messages: [],
+    };
+    restored.createdConversationFingerprint = analysisInputFingerprint(restored);
+    mockedDraftStorage.load.mockResolvedValue(restored);
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.draft.createdConversation).not.toBeNull());
+
+    act(() => result.current.updateDraft((draft) => ({ ...draft, inputFocusTouched: true })));
+
+    expect(result.current.draft.createdConversation?.id).toBe('conversation-1');
+    expect(result.current.draft.createdConversationFingerprint)
+      .toBe(analysisInputFingerprint(result.current.draft));
+  });
+
+  test('새 분석 실행 토큰은 이전 실행의 진행과 결과 소유권을 무효화한다', async () => {
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    const first = result.current.beginAnalysisRun();
+    expect(result.current.isAnalysisRunActive(first)).toBe(true);
+    const second = result.current.beginAnalysisRun();
+
+    expect(result.current.isAnalysisRunActive(first)).toBe(false);
+    expect(result.current.isAnalysisRunActive(second)).toBe(true);
+    act(() => result.current.cancelAnalysisRun(second));
+    expect(result.current.isAnalysisRunActive(second)).toBe(false);
+  });
+
+  test('Provider의 현재 draft fingerprint를 비동기 경계에서 확인한다', async () => {
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    const fingerprint = analysisInputFingerprint(result.current.draft);
+
+    expect(result.current.isDraftFingerprintCurrent(fingerprint)).toBe(true);
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '변경된 입력' })));
+    expect(result.current.isDraftFingerprintCurrent(fingerprint)).toBe(false);
   });
 
   test('reset은 시작된 저장 뒤에 clear를 실행해 오래된 저장값을 남기지 않는다', async () => {

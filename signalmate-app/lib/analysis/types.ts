@@ -61,6 +61,7 @@ export type AnalysisDraft = {
   guidedAnswers: GuidedAnswers;
   inputFocusTouched?: boolean;
   createdConversation: ConversationSnapshot | null;
+  createdConversationFingerprint: string | null;
   updatedAt: string;
 };
 
