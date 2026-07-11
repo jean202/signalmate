@@ -27,6 +27,7 @@ export default function HomeScreen() {
   const hasSavedDraft = useMemo(() => (
     draft.images.length > 0
     || draft.pastedText.trim().length > 0
+    || Boolean(draft.selfName?.trim())
     || draft.relationshipStage !== null
     || draft.meetingChannel !== null
   ), [draft]);
@@ -148,6 +149,20 @@ export default function HomeScreen() {
           {selectedInput === 'text' && (
             <>
               <Text style={styles.panelTitle}>대화 텍스트</Text>
+              <Text style={styles.fieldLabel}>대화 속 내 이름</Text>
+              <TextInput
+                accessibilityLabel="대화 속 내 이름"
+                autoCorrect={false}
+                placeholder="예: 김진하"
+                placeholderTextColor={colors.muted}
+                value={draft.selfName ?? ''}
+                onChangeText={(selfName) => updateDraft((current) => ({
+                  ...current,
+                  primaryInput: 'text',
+                  selfName,
+                }))}
+                style={styles.nameInput}
+              />
               <TextInput
                 accessibilityLabel="대화 내용"
                 multiline
@@ -221,6 +236,19 @@ const styles = StyleSheet.create({
   },
   panelTitle: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 24 },
   panelDescription: { color: colors.muted, fontSize: 15, lineHeight: 23, marginTop: 8 },
+  fieldLabel: { color: colors.text, fontSize: 13, fontWeight: '700', lineHeight: 18, marginTop: 14 },
+  nameInput: {
+    minHeight: touchTarget,
+    marginTop: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.control,
+    backgroundColor: colors.surface,
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 21,
+  },
   textInput: {
     minHeight: 180,
     marginTop: 12,

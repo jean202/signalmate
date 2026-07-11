@@ -31,11 +31,12 @@ export type ChatTranscriptLineKind = "empty" | "metadata" | "message" | "other";
 
 const KAKAO_DATE_HEADER_KR = /^-+\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일\s*.+\s*-+$/;
 const KAKAO_DATE_HEADER_EN = /^-+\s*\w+day,\s+\w+\s+\d{1,2},\s+\d{4}\s*-+$/;
+const OCR_DATE_HEADER_KR = /^\d{4}년\s*\d{1,2}월\s*\d{1,2}일(?:\s+[월화수목금토일]요일)?$/;
 const KAKAO_SYSTEM_MSG = /^(.*님이 들어왔습니다|.*님이 나갔습니다|.*님을 초대했습니다|채팅방 관리자가)/;
 
 // "2026년 3월 15일 오후 2:30, 김진하 : 메시지"
 const KAKAO_LINE_KR =
-  /^(\d{4}년\s*\d{1,2}월\s*\d{1,2}일\s*[오전후]+\s*\d{1,2}:\d{2}),\s*(.+?)\s*:\s*(.+)$/;
+  /^(\d{4}년\s*\d{1,2}월\s*\d{1,2}일\s*[오전후]+\s*\d{1,2}:\d{2}),\s*(.+?)\s*[:：]\s*(.+)$/;
 
 // "[김진하] [오후 2:30] 메시지"
 const KAKAO_LINE_BRACKET =
@@ -43,12 +44,16 @@ const KAKAO_LINE_BRACKET =
 
 // "2026. 3. 15. 2:30 PM, Name : message"
 const KAKAO_LINE_EN =
-  /^(\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{1,2}:\d{2}\s*[APap][Mm]),\s*(.+?)\s*:\s*(.+)$/;
+  /^(\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{1,2}:\d{2}\s*[APap][Mm]),\s*(.+?)\s*[:：]\s*(.+)$/;
 
 // ─── Generic format ────────────────────────────────────────
 // "[14:30] 김진하: 메시지" or "14:30 김진하: 메시지"
 const GENERIC_TIME_NAME =
   /^\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?\s+(.+?)[:：]\s*(.+)$/;
+
+// "[오후 8:10] 나: 메시지"
+const OCR_TIME_ROLE =
+  /^\[((?:오전|오후)\s*\d{1,2}:\d{2})\]\s*(나|저|상대|상대방)\s*[:：]\s*(.+)$/;
 
 // "김진하: 메시지" or "Name: message"
 const SIMPLE_NAME_MSG = /^(.+?)[:：]\s+(.+)$/;
@@ -89,7 +94,9 @@ export function classifyChatTranscriptLine(rawLine: string): ChatTranscriptLineK
     return "empty";
   }
 
-  if (KAKAO_DATE_HEADER_KR.test(trimmed) || KAKAO_DATE_HEADER_EN.test(trimmed)) {
+  if (KAKAO_DATE_HEADER_KR.test(trimmed)
+    || KAKAO_DATE_HEADER_EN.test(trimmed)
+    || OCR_DATE_HEADER_KR.test(trimmed)) {
     return "metadata";
   }
 
@@ -101,6 +108,7 @@ export function classifyChatTranscriptLine(rawLine: string): ChatTranscriptLineK
     KAKAO_LINE_KR.test(trimmed) ||
     KAKAO_LINE_BRACKET.test(trimmed) ||
     KAKAO_LINE_EN.test(trimmed) ||
+    OCR_TIME_ROLE.test(trimmed) ||
     GENERIC_TIME_NAME.test(trimmed)
   ) {
     return "message";
@@ -213,7 +221,9 @@ export function parseChatText(rawText: string, selfNameHint?: string): ParseResu
     if (!trimmed) continue;
 
     // Skip KakaoTalk date headers and system messages
-    if (KAKAO_DATE_HEADER_KR.test(trimmed) || KAKAO_DATE_HEADER_EN.test(trimmed)) {
+    if (KAKAO_DATE_HEADER_KR.test(trimmed)
+      || KAKAO_DATE_HEADER_EN.test(trimmed)
+      || OCR_DATE_HEADER_KR.test(trimmed)) {
       // Extract date context for bracket format
       const dateMatch = trimmed.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
       if (dateMatch) {
@@ -255,6 +265,20 @@ export function parseChatText(rawText: string, selfNameHint?: string): ParseResu
         senderName: match[2].trim(),
         messageText: match[3].trim(),
         sentAt: parseKakaoTimeEn(match[1]),
+      });
+      continue;
+    }
+
+    // Try OCR "[오후 8:10] 나: 메시지" format
+    match = trimmed.match(OCR_TIME_ROLE);
+    if (match) {
+      detectedFormat = "ocr-time-role";
+      collected.push({
+        senderName: match[2] === "나" || match[2] === "저" ? "나" : "상대",
+        messageText: match[3].trim(),
+        sentAt: currentDateContext
+          ? parseKakaoBracketTime(match[1], currentDateContext)
+          : null,
       });
       continue;
     }

@@ -84,9 +84,11 @@ describe('HomeScreen', () => {
       screen.getByPlaceholderText('대화 내용을 붙여넣으세요'),
       '나: 안녕\n상대: 반가워',
     );
+    fireEvent.changeText(screen.getByLabelText('대화 속 내 이름'), '진하');
     fireEvent.press(screen.getByRole('button', { name: '상황 정보 입력' }));
 
     expect(screen.getByDisplayValue('나: 안녕\n상대: 반가워')).toBeTruthy();
+    expect(screen.getByDisplayValue('진하')).toBeTruthy();
     expect(mockPush).toHaveBeenCalledWith('/situation');
   });
 

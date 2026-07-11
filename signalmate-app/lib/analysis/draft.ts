@@ -4,6 +4,7 @@ export function createEmptyDraft(now = new Date().toISOString()): AnalysisDraft 
   return {
     version: 1,
     primaryInput: null,
+    selfName: '',
     images: [],
     pastedText: '',
     replacementRules: [],
@@ -28,6 +29,7 @@ export function normalizeRestoredDraft(draft: AnalysisDraft): AnalysisDraft {
   );
   return {
     ...draft,
+    selfName: draft.selfName ?? '',
     inputFocusTouched: draft.inputFocusTouched ?? false,
     createdConversation: hasReusableConversation ? draft.createdConversation : null,
     createdConversationFingerprint: hasReusableConversation

@@ -160,6 +160,38 @@ describe('validated API envelopes', () => {
     expect(imageFields[0]).toBeInstanceOf(Blob);
   });
 
+  test('실제 OCR 응답의 문자열 notes를 앱의 메모 목록으로 정규화한다', async () => {
+    mockFetch.mockResolvedValue(jsonResponse(200, {
+      success: true,
+      data: {
+        rawText: '나: 안녕\n상대: 안녕',
+        messageCount: 2,
+        notes: '날짜는 11월 15일',
+      },
+      error: null,
+    }));
+
+    await expect(extractImage('file://cache/chat.png')).resolves.toEqual({
+      rawText: '나: 안녕\n상대: 안녕',
+      messageCount: 2,
+      notes: ['날짜는 11월 15일'],
+    });
+  });
+
+  test('실제 OCR 응답에서 notes가 생략되면 빈 메모 목록으로 정규화한다', async () => {
+    mockFetch.mockResolvedValue(jsonResponse(200, {
+      success: true,
+      data: { rawText: '나: 안녕\n상대: 안녕', messageCount: 2 },
+      error: null,
+    }));
+
+    await expect(extractImage('file://cache/chat.png')).resolves.toEqual({
+      rawText: '나: 안녕\n상대: 안녕',
+      messageCount: 2,
+      notes: [],
+    });
+  });
+
   test('대화 생성 성공 응답에서 data.conversation을 반환한다', async () => {
     mockFetch.mockResolvedValue(jsonResponse(201, {
       success: true,

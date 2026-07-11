@@ -38,6 +38,7 @@ function editCommand(error: string, draft: AnalysisDraft): {
   if (error.startsWith('원하는 도움')) return { label: '원하는 도움 수정', route: '/situation' };
   if (error.startsWith('만남 후기')) return { label: '만남 후기 수정', route: '/situation' };
   if (error.startsWith('추출된 캡처')) return { label: '캡처 검수하기', route: '/ocr-review' };
+  if (error.startsWith('이름이 표시된 대화')) return { label: '내 이름 입력', route: '/' };
   if (error.startsWith('대화 두 줄')) {
     if (draft.guidedAnswers.inputFocus !== 'chat') {
       return { label: '만남 후기 보완', route: '/situation' };
@@ -64,7 +65,7 @@ export function InputSummary({ draft, onNavigate }: InputSummaryProps) {
   const completedImages = draft.images.filter((image) => image.status === 'complete');
   const reviewedImages = completedImages.filter((image) => image.reviewed);
   const activeRules = draft.replacementRules.filter((rule) => (
-    rule.source.trim().length > 0 && rule.replacement.trim().length > 0
+    rule.source.trim().length > 0
   ));
   const activeDuplicateIds = new Set(
     retainValidDuplicateIds(draft.images, draft.excludedDuplicateIds),
@@ -79,7 +80,7 @@ export function InputSummary({ draft, onNavigate }: InputSummaryProps) {
         <SummaryRow label="후기" value={`만남 후기 ${draft.guidedAnswers.freeText.length}자`} />
         <SummaryRow label="관계" value={`관계 단계 ${draft.relationshipStage ? RELATIONSHIP_LABELS[draft.relationshipStage] : '미선택'}`} />
         <SummaryRow label="경로" value={`만난 경로 ${draft.meetingChannel ? CHANNEL_LABELS[draft.meetingChannel] : '미선택'}`} />
-        <SummaryRow label="개인정보" value={`치환 규칙 ${activeRules.length}개`} />
+        <SummaryRow label="개인정보" value={`분석 전 자동 치환 ${activeRules.length}개`} />
         <SummaryRow label="중복" value={`중복 제외 ${activeDuplicateIds.size}개`} />
       </View>
 

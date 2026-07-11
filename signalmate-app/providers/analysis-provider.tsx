@@ -200,7 +200,9 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
       throw error instanceof DraftResetError ? error : new DraftResetError();
     }
 
-    if (!mounted.current || generation.current !== resetGeneration) return;
+    if (generation.current !== resetGeneration) return;
+    generation.current = resetGeneration + 1;
+    if (!mounted.current) return;
 
     hasCompletedInitialHydration.current = true;
     skipNextPersist.current = true;

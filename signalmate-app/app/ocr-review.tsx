@@ -197,6 +197,11 @@ export default function OcrReviewScreen() {
           onRulesChange={updateRules}
           onApply={applyRules}
         />
+        {draft.replacementRules.some((rule) => rule.source.trim().length > 0) && (
+          <Text style={styles.privacyNotice}>
+            저장한 치환 규칙은 분석 전에 자동 적용돼요.
+          </Text>
+        )}
 
         {duplicateCandidates.length > 0 && <View style={styles.divider} />}
         <DuplicateCandidateList
@@ -294,6 +299,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '700', lineHeight: 22 },
   emptyText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   divider: { height: 1, backgroundColor: colors.border },
+  privacyNotice: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   pressed: { backgroundColor: colors.surface },
   disabled: { opacity: 0.35 },
 });

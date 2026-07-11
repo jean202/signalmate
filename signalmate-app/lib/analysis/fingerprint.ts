@@ -1,4 +1,4 @@
-import { buildMergedChatText } from './input-builder';
+import { buildProtectedConversationInput } from './input-builder';
 import type { AnalysisDraft } from './types';
 
 function hash32(value: string, seed: number): string {
@@ -11,12 +11,14 @@ function hash32(value: string, seed: number): string {
 }
 
 export function analysisInputFingerprint(draft: AnalysisDraft): string {
+  const { rawText, freeText, selfName } = buildProtectedConversationInput(draft);
   const canonicalInput = JSON.stringify({
     primaryInput: draft.primaryInput,
     sourceType: draft.images.length > 0 ? 'mobile_capture' : 'mobile_manual',
     relationshipStage: draft.relationshipStage,
     meetingChannel: draft.meetingChannel,
-    rawText: buildMergedChatText(draft),
+    rawText,
+    selfName,
     guidedAnswers: {
       inputFocus: draft.guidedAnswers.inputFocus,
       meetingCount: draft.guidedAnswers.meetingCount,
@@ -25,7 +27,7 @@ export function analysisInputFingerprint(draft: AnalysisDraft): string {
       afterMeetingContact: draft.guidedAnswers.afterMeetingContact,
       desiredHelp: draft.guidedAnswers.desiredHelp,
       otherStyle: draft.guidedAnswers.otherStyle,
-      freeText: draft.guidedAnswers.freeText,
+      freeText,
     },
   });
 

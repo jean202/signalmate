@@ -11,6 +11,14 @@ describe('analysis draft', () => {
     expect(draft.relationshipStage).toBeNull();
     expect(draft.meetingChannel).toBeNull();
     expect(draft.images).toEqual([]);
+    expect(draft.selfName).toBe('');
+  });
+
+  test('이전 버전 초안은 내 이름을 빈 값으로 복구한다', () => {
+    const draft = createEmptyDraft();
+    delete draft.selfName;
+
+    expect(normalizeRestoredDraft(draft).selfName).toBe('');
   });
 
   test('앱 재실행 시 중단된 추출 상태를 대기로 되돌린다', () => {

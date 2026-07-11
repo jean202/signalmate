@@ -8,6 +8,69 @@ export type DuplicateCandidate = {
 };
 
 const normalizeLine = (line: string) => line.trim().replace(/\s+/g, ' ');
+const SELF_SENDER_TOKEN = '\uE000signalmate-self-sender\uE001';
+const OTHER_SENDER_TOKEN = '\uE000signalmate-other-sender\uE001';
+const RELATIVE_SELF_NAMES = new Set(['나', '저']);
+const RELATIVE_OTHER_NAMES = new Set(['상대', '상대방']);
+const SITUATION_NOTE_LABELS = ['상황', '메모', '후기', '느낌', '추가'];
+const MAX_SITUATION_NOTE_LABEL_LENGTH = 12;
+const SENDER_LINE_PATTERNS = [
+  /^(\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일\s*[오전후]+\s*\d{1,2}:\d{2},\s*)(.+?)(\s*[:：]\s*)(.+)$/,
+  /^(\s*\[)(.+?)(\]\s*\[[오전후]+\s*\d{1,2}:\d{2}\]\s*)(.+)$/,
+  /^(\s*\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{1,2}:\d{2}\s*[APap][Mm],\s*)(.+?)(\s*[:：]\s*)(.+)$/,
+  /^(\s*\[(?:오전|오후)\s*\d{1,2}:\d{2}\]\s*)(.+?)(\s*[:：]\s*)(.+)$/,
+  /^(\s*\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s+)(.+?)(\s*[:：]\s*)(.+)$/,
+  /^(\s*)(.+?)(\s*[:：]\s*)(.+)$/,
+];
+
+type ParsedSenderLine = {
+  senderName: string;
+  named: boolean;
+  render: (senderName: string) => string;
+};
+
+function isSimpleNameCandidate(candidateName: string): boolean {
+  return candidateName.length <= 20
+    && !candidateName.includes('http')
+    && !candidateName.includes('/');
+}
+
+function isSituationNoteLabel(label: string): boolean {
+  const compactLabel = label.trim().replace(/\s+/g, '');
+  return compactLabel.length > 0
+    && compactLabel.length <= MAX_SITUATION_NOTE_LABEL_LENGTH
+    && SITUATION_NOTE_LABELS.some((token) => compactLabel.includes(token));
+}
+
+function parseSenderLine(line: string): ParsedSenderLine | null {
+  for (let index = 0; index < SENDER_LINE_PATTERNS.length; index += 1) {
+    const match = line.match(SENDER_LINE_PATTERNS[index]);
+    if (!match) continue;
+    const senderName = match[2].trim();
+    if (index === SENDER_LINE_PATTERNS.length - 1
+      && (!isSimpleNameCandidate(senderName) || isSituationNoteLabel(senderName))) {
+      return null;
+    }
+    const relative = RELATIVE_SELF_NAMES.has(senderName) || RELATIVE_OTHER_NAMES.has(senderName);
+    return {
+      senderName,
+      named: !relative,
+      render: (nextSenderName) => `${match[1]}${nextSenderName}${match[3]}${match[4]}`,
+    };
+  }
+  return null;
+}
+
+function protectSenderLabels(text: string, selfName: string): string {
+  const trimmedSelfName = selfName.trim();
+  return text.split(/\r?\n/).map((line) => {
+    const parsed = parseSenderLine(line);
+    if (!parsed) return line;
+    const isSelf = RELATIVE_SELF_NAMES.has(parsed.senderName)
+      || (trimmedSelfName.length > 0 && parsed.senderName === trimmedSelfName);
+    return parsed.render(isSelf ? SELF_SENDER_TOKEN : OTHER_SENDER_TOKEN);
+  }).join('\n');
+}
 
 export function duplicateCandidateId(imageId: string, lineIndex: number, text: string): string {
   return `duplicate:${encodeURIComponent(imageId)}:${lineIndex}:${encodeURIComponent(normalizeLine(text))}`;
@@ -133,9 +196,29 @@ export function buildMergedChatText(draft: AnalysisDraft): string {
 }
 
 export function recognizedChatCount(text: string): number {
-  return text.split(/\r?\n/).filter((line) =>
-    /^(?:\[[^\]]+\]\s*)?(?:나|저|상대|상대방)\s*[:：]\s*\S+/.test(line.trim()),
-  ).length;
+  return text.split(/\r?\n/).filter((line) => parseSenderLine(line) !== null).length;
+}
+
+function hasNamedSenderMessage(text: string): boolean {
+  return text.split(/\r?\n/).some((line) => parseSenderLine(line)?.named === true);
+}
+
+export function buildProtectedConversationInput(draft: AnalysisDraft): {
+  rawText: string;
+  freeText: string;
+  selfName: '나';
+} {
+  const protectedRawText = protectSenderLabels(
+    buildMergedChatText(draft),
+    draft.selfName ?? '',
+  );
+  return {
+    rawText: applyReplacementRules(protectedRawText, draft.replacementRules)
+      .split(SELF_SENDER_TOKEN).join('나')
+      .split(OTHER_SENDER_TOKEN).join('상대'),
+    freeText: applyReplacementRules(draft.guidedAnswers.freeText, draft.replacementRules),
+    selfName: '나',
+  };
 }
 
 const USER_GOAL = {
@@ -165,6 +248,10 @@ export function validateDraft(draft: AnalysisDraft): { valid: boolean; errors: s
   if (recognizedChatCount(chatText) < 2 && !situationAllowed) {
     errors.push('대화 두 줄 이상 또는 20자 이상의 만남 후기가 필요해요.');
   }
+  if (hasNamedSenderMessage(chatText)
+    && !draft.selfName?.trim()) {
+    errors.push('이름이 표시된 대화에서는 내 이름을 입력해 주세요.');
+  }
   if (draft.images.some((image) => image.status === 'complete' && !image.reviewed)) {
     errors.push('추출된 캡처 내용을 모두 검수해 주세요.');
   }
@@ -178,6 +265,11 @@ export function buildConversationRequest(draft: AnalysisDraft) {
     throw new Error(validation.errors[0] ?? '분석 입력이 완성되지 않았어요.');
   }
   const userGoal = USER_GOAL[draft.guidedAnswers.desiredHelp];
+  const protectedInput = buildProtectedConversationInput(draft);
+  const guidedAnswers = {
+    ...draft.guidedAnswers,
+    freeText: protectedInput.freeText,
+  };
   return {
     title: '모바일 분석',
     sourceType: draft.images.length > 0 ? 'mobile_capture' : 'mobile_manual',
@@ -185,8 +277,8 @@ export function buildConversationRequest(draft: AnalysisDraft) {
     meetingChannel: draft.meetingChannel,
     userGoal,
     saveMode: 'temporary' as const,
-    rawText: buildMergedChatText(draft),
-    selfName: '나',
-    guidedAnswers: draft.guidedAnswers,
+    rawText: protectedInput.rawText,
+    selfName: protectedInput.selfName,
+    guidedAnswers,
   };
 }

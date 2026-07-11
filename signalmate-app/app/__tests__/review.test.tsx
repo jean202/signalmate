@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createEmptyDraft } from '../../lib/analysis/draft';
 import { analysisInputFingerprint } from '../../lib/analysis/fingerprint';
 import { duplicateCandidateId } from '../../lib/analysis/input-builder';
+import { clearCachedImages } from '../../lib/analysis/image-cache';
 import type { AnalysisDraft, AnalysisResult, ConversationSnapshot } from '../../lib/analysis/types';
 import { createConversation, streamAnalysis } from '../../lib/api/client';
 import { useAnalysis } from '../../providers/analysis-provider';
@@ -51,10 +52,14 @@ jest.mock('../../lib/api/client', () => ({
   createConversation: jest.fn(),
   streamAnalysis: jest.fn(),
 }));
+jest.mock('../../lib/analysis/image-cache', () => ({
+  clearCachedImages: jest.fn(),
+}));
 
 const mockedUseAnalysis = useAnalysis as jest.MockedFunction<typeof useAnalysis>;
 const mockedCreateConversation = createConversation as jest.MockedFunction<typeof createConversation>;
 const mockedStreamAnalysis = streamAnalysis as jest.MockedFunction<typeof streamAnalysis>;
+const mockedClearCachedImages = clearCachedImages as jest.MockedFunction<typeof clearCachedImages>;
 let latestDraft: AnalysisDraft;
 
 const conversation: ConversationSnapshot = {
@@ -121,6 +126,7 @@ function renderReview(initialDraft = validSituationDraft()) {
 describe('ReviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedClearCachedImages.mockReset();
     activeRunId = 0;
     externalUpdateDraft = null;
     mockFocusCleanups.clear();
@@ -155,6 +161,7 @@ describe('ReviewScreen', () => {
     ];
     draft.replacementRules = [
       { id: 'active', source: '민수', replacement: '[상대이름]' },
+      { id: 'delete', source: '010-1234-5678', replacement: '' },
       { id: 'empty', source: '', replacement: '[빈값]' },
     ];
     draft.excludedDuplicateIds = [
@@ -168,7 +175,7 @@ describe('ReviewScreen', () => {
     expect(screen.getByText('완료 이미지 2장 · 검수 1장')).toBeTruthy();
     expect(screen.getByText('관계 단계 첫 만남 후')).toBeTruthy();
     expect(screen.getByText('만난 경로 소개팅')).toBeTruthy();
-    expect(screen.getByText('치환 규칙 1개')).toBeTruthy();
+    expect(screen.getByText('분석 전 자동 치환 2개')).toBeTruthy();
     expect(screen.getByText('중복 제외 1개')).toBeTruthy();
   });
 
@@ -207,6 +214,7 @@ describe('ReviewScreen', () => {
 
   test('대화 생성 직후 로컬 conversation을 저장하고 같은 값으로 분석한 뒤 결과로 이동한다', async () => {
     const calls: string[] = [];
+    mockedClearCachedImages.mockImplementation(() => { calls.push('cache'); });
     mockedCreateConversation.mockImplementation(async () => {
       calls.push('create');
       return conversation as Awaited<ReturnType<typeof createConversation>>;
@@ -222,9 +230,42 @@ describe('ReviewScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/result'));
-    expect(calls).toEqual(['create', 'stream:conversation-1', 'result', 'replace']);
+    expect(calls).toEqual(['create', 'stream:conversation-1', 'cache', 'result', 'replace']);
     expect(latestDraft.createdConversation).toEqual(conversation);
     expect(mockedStreamAnalysis).toHaveBeenCalledWith(conversation, expect.any(Function));
+  });
+
+  test('분석 완료 뒤 결과를 노출하기 전에 원본 캡처 캐시를 삭제한다', async () => {
+    const calls: string[] = [];
+    mockedClearCachedImages.mockImplementation(() => { calls.push('cache'); });
+    mockSetResult.mockImplementation(() => { calls.push('result'); });
+    mockReplace.mockImplementation(() => { calls.push('replace'); });
+    const draft = validSituationDraft();
+    draft.images = [{
+      id: 'image-1', order: 0, uri: 'file://cache/image-1.png', fileName: 'image-1.png',
+      mimeType: 'image/png', fileSize: 1, status: 'complete', extractedText: '나: 안녕',
+      editedText: '나: 안녕', notes: [], errorCode: null, reviewed: true,
+    }];
+    const screen = renderReview(draft);
+
+    fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/result'));
+    expect(calls).toEqual(['cache', 'result', 'replace']);
+  });
+
+  test('원본 캐시 삭제 실패는 성공한 분석 결과에 경고를 남기고 결과로 이동한다', async () => {
+    mockedClearCachedImages.mockImplementation(() => { throw new Error('private cache error'); });
+    const screen = renderReview();
+
+    fireEvent.press(screen.getByRole('button', { name: '분석하기' }));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/result'));
+    expect(mockedStreamAnalysis).toHaveBeenCalledTimes(1);
+    expect(mockSetResult).toHaveBeenCalledWith(expect.objectContaining({
+      warnings: ['원본 캡처 임시 파일을 자동 삭제하지 못했어요. 새 분석을 시작하면 다시 정리합니다.'],
+    }));
+    expect(screen.queryByRole('button', { name: '분석 다시 시도' })).toBeNull();
   });
 
   test('분석 실패 뒤 생성된 대화와 입력을 유지하고 분석만 재시도한다', async () => {

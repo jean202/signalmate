@@ -194,6 +194,14 @@ describe('OcrReviewScreen', () => {
     expect(nextDraft.pastedText).toBe('[내이름]: 붙여넣기');
   });
 
+  test('저장한 치환 규칙은 전체 적용을 누르지 않아도 분석 전에 자동 적용됨을 안내한다', () => {
+    const screen = renderReview(draftWith({
+      replacementRules: [{ id: 'rule-1', source: '진하님', replacement: '[내이름]' }],
+    }));
+
+    expect(screen.getByText('저장한 치환 규칙은 분석 전에 자동 적용돼요.')).toBeTruthy();
+  });
+
   test('중복 후보는 체크박스로 표시하고 선택한 id만 제외 목록에 토글한다', () => {
     const savedDraft = draftWith({
       images: [

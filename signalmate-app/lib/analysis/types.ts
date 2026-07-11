@@ -52,6 +52,7 @@ export type ConversationSnapshot = {
 export type AnalysisDraft = {
   version: 1;
   primaryInput: PrimaryInput | null;
+  selfName?: string;
   images: ImageDraftItem[];
   pastedText: string;
   replacementRules: ReplacementRule[];

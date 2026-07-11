@@ -8,6 +8,7 @@ import { ScreenShell } from '../components/ui/screen-shell';
 import { colors, radius, touchTarget } from '../components/ui/theme';
 import { buildConversationRequest, validateDraft } from '../lib/analysis/input-builder';
 import { analysisInputFingerprint } from '../lib/analysis/fingerprint';
+import { clearCachedImages } from '../lib/analysis/image-cache';
 import { createConversation, streamAnalysis, type AnalysisStreamEvent } from '../lib/api/client';
 import { useAnalysis } from '../providers/analysis-provider';
 
@@ -92,7 +93,19 @@ export default function ReviewScreen() {
         if (nextCopy) setProgressCopy(nextCopy);
       });
       if (!canContinue()) return;
-      setResult(analysisResult);
+      let completedResult = analysisResult;
+      try {
+        clearCachedImages();
+      } catch {
+        completedResult = {
+          ...analysisResult,
+          warnings: [
+            ...analysisResult.warnings,
+            '원본 캡처 임시 파일을 자동 삭제하지 못했어요. 새 분석을 시작하면 다시 정리합니다.',
+          ],
+        };
+      }
+      setResult(completedResult);
       router.replace('/result');
     } catch {
       if (canContinue()) setSubmissionState('failed');

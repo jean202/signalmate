@@ -6,6 +6,7 @@ import {
   countReplacementChanges,
   duplicateCandidateId,
   findDuplicateCandidates,
+  recognizedChatCount,
   validateDraft,
 } from '../input-builder';
 import type { DesiredHelp } from '../types';
@@ -205,6 +206,181 @@ test('원하는 도움을 API userGoal로 변환한다', () => {
   draft.guidedAnswers.freeText = '대화는 편했고 상대가 먼저 다음 장소를 이야기했다.';
   expect(buildConversationRequest(draft).userGoal).toBe('ask_for_date');
 });
+
+test('전체 적용을 누르지 않은 치환 규칙도 분석 요청의 대화와 만남 후기에 적용한다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'after_first_date';
+  draft.meetingChannel = 'blind_date';
+  draft.selfName = '민수';
+  draft.pastedText = '나: 민수입니다\n상대: 반가워요';
+  draft.guidedAnswers.inputFocus = 'mixed';
+  draft.guidedAnswers.freeText = '민수님과 실제로 만나 대화했다.';
+  draft.replacementRules = [{ id: 'name', source: '민수', replacement: '[내이름]' }];
+
+  const request = buildConversationRequest(draft);
+
+  expect(request.rawText).toBe('나: [내이름]입니다\n상대: 반가워요');
+  expect(request.guidedAnswers.freeText).toBe('[내이름]님과 실제로 만나 대화했다.');
+  expect(request.selfName).toBe('나');
+  expect(JSON.stringify(request)).not.toContain('민수');
+});
+
+test('카카오톡 한국어 내보내기 두 줄을 대화 입력으로 인정한다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.pastedText = [
+    '2026년 7월 10일 오후 8:10, 민수 : 안녕',
+    '2026년 7월 10일 오후 8:11, 진하 : 반가워',
+  ].join('\n');
+  draft.selfName = '진하';
+
+  expect(validateDraft(draft)).toEqual({ valid: true, errors: [] });
+  expect(buildConversationRequest(draft).selfName).toBe('나');
+  expect(buildConversationRequest(draft).rawText).toContain(', 나 : 반가워');
+});
+
+test('실제 이름 형식 대화는 내 이름 없이 분석하지 않는다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.pastedText = [
+    '2026년 7월 10일 오후 8:10, 민수 : 안녕',
+    '2026년 7월 10일 오후 8:11, 진하 : 반가워',
+  ].join('\n');
+
+  expect(validateDraft(draft).errors).toContain('이름이 표시된 대화에서는 내 이름을 입력해 주세요.');
+});
+
+test('캡처와 이름 기반 내보내기를 섞어도 내 발화자를 나로 통일한다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'capture';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.selfName = '진하';
+  draft.images = [{
+    id: 'capture', order: 0, uri: 'file://capture.png', fileName: 'capture.png',
+    mimeType: 'image/png', fileSize: 1, status: 'complete', extractedText: '',
+    editedText: '[오후 8:00] 나: 먼저 보냈어요\n[오후 8:01] 상대: 답장이에요',
+    notes: [], errorCode: null, reviewed: true,
+  }];
+  draft.pastedText = [
+    '2026년 7월 10일 오후 8:10, 민수 : 다음 메시지',
+    '2026년 7월 10일 오후 8:11, 진하 : 제 답장',
+  ].join('\n');
+
+  const request = buildConversationRequest(draft);
+
+  expect(request.selfName).toBe('나');
+  expect(request.rawText).toContain('[오후 8:00] 나: 먼저 보냈어요');
+  expect(request.rawText).toContain('2026년 7월 10일 오후 8:11, 나 : 제 답장');
+  expect(request.rawText).not.toContain(', 진하 :');
+});
+
+test('상대 역할 줄과 이름 기반 줄이 섞여도 내 이름을 요구한다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.pastedText = [
+    '[오후 8:00] 상대: 먼저 보냈어요',
+    '2026년 7월 10일 오후 8:11, 진하 : 제 답장',
+  ].join('\n');
+
+  expect(validateDraft(draft).errors).toContain('이름이 표시된 대화에서는 내 이름을 입력해 주세요.');
+});
+
+test('내 이름 삭제 치환도 발화자 표준 표시는 지우지 않는다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.selfName = '진하';
+  draft.pastedText = [
+    '2026년 7월 10일 오후 8:10, 민수 : 진하님 안녕',
+    '2026년 7월 10일 오후 8:11, 진하 : 반가워',
+  ].join('\n');
+  draft.replacementRules = [{ id: 'delete-self-name', source: '진하', replacement: '' }];
+
+  const request = buildConversationRequest(draft);
+
+  expect(request.selfName).toBe('나');
+  expect(request.rawText).toContain('2026년 7월 10일 오후 8:11, 나 : 반가워');
+  expect(request.rawText).not.toContain('진하');
+});
+
+test('상대 이름 삭제 치환도 대괄호 형식 메시지를 유지한다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.selfName = '진하';
+  draft.pastedText = '[민수] [오후 8:10] 안녕\n[진하] [오후 8:11] 반가워';
+  draft.replacementRules = [{ id: 'delete-other-name', source: '민수', replacement: '' }];
+
+  const request = buildConversationRequest(draft);
+
+  expect(request.rawText).toContain('[상대] [오후 8:10] 안녕');
+  expect(request.rawText).toContain('[나] [오후 8:11] 반가워');
+  expect(recognizedChatCount(request.rawText)).toBe(2);
+});
+
+test('본문 속 쉼표 뒤 내 이름 표기는 발화자로 바꾸지 않는다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.selfName = '진하';
+  draft.pastedText = '상대: 응, 진하: 그렇게 말했어\n진하: 맞아';
+
+  const request = buildConversationRequest(draft);
+
+  expect(request.rawText).toBe('상대: 응, 진하: 그렇게 말했어\n나: 맞아');
+});
+
+test('이름 기반 한 줄과 충분한 만남 후기를 함께 써도 내 이름을 요구한다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'after_first_date';
+  draft.meetingChannel = 'mutual_friend';
+  draft.pastedText = '진하: 오늘 즐거웠어요';
+  draft.guidedAnswers.inputFocus = 'mixed';
+  draft.guidedAnswers.freeText = '실제로 만나서 대화를 오래 나눴고 분위기는 편안했다.';
+
+  expect(validateDraft(draft).errors).toContain('이름이 표시된 대화에서는 내 이름을 입력해 주세요.');
+});
+
+test('단순 이름 형식 두 줄도 내 이름을 받아 대화로 인정한다', () => {
+  const draft = createEmptyDraft();
+  draft.primaryInput = 'text';
+  draft.relationshipStage = 'before_meeting';
+  draft.meetingChannel = 'mutual_friend';
+  draft.selfName = '진하';
+  draft.pastedText = '민수: 안녕\n진하: 반가워';
+
+  expect(validateDraft(draft)).toEqual({ valid: true, errors: [] });
+  expect(buildConversationRequest(draft).rawText).toBe('상대: 안녕\n나: 반가워');
+});
+
+test.each(['상황', '메모', '만남 후기'])(
+  '%s 라벨은 발화자로 세거나 상대 표기로 바꾸지 않는다',
+  (label) => {
+    const draft = createEmptyDraft();
+    draft.primaryInput = 'meeting_note';
+    draft.relationshipStage = 'after_first_date';
+    draft.meetingChannel = 'mutual_friend';
+    draft.pastedText = `${label}: 상대가 먼저 다음 약속을 이야기했다.`;
+    draft.guidedAnswers.inputFocus = 'mixed';
+    draft.guidedAnswers.freeText = '실제로 만나서 대화를 오래 나눴고 분위기는 편안했다.';
+
+    expect(recognizedChatCount(draft.pastedText)).toBe(0);
+    expect(validateDraft(draft).errors).not.toContain('이름이 표시된 대화에서는 내 이름을 입력해 주세요.');
+    expect(buildConversationRequest(draft).rawText).toBe(draft.pastedText);
+  },
+);
 
 test('저장된 잘못된 desiredHelp는 분석을 거부한다', () => {
   const draft = createEmptyDraft();

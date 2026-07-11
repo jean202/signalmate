@@ -334,6 +334,30 @@ describe('AnalysisProvider', () => {
     })));
   });
 
+  test('reset 진행 중 수정된 초안은 clear 뒤 다시 저장하지 않는다', async () => {
+    const clear = createDeferred<void>();
+    mockedDraftStorage.clear.mockReturnValue(clear.promise);
+    const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '지울 대화' })));
+
+    let reset: Promise<void>;
+    act(() => { reset = result.current.resetDraft(); });
+    act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '초기화 중 수정' })));
+    act(() => jest.advanceTimersByTime(150));
+
+    await act(async () => {
+      clear.resolve();
+      await reset!;
+      await Promise.resolve();
+    });
+
+    expect(mockedDraftStorage.save).not.toHaveBeenCalledWith(expect.objectContaining({
+      pastedText: '초기화 중 수정',
+    }));
+    expect(result.current.draft.pastedText).toBe('');
+  });
+
   test('지연된 reset은 정리 성공 전까지 메모리를 유지하고 unmount 뒤 상태를 갱신하지 않는다', async () => {
     const clear = createDeferred<void>();
     mockedDraftStorage.clear.mockReturnValue(clear.promise);

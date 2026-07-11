@@ -46,6 +46,25 @@ test.each([
   expect(analysisInputFingerprint(after)).not.toBe(analysisInputFingerprint(before));
 });
 
+test('이름 기반 대화에서 내 이름 변경은 fingerprint를 바꾼다', () => {
+  const before = analysisDraft();
+  before.pastedText = '2026년 7월 10일 오후 8:10, 민수 : 안녕\n2026년 7월 10일 오후 8:11, 진하 : 반가워';
+  before.selfName = '진하';
+  const after = structuredClone(before);
+  after.selfName = '민수';
+
+  expect(analysisInputFingerprint(after)).not.toBe(analysisInputFingerprint(before));
+});
+
+test('치환 규칙으로 실제 전송 내용이 바뀌면 fingerprint를 바꾼다', () => {
+  const before = analysisDraft();
+  before.pastedText = '나: 민수님 안녕\n상대: 반가워';
+  const after = structuredClone(before);
+  after.replacementRules = [{ id: 'mask-name', source: '민수', replacement: '[상대이름]' }];
+
+  expect(analysisInputFingerprint(after)).not.toBe(analysisInputFingerprint(before));
+});
+
 test('현재 중복 제외가 바뀌어 병합 요청이 달라지면 fingerprint를 바꾼다', () => {
   const before = analysisDraft();
   before.primaryInput = 'capture';

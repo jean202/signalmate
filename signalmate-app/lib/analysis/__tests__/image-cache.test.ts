@@ -14,6 +14,15 @@ const mockFileSystemState = {
   events: [] as FileSystemEvent[],
 };
 let directoryConstructionCount = 0;
+let mockPlatformOS = 'ios';
+
+jest.mock('react-native', () => ({
+  Platform: {
+    get OS() {
+      return mockPlatformOS;
+    },
+  },
+}));
 
 jest.mock('expo-file-system', () => {
   const joinUri = (parts: Array<string | { uri: string }>) => parts
@@ -79,6 +88,7 @@ import {
 
 describe('analysis image cache', () => {
   beforeEach(() => {
+    mockPlatformOS = 'ios';
     directoryConstructionCount = 0;
     mockFileSystemState.directories.clear();
     mockFileSystemState.files.clear();
@@ -140,5 +150,22 @@ describe('analysis image cache', () => {
     expect(mockFileSystemState.events).toEqual([
       { kind: 'directory.delete', uri: cacheDirectoryUri },
     ]);
+  });
+
+  test('웹에서는 파일 시스템 대신 blob URL을 추적해 삭제한다', () => {
+    mockPlatformOS = 'web';
+    const firstUri = 'blob:http://localhost/image-1';
+    const secondUri = 'blob:http://localhost/image-2';
+    const revokeObjectURL = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    expect(cachePickedImage(firstUri, 'image-1', 'original.png', 'image/png')).toBe(firstUri);
+    expect(cachePickedImage(secondUri, 'image-2', 'original.png', 'image/png')).toBe(secondUri);
+    deleteCachedImage(firstUri);
+    clearCachedImages();
+
+    expect(revokeObjectURL.mock.calls).toEqual([[firstUri], [secondUri]]);
+    expect(directoryConstructionCount).toBe(0);
+    expect(mockFileSystemState.events).toEqual([]);
+    revokeObjectURL.mockRestore();
   });
 });

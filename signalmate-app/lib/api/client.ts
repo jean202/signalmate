@@ -274,17 +274,24 @@ export async function extractImage(uri: string): Promise<ExtractedImage> {
   });
 
   return readEnvelope(response, (data) => {
+    const notes = isRecord(data) && typeof data.notes === 'string'
+      ? (data.notes.trim() ? [data.notes] : [])
+      : isRecord(data) && data.notes === undefined
+        ? []
+        : isRecord(data) && isStringArray(data.notes)
+          ? data.notes
+          : null;
     if (!isRecord(data)
       || typeof data.rawText !== 'string'
       || typeof data.messageCount !== 'number'
       || !Number.isFinite(data.messageCount)
-      || !isStringArray(data.notes)) {
+      || notes === null) {
       return null;
     }
     return {
       rawText: data.rawText,
       messageCount: data.messageCount,
-      notes: data.notes,
+      notes,
     };
   });
 }
