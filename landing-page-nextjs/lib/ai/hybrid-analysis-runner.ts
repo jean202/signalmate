@@ -77,6 +77,14 @@ export async function runAgentOrHybridAnalysis(
   const modelName = options?.modelName?.trim() || "hybrid-v1";
 
   if (modelName === "agent-v1") {
+    const guardedRuleResult = buildRuleBasedAnalysis(conversation, options);
+    if (hasExplicitRelationshipEnd(guardedRuleResult)) {
+      return {
+        ...guardedRuleResult,
+        modelName: "agent-v1 (guarded: explicit relationship end)",
+      };
+    }
+
     try {
       return await runAgentAnalysis(conversation);
     } catch (error) {
@@ -103,6 +111,28 @@ export async function runHybridAnalysis(
 ): Promise<HybridAnalysisResult> {
   const ruleResult = buildRuleBasedAnalysis(conversation, options);
   await options?.callbacks?.onRuleComplete?.(ruleResult);
+
+  if (hasExplicitRelationshipEnd(ruleResult)) {
+    await options?.callbacks?.onSignalsReady?.({
+      signals: ruleResult.signals,
+      overallSummary: ruleResult.overallSummary,
+    });
+    await options?.callbacks?.onRecommendationsReady?.({
+      recommendations: ruleResult.recommendations,
+      recommendedActionReason: ruleResult.recommendedActionReason,
+    });
+
+    return {
+      analysis: {
+        ...ruleResult,
+        modelName: "hybrid-v1 (guarded: explicit relationship end)",
+      },
+      ruleResult,
+      signalEnhanced: false,
+      recommendationEnhanced: false,
+      hasRag: false,
+    };
+  }
 
   if (!isAnthropicAvailable()) {
     logger.warn("anthropic_unavailable_fallback_to_rule_based", {
@@ -383,6 +413,14 @@ export async function runHybridAnalysis(
       hasRag: false,
     };
   }
+}
+
+function hasExplicitRelationshipEnd(
+  analysis: Pick<StoredAnalysis, "signals">,
+): boolean {
+  return analysis.signals.some(
+    (signal) => signal.signalKey === "explicit_relationship_end",
+  );
 }
 
 async function buildSimilarPatternContext(

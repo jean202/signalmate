@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredSignal } from "@/lib/analysis-store";
 import { enhanceSignals } from "@/lib/ai/chains/signal-enhancer";
 import { generateRecommendations } from "@/lib/ai/chains/recommendation-generator";
+import { submitRecommendationsTool } from "@/lib/ai/schemas/analysis-schema";
 import { trackUsage } from "@/lib/ai/token-tracker";
 
 const anthropicMocks = vi.hoisted(() => ({
@@ -191,6 +192,15 @@ describe("LLM chains", () => {
       "tone_guide",
       "avoid_phrase",
     ]);
+  });
+
+  it("uses an Anthropic-compatible array schema for recommendation tools", () => {
+    expect(JSON.stringify(submitRecommendationsTool.input_schema)).not.toContain(
+      '"minItems":3',
+    );
+    expect(JSON.stringify(submitRecommendationsTool.input_schema)).not.toContain(
+      '"maxItems":3',
+    );
   });
 
   it("rejects recommendation results with duplicate recommendation types", async () => {

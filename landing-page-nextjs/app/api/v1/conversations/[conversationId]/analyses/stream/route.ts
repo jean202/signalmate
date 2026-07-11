@@ -174,15 +174,15 @@ function getPublicStageWarningMessage(stage: StreamFallbackStage): string {
     case "agent":
       return "에이전트 분석이 지연되어 하이브리드 분석으로 이어갑니다.";
     case "signal_enhancer":
-      return "시그널 문장 보강이 지연되어 기본 분석 결과로 이어갑니다.";
+      return "AI 시그널 보강을 완료하지 못해 기본 분석을 사용했습니다.";
     case "signal_quality_gate":
       return "시그널 근거 검증 결과 기본 분석 결과로 이어갑니다.";
     case "recommendation_generator":
-      return "맞춤 추천 생성이 지연되어 기본 추천으로 이어갑니다.";
+      return "AI 맞춤 추천을 완료하지 못해 기본 추천을 사용했습니다.";
     case "quality_gate":
       return "추천 품질 검증 결과 기본 추천으로 이어갑니다.";
     case "all_llm_stages":
-      return "AI 보강 단계가 지연되어 규칙 기반 분석으로 완료합니다.";
+      return "AI 보강을 완료하지 못해 규칙 기반 분석을 사용했습니다.";
     case "hybrid_pipeline":
     case "stream_pipeline":
       return "분석 처리 중 문제가 발생했습니다.";

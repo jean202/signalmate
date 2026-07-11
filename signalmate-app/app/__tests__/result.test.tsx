@@ -109,7 +109,7 @@ describe('ResultScreen', () => {
     expect(headings.indexOf('판단이 어려운 부분')).toBeLessThan(headings.indexOf('종합 판단'));
     expect(headings.indexOf('종합 판단')).toBeLessThan(headings.indexOf('추천하는 다음 행동'));
     expect(headings.indexOf('추천하는 다음 행동')).toBeLessThan(headings.indexOf('추천 메시지'));
-    expect(headings.indexOf('추천 메시지')).toBeLessThan(headings.indexOf('서버 안내'));
+    expect(headings.indexOf('추천 메시지')).toBeLessThan(headings.indexOf('분석 처리 안내'));
     expect(screen.getByText('만남에서 확인된 신호')).toBeTruthy();
     expect(screen.getByText('만남 뒤 연락')).toBeTruthy();
   });
@@ -232,7 +232,7 @@ describe('ResultScreen', () => {
     expect(screen.queryByRole('header', { name: '실제 만남 신호' })).toBeNull();
     expect(screen.getByRole('header', { name: '채팅 신호' })).toBeTruthy();
     expect(screen.queryByRole('header', { name: '판단이 어려운 부분' })).toBeNull();
-    expect(screen.queryByRole('header', { name: '서버 안내' })).toBeNull();
+    expect(screen.queryByRole('header', { name: '분석 처리 안내' })).toBeNull();
   });
 
   test('추천 메시지가 없으면 다음 행동을 이어갈 안내를 표시한다', () => {

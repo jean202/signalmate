@@ -53,6 +53,7 @@ type MessageMetrics = {
   otherWarmDropDetected: boolean;
   otherWarmFirstHalfPct: number;   // 0–100, 0 if otherMessages < 4
   otherWarmSecondHalfPct: number;  // 0–100, 0 if otherMessages < 4
+  explicitRelationshipEndEvidence: string | null;
 };
 
 // ── 단계별 설정 ──────────────────────────────────────────────────────────────
@@ -95,6 +96,22 @@ const definitePlanPattern =
   /(\d{1,2}\s*시|\d{1,2}\s*일|월요일|화요일|수요일|목요일|금요일|토요일|일요일|내일|모레)/i;
 const schedulingAskPattern = /(언제|주말|다음 주|이번 주|시간|볼까|볼까요|가볼까요|만날|약속)/i;
 const closingPattern = /(잘 자|수고|바이|안녕|굿[나밤]|좋은 [밤꿈하]|내일 봐|들어가)/i;
+const explicitRelationshipEndPatterns = [
+  /(?:저는\s*)?여기까지\s*(?:연락|대화|인연)/i,
+  /(?:연락|대화)(?:은|을|를)?\s*여기까지/i,
+  /(?:^|\s)(?:이제\s*)?연락하지\s*(?:말아?\s*주세요|마세요|않았으면\s*좋겠)/i,
+  /그만\s*연락(?:해\s*주세요|해주세요|하죠|합시다|할게|하겠)/i,
+  /(?:다시|앞으로|더\s*이상|다음에\s*다시).{0,12}연락(?:을|를)?\s*(?:하지\s*(?:말|마|않겠|않을)|할\s*생각(?:은|이)?\s*없|안\s*하겠)/i,
+  /(?:우리|저희)(?:의)?\s*(?:인연|관계).*(?:아닌|여기까지|정리)/i,
+];
+const explicitRelationshipResumePatterns = [
+  /다시\s*연락(?:드린|한)\s*(?:건|것은).*(?:계속|이어).*(?:싶|하자)/i,
+  /(?:내일|다음에|나중에).{0,12}(?:(?:다시|또)\s*)?(?:연락(?:할게|드릴게|해요|하자)|대화(?:해요|하자)|이야기(?:해요|하자)|만나(?:요|자)|봐요|봬요)/i,
+  /(?:계속|다시).{0,12}(?:이야기|대화).*(?:하고\s*싶|해요|하자)/i,
+  /연락\s*안\s*하는\s*날.*없었으면/i,
+  /연락(?:을|를)?\s*미루지\s*않/i,
+  /연락\s*안\s*하면.*먼저\s*(?:할게|하겠)/i,
+];
 const topicKeywords = ["전시", "커피", "식사", "영화", "산책", "공연", "맛집", "책", "드라이브"];
 const meetingPositivePatterns = [
   /분위기(?:는|가)?\s*(?:좋|괜찮|편|즐거|아주 좋)/i,
@@ -180,6 +197,33 @@ function maskPatternSpans(text: string, patterns: RegExp[]): string {
 function hasFollowUpCautionPattern(text: string): boolean {
   const textWithoutNegatedSpans = maskPatternSpans(text, followUpCautionNegationPatterns);
   return hasAny(textWithoutNegatedSpans, followUpCautionPatterns);
+}
+
+function findExplicitRelationshipEndEvidence(
+  conversation: StoredConversation,
+): string | null {
+  const recentOtherMessages = conversation.messages
+    .filter((message) => message.senderRole === "other")
+    .slice(-6);
+
+  for (let index = recentOtherMessages.length - 1; index >= 0; index -= 1) {
+    const messageText = recentOtherMessages[index].messageText.trim();
+    if (hasAny(messageText, explicitRelationshipResumePatterns)) {
+      return null;
+    }
+
+    if (!hasAny(messageText, explicitRelationshipEndPatterns)) {
+      continue;
+    }
+
+    return recentOtherMessages
+      .slice(index, index + 2)
+      .map((message) => message.messageText.trim())
+      .filter(Boolean)
+      .join(" / ");
+  }
+
+  return null;
 }
 
 function clampScore(score: number): number {
@@ -340,6 +384,7 @@ function buildMetrics(conversation: StoredConversation, stageConfig: StageConfig
     hasClosingWithoutFollowUp,
     toneDrop,
     averageOtherResponseDelayMinutes: averageDelayMinutes,
+    explicitRelationshipEndEvidence: findExplicitRelationshipEndEvidence(conversation),
   };
   const otherInitiativeScore = scoreOtherInitiative(partialMetrics);
   const responseCadenceScore = scoreResponseCadence(averageDelayMinutes);
@@ -523,6 +568,10 @@ function hasLowEngagementPattern(metrics: MessageMetrics) {
 }
 
 function buildSummary(metrics: MessageMetrics, positiveCount: number, cautionCount: number) {
+  if (metrics.explicitRelationshipEndEvidence) {
+    return "상대가 연락을 여기서 종료하겠다는 뜻을 명확히 밝혔습니다. 이전의 긍정 신호보다 이 최신 의사를 우선해 해석해야 합니다.";
+  }
+
   if (metrics.otherMessages === 0) {
     return "상대 반응이 아직 없어 관계 신호를 충분히 읽기 어려운 상태입니다.";
   }
@@ -586,6 +635,14 @@ function buildRecommendedAction(
     return {
       action: "wait_for_response",
       reason: "상대 반응이 아직 없어 추가 메시지를 몰아보내기보다 응답을 기다리는 편이 낫습니다.",
+    };
+  }
+
+  if (metrics.explicitRelationshipEndEvidence) {
+    return {
+      action: "consider_stopping",
+      reason:
+        "상대가 관계 종료 의사를 명확히 표현했으므로 추가 만남 제안이나 설득 없이 경계를 존중하고 대화를 마무리해야 합니다.",
     };
   }
 
@@ -698,7 +755,40 @@ function buildRecommendations(
   action: RecommendedAction,
   reason: string,
   conversation: StoredConversation,
+  hasExplicitRelationshipEnd = false,
 ): StoredRecommendation[] {
+  if (hasExplicitRelationshipEnd) {
+    return [
+      {
+        id: randomUUID(),
+        recommendationType: "next_message",
+        title: "짧게 마무리하기",
+        content: "알겠습니다. 말씀해 주셔서 감사해요. 하시는 일 잘 되시길 바랍니다.",
+        rationale: reason,
+        toneLabel: "respectful",
+        displayOrder: 1,
+      },
+      {
+        id: randomUUID(),
+        recommendationType: "tone_guide",
+        title: "상대의 경계 존중하기",
+        content: "답장을 보낸다면 짧고 예의 있게 마무리하세요. 추가 연락이나 만남 가능성을 다시 묻지 않는 편이 좋습니다.",
+        rationale: "명확한 종료 의사 뒤에는 메시지 기술보다 상대가 세운 경계를 존중하는 것이 우선입니다.",
+        toneLabel: "respectful",
+        displayOrder: 2,
+      },
+      {
+        id: randomUUID(),
+        recommendationType: "avoid_phrase",
+        title: "설득과 이유 추궁 피하기",
+        content: "한 번만 더 만나보면 안 될까요?, 제가 뭘 잘못했나요?처럼 결정을 되돌리려는 표현은 보내지 마세요.",
+        rationale: "상대가 이미 의사를 밝혔으므로 재제안이나 해명 요구는 부담을 키울 수 있습니다.",
+        toneLabel: "avoid",
+        displayOrder: 3,
+      },
+    ];
+  }
+
   const hook = buildConversationHook(conversation);
 
   const templates: Record<RecommendedAction, Omit<StoredRecommendation, "id" | "displayOrder">[]> = {
@@ -841,6 +931,17 @@ export function buildRuleBasedAnalysis(
         hasFollowUpPositive: false,
         hasFollowUpCaution: false,
       };
+
+  if (metrics.explicitRelationshipEndEvidence) {
+    signalFactory.add(
+      "caution",
+      "explicit_relationship_end",
+      "상대가 관계 종료 의사를 밝혔어요",
+      "연락을 여기서 마치겠다는 직접적인 표현입니다. 이전 대화의 분위기와 무관하게 상대의 최신 의사를 우선해야 합니다.",
+      metrics.explicitRelationshipEndEvidence,
+      "high",
+    );
+  }
 
   if (metrics.otherResponsePairs >= 2 || (metrics.otherMessages >= 2 && metrics.otherResponsePairs >= 1)) {
     signalFactory.add(
@@ -1107,21 +1208,29 @@ export function buildRuleBasedAnalysis(
                 "채팅 근거는 적지만 실제 만남 분위기가 나쁘지 않아, 부담 없는 톤으로 연결을 유지해볼 만합니다.",
             }
           : null;
-  const { action, reason } =
-    situationAction ??
-    buildRecommendedAction(
-      metrics,
-      positiveSignalCount,
-      cautionSignalCount,
-    );
-  const recommendations = buildRecommendations(action, reason, conversation);
+  const metricAction = buildRecommendedAction(
+    metrics,
+    positiveSignalCount,
+    cautionSignalCount,
+  );
+  const { action, reason } = metrics.explicitRelationshipEndEvidence
+    ? metricAction
+    : situationAction ?? metricAction;
+  const recommendations = buildRecommendations(
+    action,
+    reason,
+    conversation,
+    Boolean(metrics.explicitRelationshipEndEvidence),
+  );
   const situationSummary = situationOnly ? buildSituationSummary(situationFlags) : null;
 
   return {
     conversationId: conversation.id,
     analysisVersion: options?.analysisVersion?.trim() || "v1",
     modelName: options?.modelName?.trim() || "rule-based-dev",
-    overallSummary: situationSummary ?? buildSummary(metrics, positiveSignalCount, cautionSignalCount),
+    overallSummary: metrics.explicitRelationshipEndEvidence
+      ? buildSummary(metrics, positiveSignalCount, cautionSignalCount)
+      : situationSummary ?? buildSummary(metrics, positiveSignalCount, cautionSignalCount),
     positiveSignalCount,
     ambiguousSignalCount,
     cautionSignalCount,

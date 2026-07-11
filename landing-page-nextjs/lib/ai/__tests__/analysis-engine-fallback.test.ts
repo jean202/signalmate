@@ -126,6 +126,63 @@ describe("runAnalysis LLM fallback", () => {
       }),
     );
   });
+
+  it("keeps deterministic closure recommendations when the other person ends contact", async () => {
+    const conversation = makeConversationFixture({
+      relationshipStage: "cooling_down",
+      meetingChannel: "dating_app",
+      userGoal: "evaluate_interest",
+      messages: [
+        { senderRole: "other", messageText: "안녕하세요! 먼저 연락드려요." },
+        { senderRole: "self", messageText: "다음에 커피 한잔해요." },
+        { senderRole: "other", messageText: "좋아요. 다음 주에 봐요!" },
+        { senderRole: "other", messageText: "네 저는 여기까지 연락해야했네요" },
+        { senderRole: "other", messageText: "하시는 일 잘 되시길 바랍습니다 🙏" },
+      ],
+    });
+    const ruleResult = buildRuleBasedAnalysis(conversation);
+
+    mocks.enhanceSignals.mockResolvedValue({
+      overallSummary: ruleResult.overallSummary,
+      signals: ruleResult.signals,
+    });
+    mocks.generateRecommendations.mockResolvedValue({
+      recommendedActionReason: "다음 만남을 제안해 보세요.",
+      recommendations: [
+        makeRecommendation("next_message", "다음 만남 제안"),
+        makeRecommendation("tone_guide", "적극적인 톤"),
+        makeRecommendation("avoid_phrase", "소극적인 표현 피하기"),
+      ],
+    });
+
+    const result = await runAnalysis(conversation, { modelName: "hybrid-v1" });
+
+    expect(result.recommendedAction).toBe("consider_stopping");
+    expect(result.recommendations[0].content).toContain("알겠습니다");
+    expect(mocks.generateRecommendations).not.toHaveBeenCalled();
+  });
+
+  it("does not let agent analysis override an explicit relationship end", async () => {
+    const conversation = makeConversationFixture({
+      relationshipStage: "cooling_down",
+      meetingChannel: "dating_app",
+      userGoal: "evaluate_interest",
+      messages: [
+        { senderRole: "other", messageText: "다음에 또 봬요!" },
+        { senderRole: "other", messageText: "네 저는 여기까지 연락해야겠네요" },
+        { senderRole: "other", messageText: "하시는 일 잘 되시길 바랍니다." },
+      ],
+    });
+    mocks.runAgentAnalysis.mockResolvedValue({
+      ...buildRuleBasedAnalysis(conversation),
+      recommendedAction: "suggest_date",
+    });
+
+    const result = await runAnalysis(conversation, { modelName: "agent-v1" });
+
+    expect(result.recommendedAction).toBe("consider_stopping");
+    expect(mocks.runAgentAnalysis).not.toHaveBeenCalled();
+  });
 });
 
 function makeConversation() {

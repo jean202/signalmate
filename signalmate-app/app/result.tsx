@@ -202,7 +202,7 @@ export default function ResultScreen() {
         </ResultSection>
 
         {result.warnings.length > 0 && (
-          <ResultSection title="서버 안내">
+          <ResultSection title="분석 처리 안내">
             <View accessibilityRole="alert" style={styles.warningList}>
               {result.warnings.map((warning, index) => (
                 <Text key={`${index}-${warning}`} style={styles.warningText}>{warning}</Text>

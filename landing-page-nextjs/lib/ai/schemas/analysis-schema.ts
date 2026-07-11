@@ -121,8 +121,6 @@ export const submitRecommendationsTool: Tool = {
             "toneLabel",
           ],
         },
-        minItems: 3,
-        maxItems: 3,
       },
     },
     required: ["recommendedActionReason", "recommendations"],

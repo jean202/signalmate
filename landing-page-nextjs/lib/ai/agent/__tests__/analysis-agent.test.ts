@@ -133,6 +133,7 @@ describe("runAgentAnalysis", () => {
 
     expect(anthropicMocks.create).toHaveBeenCalled();
     const request = anthropicMocks.create.mock.calls[0]?.[0];
+    const serializedTools = JSON.stringify(request?.tools);
     const systemPrompt = request?.system?.[0]?.text;
     const initialPrompt = request?.messages?.[0]?.content;
 
@@ -145,6 +146,8 @@ describe("runAgentAnalysis", () => {
     expect(initialPrompt).toContain("채팅 텍스트가 없거나 적으면 이 블록도 분석 근거입니다.");
     expect(initialPrompt).not.toContain("대화 텍스트에 나타나지 않는 배경 맥락입니다.");
     expect(initialPrompt).not.toContain("대화 텍스트의 증거가 우선합니다.");
+    expect(serializedTools).not.toMatch(/"minItems":(?:[2-9]|\d{2,})/);
+    expect(serializedTools).not.toMatch(/"maxItems":(?:[2-9]|\d{2,})/);
   });
 });
 
