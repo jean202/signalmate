@@ -3,6 +3,7 @@ import { createConversation, type SaveMode, type SenderRole } from "@/lib/store"
 import { getCurrentUserId } from "@/lib/auth-helpers";
 import { parseChatText } from "@/lib/chat-parser";
 import { mergeSituationContext } from "@/lib/situation-context-builder";
+import { isStrictIsoDate } from "@/lib/strict-iso-date";
 import {
   hasEnoughSituationInput,
   type GuidedAnswers,
@@ -72,6 +73,10 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isPrismaInt(value: number): boolean {
+  return Number.isInteger(value) && value >= PRISMA_INT_MIN && value <= PRISMA_INT_MAX;
+}
+
 function isMessageInput(value: unknown): value is ConversationMessageInput {
   if (!isRecord(value)) return false;
   return (value.senderRole == null || (
@@ -80,13 +85,10 @@ function isMessageInput(value: unknown): value is ConversationMessageInput {
   ))
     && isOptionalNullableString(value.messageText)
     && (value.sentAt == null || (
-      typeof value.sentAt === "string" && Number.isFinite(new Date(value.sentAt).getTime())
+      typeof value.sentAt === "string" && isStrictIsoDate(value.sentAt)
     ))
     && (value.sequenceNo == null || (
-      typeof value.sequenceNo === "number"
-      && Number.isInteger(value.sequenceNo)
-      && value.sequenceNo >= PRISMA_INT_MIN
-      && value.sequenceNo <= PRISMA_INT_MAX
+      typeof value.sequenceNo === "number" && isPrismaInt(value.sequenceNo)
     ));
 }
 
@@ -216,6 +218,12 @@ export async function POST(request: Request) {
   }
 
   const sequenceNumbers = normalizedMessages.map((message) => message.sequenceNo);
+  if (!normalizedMessages.every((message) => (
+    isPrismaInt(message.sequenceNo)
+    && (message.sentAt === null || isStrictIsoDate(message.sentAt))
+  ))) {
+    return errorResponse(400, "VALIDATION_ERROR", "Normalized messages are not safe to store.");
+  }
   if (new Set(sequenceNumbers).size !== sequenceNumbers.length) {
     return errorResponse(400, "VALIDATION_ERROR", "Message sequence numbers must be unique.");
   }

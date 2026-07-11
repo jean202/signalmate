@@ -217,6 +217,12 @@ describe("POST /api/v1/conversations", () => {
   it.each([
     ["invalid date text", [{ messageText: "안녕", sentAt: "not-a-date", sequenceNo: 1 }]],
     ["empty date text", [{ messageText: "안녕", sentAt: "", sequenceNo: 1 }]],
+    ["normalized calendar date", [{ messageText: "안녕", sentAt: "2026-02-30", sequenceNo: 1 }]],
+    ["non-leap February 29", [{ messageText: "안녕", sentAt: "2025-02-29T12:00:00Z", sequenceNo: 1 }]],
+    ["hour 25", [{ messageText: "안녕", sentAt: "2026-03-27T25:00:00Z", sequenceNo: 1 }]],
+    ["minute 60", [{ messageText: "안녕", sentAt: "2026-03-27T23:60:00Z", sequenceNo: 1 }]],
+    ["second 60", [{ messageText: "안녕", sentAt: "2026-03-27T23:59:60Z", sequenceNo: 1 }]],
+    ["offset beyond ISO range", [{ messageText: "안녕", sentAt: "2026-03-27T23:59:59+14:01", sequenceNo: 1 }]],
     ["above Prisma Int max", [{ messageText: "안녕", sequenceNo: 2147483648 }]],
     ["below Prisma Int min", [{ messageText: "안녕", sequenceNo: -2147483649 }]],
   ])("rejects DB-unsafe message value: %s", async (_label, messages) => {
@@ -260,13 +266,13 @@ describe("POST /api/v1/conversations", () => {
       {
         senderRole: "self",
         messageText: "최솟값 순번",
-        sentAt: "2026-03-27T20:10:00+09:00",
+        sentAt: "2024-02-29T23:59:59Z",
         sequenceNo: -2147483648,
       },
       {
         senderRole: "other",
         messageText: "최댓값 순번",
-        sentAt: "2026-03-27",
+        sentAt: "2026-03-27T20:10:00+09:00",
         sequenceNo: 2147483647,
       },
     ];
@@ -279,6 +285,45 @@ describe("POST /api/v1/conversations", () => {
 
     expect(response.status).toBe(201);
     expect(createConversationMock).toHaveBeenCalledWith(expect.objectContaining({ messages }));
+  });
+
+  it("keeps a real ISO calendar date without time compatible", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      messages: [{ messageText: "날짜만 저장", sentAt: "2024-02-29", sequenceNo: 1 }],
+    }));
+
+    expect(response.status).toBe(201);
+  });
+
+  it.each([
+    ["Korean line date", [
+      "2026년 2월 30일 오후 2:30, 나 : 안녕하세요",
+      "2026년 2월 30일 오후 2:31, 상대 : 반가워요",
+    ].join("\n")],
+    ["bracket date header", [
+      "--------------- 2026년 2월 30일 월요일 ---------------",
+      "[나] [오후 2:30] 안녕하세요",
+      "[상대] [오후 2:31] 반가워요",
+    ].join("\n")],
+    ["English line date", [
+      "2026. 2. 30. 2:30 PM, Me : hello",
+      "2026. 2. 30. 2:31 PM, Other : hi",
+    ].join("\n")],
+  ])("rejects invalid %s after rawText parsing", async (_label, rawText) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
   });
 
   it("keeps null optional fields and null message selections compatible", async () => {
