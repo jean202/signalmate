@@ -54,7 +54,7 @@ Tests: 13 passed, 13 total
 ```text
 npm test
 Test Suites: 23 passed, 23 total
-Tests: 198 passed, 198 total
+Tests: 207 passed, 207 total
 
 npm run typecheck
 exit 0
@@ -68,7 +68,7 @@ exit 0
 
 `rg`로 URL 결과 파싱, `/analyze`, 구형 `lib/api` import, `console.log/error/warn/info/debug` 잔재가 없고 `lib/api/client.ts`가 유지된 것을 확인했다.
 
-초기화 일관성 재검토의 집중 Provider 테스트는 17개가 통과했다. 홈 집중 테스트의 직전 실행에서는 9개 중 8개가 통과했고, 실패 안내 View에 `accessibilityRole="alert"`가 렌더링되어 있음에도 React Native Testing Library의 `getByRole('alert')` 조회 1건이 실패했다. 사용자 지시에 따라 추가 수정이나 재실행 없이 현재 상태를 커밋했다.
+초기화 일관성 재검토의 집중 Provider 테스트 17개와 홈 집중 테스트 9개가 통과했다. 홈 실패 안내 컨테이너를 실제 접근성 요소로 노출하고, 테스트에서 `alert` 역할과 명확한 접근성 이름을 함께 검증했다. 전체 테스트는 23 suites, 207 tests가 통과했다.
 
 ## 시각 검수
 

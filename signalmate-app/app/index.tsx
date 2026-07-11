@@ -112,7 +112,12 @@ export default function HomeScreen() {
         )}
 
         {resetState === 'failed' && (
-          <View accessibilityRole="alert" style={styles.resetFailure}>
+          <View
+            accessible
+            accessibilityRole="alert"
+            accessibilityLabel="새로 시작하지 못했어요. 기존 초안은 유지했습니다. 잠시 후 다시 시도해 주세요."
+            style={styles.resetFailure}
+          >
             <Text style={styles.resetFailureTitle}>새로 시작하지 못했어요</Text>
             <Text style={styles.resetFailureText}>기존 초안은 유지했습니다. 잠시 후 다시 시도해 주세요.</Text>
           </View>

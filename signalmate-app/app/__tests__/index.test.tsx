@@ -137,8 +137,9 @@ describe('HomeScreen', () => {
 
     fireEvent.press(await screen.findByRole('button', { name: '새로 시작' }));
 
-    expect(await screen.findByText('새로 시작하지 못했어요')).toBeTruthy();
-    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(await screen.findByRole('alert', {
+      name: '새로 시작하지 못했어요. 기존 초안은 유지했습니다. 잠시 후 다시 시도해 주세요.',
+    })).toBeTruthy();
     expect(screen.getByRole('button', { name: '이어서 작성' })).toBeTruthy();
     expect(screen.getByDisplayValue('저장된 대화')).toBeTruthy();
     expect(screen.getByRole('button', { name: '새로 시작 다시 시도' })).toBeTruthy();
