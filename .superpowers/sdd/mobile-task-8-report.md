@@ -37,6 +37,7 @@
 - conversations POST는 required 문자열, optional nullable 문자열, saveMode, messages 배열과 메시지 필드 타입을 사용 전에 검증한다. 오류 응답과 로그에는 입력 원문을 포함하지 않는다.
 - required 관계 enum은 Prisma schema allowlist와 일치시키고, `sentAt` 유효 날짜·`sequenceNo` signed 32-bit Int 범위·정규화 후 순번 유일성을 DB 호출 전에 검증한다.
 - `sentAt`은 실제 달력 날짜·윤년·시분초·±14:00 offset을 확인하는 strict ISO helper로 검증한다. 명시 messages와 rawText parser 결과 모두 저장 직전에 같은 검증을 통과해야 한다.
+- 저장 직전 normalizedMessages는 출처와 무관하게 객체·senderRole·비어 있지 않은 messageText·strict sentAt·Prisma Int·순번 유일성을 하나의 런타임 type guard로 검증한다.
 
 ## TDD 기록
 
@@ -54,13 +55,14 @@
 12. 숫자/객체/배열 top-level 필드와 잘못된 messages 요소가 500 또는 201이 되는 11건을 RED로 확인하고 route 선행 validator로 수정했다.
 13. unknown required enum, invalid date, Prisma Int 범위 밖, 명시/fallback 순번 충돌 9건이 201이 되는 것을 RED로 확인하고 DB 저장 전 validator로 수정했다.
 14. 자동 보정 달력 날짜·비윤년 2월 29일·잘못된 offset과 rawText parser 우회 6건이 201이 되는 것을 RED로 확인하고 strict ISO 및 정규화 후 공통 방어 검증으로 수정했다.
+15. parser의 비정상 senderRole·messageText가 201로 통과하고 null message가 예외를 내는 3건을 RED로 확인한 뒤 타입 단언 매핑을 완전한 저장 경계 validator로 교체했다.
 
 ## 검증 결과
 
 - 리뷰 후속 집중 테스트: 7 suites, 65 tests passed
 - 앱 전체 `npm test`: 19 suites, 174 tests passed
 - 앱 `npm run typecheck`: 통과
-- landing route 테스트: 1 file, 76 tests passed
+- landing route 테스트: 1 file, 81 tests passed
 - landing `npx tsc --noEmit`: 통과
 - `git diff --check`: 통과
 

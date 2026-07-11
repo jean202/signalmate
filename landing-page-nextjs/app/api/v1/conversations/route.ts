@@ -33,6 +33,13 @@ type ConversationCreateBody = {
   messages?: ConversationMessageInput[] | null;
 };
 
+type NormalizedMessage = {
+  senderRole: SenderRole;
+  messageText: string;
+  sentAt: string | null;
+  sequenceNo: number;
+};
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -90,6 +97,25 @@ function isMessageInput(value: unknown): value is ConversationMessageInput {
     && (value.sequenceNo == null || (
       typeof value.sequenceNo === "number" && isPrismaInt(value.sequenceNo)
     ));
+}
+
+function isNormalizedMessage(value: unknown): value is NormalizedMessage {
+  if (!isRecord(value)) return false;
+  return typeof value.senderRole === "string"
+    && validSenderRoles.includes(value.senderRole as SenderRole)
+    && typeof value.messageText === "string"
+    && value.messageText.trim().length > 0
+    && (value.sentAt === null || (
+      typeof value.sentAt === "string" && isStrictIsoDate(value.sentAt)
+    ))
+    && typeof value.sequenceNo === "number"
+    && isPrismaInt(value.sequenceNo);
+}
+
+function isNormalizedMessageArray(value: unknown): value is NormalizedMessage[] {
+  if (!Array.isArray(value) || !value.every(isNormalizedMessage)) return false;
+  const sequenceNumbers = value.map((message) => message.sequenceNo);
+  return new Set(sequenceNumbers).size === sequenceNumbers.length;
 }
 
 function isOptionalEnum(value: unknown, allowed: readonly string[]): boolean {
@@ -189,11 +215,11 @@ export async function POST(request: Request) {
     return errorResponse(400, "VALIDATION_ERROR", "rawText or messages is required.");
   }
 
-  let normalizedMessages: { senderRole: SenderRole; messageText: string; sentAt: string | null; sequenceNo: number }[];
+  let normalizedMessagesCandidate: unknown;
 
   if (Array.isArray(body.messages)) {
     // Mode 1: Pre-parsed messages provided. 빈 배열도 명시적 입력으로 존중한다.
-    normalizedMessages = body.messages
+    normalizedMessagesCandidate = body.messages
       .map((message, index) => ({
         senderRole: validSenderRoles.includes(message.senderRole ?? "unknown")
           ? (message.senderRole ?? "unknown")
@@ -202,31 +228,20 @@ export async function POST(request: Request) {
         sentAt: typeof message.sentAt === "string" ? message.sentAt : null,
         sequenceNo: Number.isInteger(message.sequenceNo) ? (message.sequenceNo as number) : index + 1,
       }))
-      .filter((message) => message.messageText.length > 0)
-      .sort((left, right) => left.sequenceNo - right.sequenceNo);
+      .filter((message) => message.messageText.length > 0);
   } else if (body.rawText?.trim()) {
     // Mode 2: Auto-parse from rawText
-    const parseResult = parseChatText(body.rawText, body.selfName ?? undefined);
-    normalizedMessages = parseResult.messages.map((m) => ({
-      senderRole: m.senderRole as SenderRole,
-      messageText: m.messageText,
-      sentAt: m.sentAt,
-      sequenceNo: m.sequenceNo,
-    }));
+    const parseResult: unknown = parseChatText(body.rawText, body.selfName ?? undefined);
+    normalizedMessagesCandidate = isRecord(parseResult) ? parseResult.messages : null;
   } else {
-    normalizedMessages = [];
+    normalizedMessagesCandidate = [];
   }
 
-  const sequenceNumbers = normalizedMessages.map((message) => message.sequenceNo);
-  if (!normalizedMessages.every((message) => (
-    isPrismaInt(message.sequenceNo)
-    && (message.sentAt === null || isStrictIsoDate(message.sentAt))
-  ))) {
+  if (!isNormalizedMessageArray(normalizedMessagesCandidate)) {
     return errorResponse(400, "VALIDATION_ERROR", "Normalized messages are not safe to store.");
   }
-  if (new Set(sequenceNumbers).size !== sequenceNumbers.length) {
-    return errorResponse(400, "VALIDATION_ERROR", "Message sequence numbers must be unique.");
-  }
+  const normalizedMessages = [...normalizedMessagesCandidate]
+    .sort((left, right) => left.sequenceNo - right.sequenceNo);
 
   if (normalizedMessages.length === 0 && !allowsSituationOnly) {
     return errorResponse(

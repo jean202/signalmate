@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createConversationMock = vi.fn();
+const parseChatTextMock = vi.fn();
 
 vi.mock("@/lib/store", () => ({
   createConversation: createConversationMock,
@@ -9,6 +10,16 @@ vi.mock("@/lib/store", () => ({
 vi.mock("@/lib/auth-helpers", () => ({
   getCurrentUserId: vi.fn(async () => null),
 }));
+
+vi.mock("@/lib/chat-parser", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/chat-parser")>();
+  return {
+    ...actual,
+    parseChatText: (...args: Parameters<typeof actual.parseChatText>) => (
+      parseChatTextMock(...args) ?? actual.parseChatText(...args)
+    ),
+  };
+});
 
 function request(body: unknown) {
   return new Request("http://localhost/api/v1/conversations", {
@@ -21,6 +32,7 @@ function request(body: unknown) {
 describe("POST /api/v1/conversations", () => {
   beforeEach(() => {
     createConversationMock.mockReset();
+    parseChatTextMock.mockReset();
     createConversationMock.mockImplementation(async (input) => ({
       id: "conv_1",
       saveMode: input.saveMode ?? "temporary",
@@ -320,6 +332,39 @@ describe("POST /api/v1/conversations", () => {
       meetingChannel: "dating_app",
       userGoal: "continue_chat",
       rawText,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["unexpected senderRole", {
+      senderRole: "system", senderName: "system", messageText: "안내", sentAt: null, sequenceNo: 1,
+    }],
+    ["non-string messageText", {
+      senderRole: "self", senderName: "나", messageText: 42, sentAt: null, sequenceNo: 1,
+    }],
+    ["non-object message", null],
+    ["invalid sentAt", {
+      senderRole: "self", senderName: "나", messageText: "안녕", sentAt: "2026-02-30", sequenceNo: 1,
+    }],
+    ["invalid sequenceNo", {
+      senderRole: "self", senderName: "나", messageText: "안녕", sentAt: null, sequenceNo: 2147483648,
+    }],
+  ])("rejects malformed parser output: %s", async (_label, malformedMessage) => {
+    parseChatTextMock.mockReturnValue({
+      messages: [malformedMessage],
+      detectedFormat: "mock",
+      senderNames: [],
+      selfName: null,
+    });
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText: "나: 원문은 로그에 남기지 않음",
     }));
 
     expect(response.status).toBe(400);
