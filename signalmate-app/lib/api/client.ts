@@ -357,7 +357,7 @@ function analysisErrorFromFrame(frame: SseFrame): ApiError | null {
 }
 
 export async function streamAnalysis(
-  conversation: CreatedConversation,
+  conversation: ConversationSnapshot,
   onProgress?: AnalysisProgressCallback,
 ): Promise<AnalysisResult> {
   const response = await fetch(

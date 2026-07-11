@@ -59,6 +59,7 @@ export type AnalysisDraft = {
   relationshipStage: RelationshipStage | null;
   meetingChannel: MeetingChannel | null;
   guidedAnswers: GuidedAnswers;
+  inputFocusTouched?: boolean;
   createdConversation: ConversationSnapshot | null;
   updatedAt: string;
 };

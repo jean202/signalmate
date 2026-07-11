@@ -15,6 +15,7 @@ export function createEmptyDraft(now = new Date().toISOString()): AnalysisDraft 
       otherInitiative: 'unknown', afterMeetingContact: 'not_applicable',
       desiredHelp: 'next_message', otherStyle: [], freeText: '',
     },
+    inputFocusTouched: false,
     createdConversation: null,
     updatedAt: now,
   };
@@ -23,6 +24,7 @@ export function createEmptyDraft(now = new Date().toISOString()): AnalysisDraft 
 export function normalizeRestoredDraft(draft: AnalysisDraft): AnalysisDraft {
   return {
     ...draft,
+    inputFocusTouched: draft.inputFocusTouched ?? false,
     images: draft.images.map((image) => ({
       ...image,
       status: image.status === 'extracting' ? 'queued' : image.status,
