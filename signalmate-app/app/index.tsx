@@ -31,6 +31,9 @@ export default function HomeScreen() {
     || draft.relationshipStage !== null
     || draft.meetingChannel !== null
   ), [draft]);
+  const canResumeReview = selectedInput === 'capture'
+    && draft.images.length > 0
+    && draft.images.every((image) => image.status === 'complete');
 
   useEffect(() => () => {
     mounted.current = false;
@@ -55,7 +58,8 @@ export default function HomeScreen() {
   };
 
   const continueDraft = () => {
-    if (selectedInput === 'capture') router.push('/capture');
+    if (canResumeReview) router.push('/ocr-review');
+    else if (selectedInput === 'capture') router.push('/capture');
     else router.push('/situation');
   };
 
@@ -82,11 +86,13 @@ export default function HomeScreen() {
           <View style={styles.savedCommands}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="이어서 작성"
+              accessibilityLabel={canResumeReview ? '검수 이어서' : '이어서 작성'}
               onPress={continueDraft}
               style={({ pressed }) => [styles.command, pressed && styles.commandPressed]}
             >
-              <Text style={styles.commandPrimary}>이어서 작성</Text>
+              <Text style={styles.commandPrimary}>
+                {canResumeReview ? '검수 이어서' : '이어서 작성'}
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"

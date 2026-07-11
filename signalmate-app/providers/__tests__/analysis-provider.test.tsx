@@ -379,4 +379,20 @@ describe('AnalysisProvider', () => {
     expect(consoleError).not.toHaveBeenCalledWith(expect.stringMatching(/unmounted component/i));
     consoleError.mockRestore();
   });
+
+  test('변경 직후 unmount돼도 debounce 대기 중인 최신 초안을 저장한다', async () => {
+    const { result, unmount } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.updateDraft((draft) => ({
+      ...draft,
+      pastedText: '리로드 직전 검수 내용',
+    })));
+    unmount();
+    await act(async () => { await Promise.resolve(); });
+
+    expect(mockedDraftStorage.save).toHaveBeenCalledWith(expect.objectContaining({
+      pastedText: '리로드 직전 검수 내용',
+    }));
+  });
 });

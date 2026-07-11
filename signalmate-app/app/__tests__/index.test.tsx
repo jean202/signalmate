@@ -114,6 +114,23 @@ describe('HomeScreen', () => {
     expect(screen.queryByText('채팅 분석 시작하기')).toBeNull();
   });
 
+  test('추출 완료 캡처가 저장돼 있으면 검수 화면으로 바로 이어간다', async () => {
+    mockLoad.mockResolvedValue({
+      ...createEmptyDraft(),
+      primaryInput: 'capture',
+      images: [{
+        id: 'image-1', order: 0, uri: 'file://image-1.png', fileName: 'image-1.png',
+        mimeType: 'image/png', fileSize: 1, status: 'complete', extractedText: '나: 안녕',
+        editedText: '나: 안녕', notes: [], errorCode: null, reviewed: true,
+      }],
+    });
+    const screen = renderHome();
+
+    fireEvent.press(await screen.findByRole('button', { name: '검수 이어서' }));
+
+    expect(mockPush).toHaveBeenCalledWith('/ocr-review');
+  });
+
   test('새로 시작 중에는 중복 탭을 차단하고 접근성 상태를 표시한다', async () => {
     const clear = deferred();
     mockLoad.mockResolvedValue(restoredDraft);

@@ -52,6 +52,7 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
   const draftRef = useRef(draft);
   const resultRef = useRef(result);
   const analysisRunGeneration = useRef(0);
+  const resetInProgress = useRef(false);
 
   const cancelPendingPersist = useCallback(() => {
     if (persistTimer.current !== null) {
@@ -74,8 +75,14 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     return () => {
       mounted.current = false;
       cancelPendingPersist();
+      if (hasCompletedInitialHydration.current && !resetInProgress.current) {
+        const latestDraft = draftRef.current;
+        void enqueueStorageOperation(() => draftStorage.save(latestDraft)).catch(() => {
+          // A reload must not expose draft content even when the final flush fails.
+        });
+      }
     };
-  }, [cancelPendingPersist]);
+  }, [cancelPendingPersist, enqueueStorageOperation]);
 
   useEffect(() => {
     let active = true;
@@ -176,6 +183,7 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     const resetGeneration = generation.current;
     analysisRunGeneration.current += 1;
     cancelPendingPersist();
+    resetInProgress.current = true;
 
     try {
       await enqueueStorageOperation(async () => {
@@ -197,9 +205,11 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
         }
       });
     } catch (error) {
+      resetInProgress.current = false;
       throw error instanceof DraftResetError ? error : new DraftResetError();
     }
 
+    resetInProgress.current = false;
     if (generation.current !== resetGeneration) return;
     generation.current = resetGeneration + 1;
     if (!mounted.current) return;
