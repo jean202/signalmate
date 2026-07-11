@@ -31,6 +31,9 @@
 - 실행 중 blur 후 재진입하면 취소된 `running` UI 상태를 복원한다.
 - 실제 Provider 누적 테스트로 입력 미변경 재시도는 create 1회, 입력 변경 재시도는 create 2회임을 검증했다.
 - 입력 요약의 중복 제외 수는 유일 ID 기준이며, ChoiceChips는 320pt와 큰 글자에서 축소/줄바꿈하고 선택 전후 1px border 폭을 유지한다.
+- route는 top-level JSON이 plain object가 아니면 속성 접근 전에 400으로 거절한다.
+- `situationContext`와 `guidedAnswers`의 `null`/`undefined` 호환을 유지하면서 값이 있을 때만 타입, 길이, enum을 검증한다.
+- 실제 Provider와 deferred promise로 stream blur/unmount resolve/reject, 복수 Review create 경쟁, blur 재진입, late stream reject의 최신 상태 보존을 검증한다.
 
 ## TDD 기록
 
@@ -43,13 +46,15 @@
 7. fingerprint 모듈 부재, Provider snapshot 미무효화/토큰 부재, Review stale snapshot·입력 변경·blur 경쟁을 각각 RED로 확인했다.
 8. 중복 ID 이중 집계, 긴 chip 폭 제약 부재, 선택 border 3px 변경을 RED로 확인했다.
 9. 실제 Provider 통합 테스트로 stream 실패 재시도와 복수 Review late resolve를 검증했다.
+10. top-level JSON `null` 예외와 nullable 상황 필드 400을 RED로 확인하고 route 경계에서 수정했다.
+11. 분석 경쟁 회귀 9개를 실제 Provider/deferred promise로 추가했으며 기존 실행 토큰 구현에서 모두 통과했다. act 경고는 숨기지 않았고 테스트 출력에 경고가 없음을 확인했다.
 
 ## 검증 결과
 
 - 리뷰 후속 집중 테스트: 7 suites, 65 tests passed
-- 앱 전체 `npm test`: 19 suites, 165 tests passed
+- 앱 전체 `npm test`: 19 suites, 174 tests passed
 - 앱 `npm run typecheck`: 통과
-- landing route 테스트: 1 file, 17 tests passed
+- landing route 테스트: 1 file, 31 tests passed
 - landing `npx tsc --noEmit`: 통과
 - `git diff --check`: 통과
 

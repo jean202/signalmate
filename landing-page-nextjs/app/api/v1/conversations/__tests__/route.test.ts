@@ -33,6 +33,77 @@ describe("POST /api/v1/conversations", () => {
     }));
   });
 
+  it.each([
+    ["null", null],
+    ["array", []],
+    ["string", "invalid"],
+    ["number", 42],
+  ])("rejects top-level %s JSON without throwing", async (_label, invalidBody) => {
+    const { POST } = await import("../route");
+    const response = await POST(request(invalidBody));
+
+    expect(response.status).toBe(400);
+    const payload = await response.json();
+    expect(["INVALID_JSON", "VALIDATION_ERROR"]).toContain(payload.error.code);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps nullable situation fields compatible", async () => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText: "나: 안녕하세요\n상대: 반가워요",
+      situationContext: null,
+      guidedAnswers: null,
+    }));
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(expect.objectContaining({
+      situationContext: null,
+    }));
+  });
+
+  it.each([
+    [2000, 201],
+    [2001, 400],
+  ])("validates top-level situationContext length %i", async (length, expectedStatus) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "after_first_date",
+      meetingChannel: "blind_date",
+      userGoal: "continue_chat",
+      messages: [],
+      situationContext: "가".repeat(length),
+    }));
+
+    expect(response.status).toBe(expectedStatus);
+    expect(createConversationMock).toHaveBeenCalledTimes(expectedStatus === 201 ? 1 : 0);
+  });
+
+  it.each([
+    ["inputFocus", { inputFocus: "invalid" }],
+    ["meetingCount", { meetingCount: "invalid" }],
+    ["meetingVibe", { meetingVibe: "invalid" }],
+    ["otherInitiative", { otherInitiative: "invalid" }],
+    ["afterMeetingContact", { afterMeetingContact: "invalid" }],
+    ["desiredHelp", { desiredHelp: "invalid" }],
+    ["otherStyle", { otherStyle: ["invalid"] }],
+  ])("rejects invalid guided enum %s", async (_field, guidedAnswers) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "after_first_date",
+      meetingChannel: "blind_date",
+      userGoal: "continue_chat",
+      rawText: "나: 안녕하세요\n상대: 반가워요",
+      guidedAnswers,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
   it("creates a conversation from situation-only meeting text", async () => {
     const { POST } = await import("../route");
     const response = await POST(

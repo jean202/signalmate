@@ -26,9 +26,9 @@ type ConversationCreateBody = {
   /** Hint for which sender name is "self" in auto-parsed chat */
   selfName?: string;
   /** Mode A: 자유 텍스트 상황 설명 */
-  situationContext?: string;
+  situationContext?: string | null;
   /** Mode B: 가이드 질문 응답 */
-  guidedAnswers?: GuidedAnswers;
+  guidedAnswers?: GuidedAnswers | null;
   messages?: ConversationMessageInput[];
 };
 
@@ -75,13 +75,17 @@ function isGuidedAnswers(value: unknown): value is GuidedAnswers {
 }
 
 export async function POST(request: Request) {
-  let body: ConversationCreateBody;
+  let parsedBody: unknown;
 
   try {
-    body = (await request.json()) as ConversationCreateBody;
+    parsedBody = await request.json();
   } catch {
     return errorResponse(400, "INVALID_JSON", "Request body must be valid JSON.");
   }
+  if (!isRecord(parsedBody)) {
+    return errorResponse(400, "VALIDATION_ERROR", "Request body must be a JSON object.");
+  }
+  const body = parsedBody as ConversationCreateBody;
 
   if (!body.relationshipStage || !body.meetingChannel || !body.userGoal) {
     return errorResponse(
@@ -91,13 +95,13 @@ export async function POST(request: Request) {
     );
   }
 
-  if (body.situationContext !== undefined && typeof body.situationContext !== "string") {
+  if (body.situationContext != null && typeof body.situationContext !== "string") {
     return errorResponse(400, "VALIDATION_ERROR", "situationContext must be a string.");
   }
   if (body.situationContext && body.situationContext.length > 2000) {
     return errorResponse(400, "VALIDATION_ERROR", "situationContext must be 2000 characters or less.");
   }
-  if (body.guidedAnswers !== undefined && !isGuidedAnswers(body.guidedAnswers)) {
+  if (body.guidedAnswers != null && !isGuidedAnswers(body.guidedAnswers)) {
     return errorResponse(400, "VALIDATION_ERROR", "guidedAnswers has an invalid format.");
   }
   if (body.guidedAnswers?.freeText && body.guidedAnswers.freeText.length > 2000) {
