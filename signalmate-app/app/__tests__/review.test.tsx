@@ -200,6 +200,23 @@ describe('ReviewScreen', () => {
     expect(mockPush.mock.calls).toEqual([['/situation'], ['/ocr-review'], ['/ocr-review']]);
   });
 
+  test('이름 기반 대화는 최종 확인 화면에서 내 이름을 바로 입력한다', async () => {
+    const draft = validSituationDraft();
+    draft.primaryInput = 'text';
+    draft.guidedAnswers.inputFocus = 'chat';
+    draft.guidedAnswers.freeText = '';
+    draft.pastedText = '민수: 안녕\n진하: 반가워';
+    draft.selfName = '';
+    const screen = renderReview(draft);
+
+    expect(screen.getByRole('button', { name: '분석하기' })).toBeDisabled();
+    fireEvent.changeText(screen.getByLabelText('대화 속 내 이름'), '진하');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '분석하기' })).toBeEnabled());
+    expect(latestDraft.selfName).toBe('진하');
+    expect(screen.queryByText('이름이 표시된 대화에서는 내 이름을 입력해 주세요.')).toBeNull();
+  });
+
   test('정보 더하기 명령은 기존 초안을 지우지 않고 각 입력 화면으로 이동한다', () => {
     const screen = renderReview();
 

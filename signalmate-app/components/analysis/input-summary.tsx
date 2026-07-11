@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   buildMergedChatText,
@@ -14,6 +14,7 @@ export type AnalysisEditRoute = '/' | '/ocr-review' | '/situation';
 type InputSummaryProps = {
   draft: AnalysisDraft;
   onNavigate: (route: AnalysisEditRoute) => void;
+  onSelfNameChange: (selfName: string) => void;
 };
 
 const RELATIONSHIP_LABELS: Record<RelationshipStage, string> = {
@@ -60,7 +61,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function InputSummary({ draft, onNavigate }: InputSummaryProps) {
+export function InputSummary({ draft, onNavigate, onSelfNameChange }: InputSummaryProps) {
   const mergedText = buildMergedChatText(draft);
   const completedImages = draft.images.filter((image) => image.status === 'complete');
   const reviewedImages = completedImages.filter((image) => image.reviewed);
@@ -89,17 +90,33 @@ export function InputSummary({ draft, onNavigate }: InputSummaryProps) {
           <Text style={styles.errorHeading}>수정이 필요한 항목</Text>
           {validation.errors.map((error) => {
             const command = editCommand(error, draft);
+            const needsSelfName = error.startsWith('이름이 표시된 대화');
             return (
               <View key={error} style={styles.errorRow}>
                 <Text style={styles.errorText}>{error}</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={command.label}
-                  onPress={() => onNavigate(command.route)}
-                  style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
-                >
-                  <Text style={styles.editButtonText}>{command.label}</Text>
-                </Pressable>
+                {needsSelfName ? (
+                  <View style={styles.selfNameField}>
+                    <Text style={styles.selfNameLabel}>캡처에서 내 메시지에 표시된 이름</Text>
+                    <TextInput
+                      accessibilityLabel="대화 속 내 이름"
+                      autoCorrect={false}
+                      onChangeText={onSelfNameChange}
+                      placeholder="예: 진하 또는 앱 닉네임"
+                      placeholderTextColor={colors.muted}
+                      style={styles.selfNameInput}
+                      value={draft.selfName ?? ''}
+                    />
+                  </View>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={command.label}
+                    onPress={() => onNavigate(command.route)}
+                    style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.editButtonText}>{command.label}</Text>
+                  </Pressable>
+                )}
               </View>
             );
           })}
@@ -136,6 +153,19 @@ const styles = StyleSheet.create({
   errorHeading: { color: colors.caution, fontSize: 15, fontWeight: '800', lineHeight: 21 },
   errorRow: { gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
   errorText: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  selfNameField: { gap: 6 },
+  selfNameLabel: { color: colors.text, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  selfNameInput: {
+    minHeight: touchTarget,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.control,
+    backgroundColor: colors.background,
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 21,
+  },
   editButton: {
     minHeight: touchTarget,
     alignSelf: 'flex-start',

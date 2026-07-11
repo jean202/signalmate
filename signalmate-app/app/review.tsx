@@ -125,7 +125,14 @@ export default function ReviewScreen() {
           <Text style={styles.description}>빠진 항목은 입력을 유지한 채 해당 화면에서 수정할 수 있어요.</Text>
         </View>
 
-        <InputSummary draft={draft} onNavigate={navigate} />
+        <InputSummary
+          draft={draft}
+          onNavigate={navigate}
+          onSelfNameChange={(selfName) => updateDraft((current) => ({
+            ...current,
+            selfName,
+          }))}
+        />
 
         <View style={styles.addSection}>
           <Text accessibilityRole="header" style={styles.sectionTitle}>정보 더하기</Text>
