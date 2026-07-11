@@ -6,6 +6,7 @@ import type { AnalysisResult } from '../../lib/analysis/types';
 
 const mockReplace = jest.fn();
 const mockResetDraft = jest.fn<Promise<void>, []>();
+const mockUsePreventRemove = jest.fn();
 let mockResult: AnalysisResult | null;
 
 jest.mock('expo-router', () => ({
@@ -14,6 +15,12 @@ jest.mock('expo-router', () => ({
 
 jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(),
+}));
+
+jest.mock('@react-navigation/native', () => ({
+  usePreventRemove: (preventRemove: boolean, callback: (event: unknown) => void) => (
+    mockUsePreventRemove(preventRemove, callback)
+  ),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -63,6 +70,11 @@ const result: AnalysisResult = {
       content: '다음 주말에 같이 가볼래요?', rationale: '구체적인 일정으로 반응을 확인할 수 있어요.',
       toneLabel: null, displayOrder: 9,
     },
+    {
+      id: 'message-alternative', recommendationType: 'next_message', title: '다른 메시지',
+      content: '지난번에 말한 전시 같이 볼까요?', rationale: '공통 관심사를 자연스럽게 이어갈 수 있어요.',
+      toneLabel: null, displayOrder: 10,
+    },
   ],
   recommendedAction: '다음 만남을 가볍게 제안하기',
   recommendedActionReason: '상대의 호응을 확인할 수 있도록 구체적인 일정 하나를 제안해 보세요.',
@@ -84,8 +96,8 @@ describe('ResultScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockResult = result;
-    mockResetDraft.mockResolvedValue(undefined);
-    (Clipboard.setStringAsync as jest.Mock).mockResolvedValue(undefined);
+    mockResetDraft.mockReset().mockResolvedValue(undefined);
+    (Clipboard.setStringAsync as jest.Mock).mockReset().mockResolvedValue(undefined);
   });
 
   test('결과 섹션을 신호 우선 순서로 표시한다', () => {
@@ -127,6 +139,83 @@ describe('ResultScreen', () => {
     expect(screen.getByRole('button', { name: '추천 메시지 복사 완료' })).toBeTruthy();
   });
 
+  test('복사 중에는 동일 버튼의 빠른 중복 탭을 차단하고 접근성 상태를 표시한다', async () => {
+    const copy = deferred();
+    (Clipboard.setStringAsync as jest.Mock).mockReturnValue(copy.promise);
+    const screen = render(<ResultScreen />);
+    const button = screen.getByRole('button', { name: '추천 메시지 복사' });
+
+    fireEvent.press(button);
+    fireEvent.press(button);
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+    expect(button.props.accessibilityState).toEqual({ busy: true, disabled: true });
+
+    await act(async () => copy.resolve());
+  });
+
+  test('복사 중에는 다른 추천 메시지 버튼도 차단하고 완료 뒤에는 복사할 수 있다', async () => {
+    const firstCopy = deferred();
+    (Clipboard.setStringAsync as jest.Mock)
+      .mockReturnValueOnce(firstCopy.promise)
+      .mockResolvedValueOnce(undefined);
+    const screen = render(<ResultScreen />);
+    const firstButton = screen.getByRole('button', { name: '추천 메시지 복사' });
+    const secondButton = screen.getByRole('button', { name: '추천 메시지 2 복사' });
+
+    fireEvent.press(firstButton);
+    fireEvent.press(secondButton);
+    expect(Clipboard.setStringAsync).toHaveBeenCalledTimes(1);
+    expect(secondButton).toBeDisabled();
+
+    await act(async () => firstCopy.resolve());
+    expect(screen.queryByRole('button', { name: '추천 메시지 복사 완료' })).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('button', { name: '추천 메시지 2 복사' }));
+    await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledTimes(2));
+    expect(Clipboard.setStringAsync).toHaveBeenLastCalledWith('지난번에 말한 전시 같이 볼까요?');
+    expect(screen.queryByRole('button', { name: '추천 메시지 복사 완료' })).toBeNull();
+    expect(screen.getByRole('button', { name: '추천 메시지 2 복사 완료' })).toBeTruthy();
+  });
+
+  test('복사 실패는 원문 없이 안내하고 정상 재시도로 복구한다', async () => {
+    (Clipboard.setStringAsync as jest.Mock)
+      .mockRejectedValueOnce(new Error('private clipboard error'))
+      .mockResolvedValueOnce(undefined);
+    const screen = render(<ResultScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: '추천 메시지 복사' }));
+    });
+    expect(screen.getByText('메시지를 복사하지 못했어요. 다시 시도해 주세요.')).toBeTruthy();
+    expect(screen.queryByText('private clipboard error')).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: '추천 메시지 복사' }));
+    });
+    expect(Clipboard.setStringAsync).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('메시지를 복사하지 못했어요. 다시 시도해 주세요.')).toBeNull();
+    expect(screen.getByRole('button', { name: '추천 메시지 복사 완료' })).toBeTruthy();
+  });
+
+  test.each(['resolve', 'reject'] as const)('unmount 뒤 복사 %s는 상태나 로그를 갱신하지 않는다', async (settle) => {
+    const copy = deferred();
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    (Clipboard.setStringAsync as jest.Mock).mockReturnValue(copy.promise);
+    const screen = render(<ResultScreen />);
+
+    fireEvent.press(screen.getByRole('button', { name: '추천 메시지 복사' }));
+    screen.unmount();
+    await act(async () => {
+      if (settle === 'resolve') copy.resolve();
+      else copy.reject(new Error('private clipboard error'));
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   test('복사 버튼은 44pt 이상 터치 영역을 가진다', () => {
     const screen = render(<ResultScreen />);
     const button = screen.getByRole('button', { name: '추천 메시지 복사' });
@@ -164,6 +253,31 @@ describe('ResultScreen', () => {
     });
 
     expect(mockResetDraft).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+
+  test('result 제거 이벤트를 navigation level에서 차단한다', () => {
+    render(<ResultScreen />);
+
+    expect(mockUsePreventRemove).toHaveBeenLastCalledWith(true, expect.any(Function));
+    const preventCallback = mockUsePreventRemove.mock.calls.at(-1)?.[1] as (event: unknown) => void;
+    preventCallback({ data: { action: { type: 'GO_BACK' } } });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  test('초기화 성공 뒤 제거 차단을 해제하고 새 분석으로 한 번만 이동한다', async () => {
+    const reset = deferred();
+    mockResetDraft.mockReturnValue(reset.promise);
+    const screen = render(<ResultScreen />);
+
+    fireEvent.press(screen.getByRole('button', { name: '새 분석 시작' }));
+    expect(mockUsePreventRemove).toHaveBeenLastCalledWith(true, expect.any(Function));
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => reset.resolve());
+    await waitFor(() => expect(mockUsePreventRemove).toHaveBeenLastCalledWith(false, expect.any(Function)));
+    expect(mockReplace).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith('/');
   });
 

@@ -11,6 +11,18 @@
 - 모바일 앱 실행 및 검증 방법과 실기기 `localhost` 주의사항을 README에 기록했다.
 - Expo web export 산출물인 `dist`가 TypeScript 입력에 포함되지 않도록 설정했다.
 
+## 리뷰 수정
+
+- Clipboard 호출에 화면 전역 lock과 실행 토큰을 적용했다. 복사 중에는 모든 추천 메시지 복사 버튼을 비활성화하고 `busy`/`disabled` 접근성 상태를 제공한다.
+- 여러 `next_message`를 순서대로 표시하며 성공, 실패, 빠른 중복 탭, 다른 추천 탭, 실패 후 재시도, unmount 후 resolve/reject를 테스트했다.
+- `usePreventRemove`로 Android 하드웨어 뒤로 가기와 web history를 포함한 navigation 제거를 차단한다. 초기화가 성공한 경우에만 차단을 해제한 다음 `replace('/')`를 한 번 실행한다.
+- `AnalysisProvider.resetDraft()`는 저장소와 캐시 정리가 성공한 뒤에만 메모리 draft/result를 비운다. 실패하면 결과와 제거 차단을 유지한다.
+- 실제 `AnalysisProvider`를 사용하는 결과 렌더·초기화 성공·초기화 실패 통합 테스트를 추가했다.
+- caution 색을 `#98600D`로 조정했다. 대비는 흰 배경 5.2316:1, `cautionSurface` 4.9131:1이다.
+- `tsconfig`에 `dist`, `node_modules`, 구성 파일, `android`, `ios` 제외를 명시해 Expo base 제외 범위를 보존했다.
+
+리뷰 RED에서는 복사 중 Clipboard가 2회 호출되고 두 번째 추천 버튼이 없으며 `usePreventRemove` 호출이 없음을 확인했다. Provider 실패 테스트에서는 결과가 조기에 사라지고, 기존 caution 대비는 흰 배경에서 4.4177:1로 실패했다.
+
 ## TDD
 
 RED:
@@ -33,8 +45,8 @@ Tests: 13 passed, 13 total
 
 ```text
 npm test
-Test Suites: 21 passed, 21 total
-Tests: 187 passed, 187 total
+Test Suites: 23 passed, 23 total
+Tests: 198 passed, 198 total
 
 npm run typecheck
 exit 0
@@ -54,6 +66,7 @@ exit 0
 - 결과 있음 fixture로 실제 만남/후속 연락/채팅/불확실성, 긴 evidence, 긴 recommendation, 긴 warning, 추천 메시지 없음과 별개인 전체 스크롤 구조를 확인했다. fixture는 검수 후 삭제했다.
 - 320px에서 수평 overflow가 없고 긴 텍스트가 줄바꿈되며 모든 섹션에 스크롤로 접근 가능했다.
 - 복사 버튼은 44pt, 새 분석 버튼은 47pt로 측정했다.
+- 리뷰 수정 후 320x700에서 두 추천 메시지 복사 버튼이 각각 44pt이고 수평 overflow가 없으며 caution 색이 `rgb(152, 96, 13)`으로 렌더링되는 것을 다시 확인했다.
 - 빈 상태도 두 뷰포트에서 중앙 정렬, 줄바꿈, 명령 접근성을 확인했다.
 - 브라우저에서 합성 대화로 실제 API 흐름을 시도했으나 개발 환경의 기본 원격 API 연결이 실패해 실서버 결과는 만들지 못했다.
 

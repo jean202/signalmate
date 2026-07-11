@@ -24,7 +24,12 @@ export default function RootLayout() {
           <Stack.Screen name="review" options={{ title: '최종 확인', headerBackTitle: '뒤로' }} />
           <Stack.Screen
             name="result"
-            options={{ title: '분석 결과', gestureEnabled: false, headerBackVisible: false }}
+            options={{
+              title: '분석 결과',
+              gestureEnabled: false,
+              headerBackVisible: false,
+              headerBackButtonMenuEnabled: false,
+            }}
           />
         </Stack>
       </AnalysisProvider>

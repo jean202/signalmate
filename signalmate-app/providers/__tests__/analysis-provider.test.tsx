@@ -223,13 +223,17 @@ describe('AnalysisProvider', () => {
     expect(result.current.result).toBeNull();
   });
 
-  test('정리 작업이 실패해도 컨텍스트를 새 분석 상태로 남긴다', async () => {
+  test('정리 작업이 실패하면 기존 draft와 result를 유지한다', async () => {
     const cleanupError = new Error('cache unavailable');
     mockedDraftStorage.clear.mockResolvedValue(undefined);
     mockedClearCachedImages.mockImplementation(() => { throw cleanupError; });
     const { result } = renderHook(() => useAnalysis(), { wrapper: AnalysisProvider });
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     act(() => result.current.updateDraft((draft) => ({ ...draft, pastedText: '지울 대화' })));
+    act(() => result.current.setResult({
+      analysisId: 'result-to-keep', overallSummary: '유지할 결과', signals: [], recommendations: [],
+      recommendedAction: '', recommendedActionReason: '', confidenceLevel: 'low', warnings: [],
+    }));
 
     let receivedError: unknown;
     await act(async () => {
@@ -241,11 +245,11 @@ describe('AnalysisProvider', () => {
     });
 
     expect(receivedError).toBe(cleanupError);
-    expect(result.current.draft.pastedText).toBe('');
-    expect(result.current.result).toBeNull();
+    expect(result.current.draft.pastedText).toBe('지울 대화');
+    expect(result.current.result?.analysisId).toBe('result-to-keep');
   });
 
-  test('지연된 reset 정리 중에도 메모리를 먼저 비우고 unmount 뒤 상태를 갱신하지 않는다', async () => {
+  test('지연된 reset은 정리 성공 전까지 메모리를 유지하고 unmount 뒤 상태를 갱신하지 않는다', async () => {
     const clear = createDeferred<void>();
     mockedDraftStorage.clear.mockReturnValue(clear.promise);
     const consoleError = jest.spyOn(console, 'error').mockImplementation();
@@ -255,7 +259,7 @@ describe('AnalysisProvider', () => {
 
     let reset: Promise<void>;
     act(() => { reset = result.current.resetDraft(); });
-    expect(result.current.draft.pastedText).toBe('');
+    expect(result.current.draft.pastedText).toBe('지울 대화');
     unmount();
 
     await act(async () => {

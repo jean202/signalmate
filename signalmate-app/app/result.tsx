@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import { usePreventRemove } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Check, Copy } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -34,13 +35,28 @@ export default function ResultScreen() {
   const { resetDraft, result } = useAnalysis();
   const mounted = useRef(true);
   const resetting = useRef(false);
+  const copyInFlight = useRef(false);
+  const copyRunId = useRef(0);
+  const pendingHomeNavigation = useRef(false);
+  const [removalAllowed, setRemovalAllowed] = useState(false);
   const [resetState, setResetState] = useState<ResetState>('idle');
+  const [copyingRecommendationId, setCopyingRecommendationId] = useState<string | null>(null);
   const [copiedRecommendationId, setCopiedRecommendationId] = useState<string | null>(null);
-  const [copyFailed, setCopyFailed] = useState(false);
+  const [copyFailedRecommendationId, setCopyFailedRecommendationId] = useState<string | null>(null);
 
   useEffect(() => () => {
     mounted.current = false;
+    copyRunId.current += 1;
+    copyInFlight.current = false;
   }, []);
+
+  usePreventRemove(!removalAllowed, () => undefined);
+
+  useEffect(() => {
+    if (!removalAllowed || !pendingHomeNavigation.current) return;
+    pendingHomeNavigation.current = false;
+    router.replace('/');
+  }, [removalAllowed, router]);
 
   const groups = useMemo(
     () => groupSignalsByContext(result?.signals ?? []),
@@ -50,7 +66,7 @@ export default function ResultScreen() {
     () => sortRecommendations(result?.recommendations ?? []),
     [result?.recommendations],
   );
-  const nextMessage = recommendations.find((item) => item.recommendationType === 'next_message');
+  const nextMessages = recommendations.filter((item) => item.recommendationType === 'next_message');
 
   const startNewAnalysis = async () => {
     if (resetting.current) return;
@@ -58,7 +74,10 @@ export default function ResultScreen() {
     setResetState('running');
     try {
       await resetDraft();
-      if (mounted.current) router.replace('/');
+      if (mounted.current) {
+        pendingHomeNavigation.current = true;
+        setRemovalAllowed(true);
+      }
     } catch {
       if (mounted.current) setResetState('failed');
     } finally {
@@ -67,12 +86,26 @@ export default function ResultScreen() {
   };
 
   const copyRecommendation = async (recommendation: AnalysisRecommendation) => {
-    setCopyFailed(false);
+    if (copyInFlight.current) return;
+    copyInFlight.current = true;
+    const runId = ++copyRunId.current;
+    setCopiedRecommendationId(null);
+    setCopyFailedRecommendationId(null);
+    setCopyingRecommendationId(recommendation.id);
     try {
       await Clipboard.setStringAsync(recommendation.content);
-      if (mounted.current) setCopiedRecommendationId(recommendation.id);
+      if (mounted.current && copyRunId.current === runId) {
+        setCopiedRecommendationId(recommendation.id);
+      }
     } catch {
-      if (mounted.current) setCopyFailed(true);
+      if (mounted.current && copyRunId.current === runId) {
+        setCopyFailedRecommendationId(recommendation.id);
+      }
+    } finally {
+      if (copyRunId.current === runId) {
+        copyInFlight.current = false;
+        if (mounted.current) setCopyingRecommendationId(null);
+      }
     }
   };
 
@@ -141,32 +174,19 @@ export default function ResultScreen() {
         </ResultSection>
 
         <ResultSection title="추천 메시지">
-          {nextMessage ? (
-            <View
-              accessibilityLabel={`추천 메시지: ${nextMessage.content}`}
-              style={styles.messagePanel}
-              testID="recommendation-row"
-            >
-              <Text style={styles.recommendationTitle}>{nextMessage.title}</Text>
-              <Text selectable style={styles.messageText}>{nextMessage.content}</Text>
-              {!!nextMessage.rationale && <Text style={styles.rationale}>{nextMessage.rationale}</Text>}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copiedRecommendationId === nextMessage.id
-                  ? '추천 메시지 복사 완료'
-                  : '추천 메시지 복사'}
-                onPress={() => { void copyRecommendation(nextMessage); }}
-                style={({ pressed }) => [styles.copyButton, pressed && styles.commandPressed]}
-              >
-                {copiedRecommendationId === nextMessage.id
-                  ? <Check color={colors.background} size={18} strokeWidth={2.5} />
-                  : <Copy color={colors.background} size={18} strokeWidth={2.25} />}
-                <Text style={styles.copyButtonText}>
-                  {copiedRecommendationId === nextMessage.id ? '복사 완료' : '복사'}
-                </Text>
-              </Pressable>
-              {copyFailed && <Text accessibilityRole="alert" style={styles.inlineError}>메시지를 복사하지 못했어요. 다시 시도해 주세요.</Text>}
-            </View>
+          {nextMessages.length > 0 ? (
+            nextMessages.map((recommendation, index) => (
+              <MessageRecommendation
+                key={recommendation.id}
+                recommendation={recommendation}
+                index={index}
+                copyBusy={copyingRecommendationId !== null}
+                copied={copiedRecommendationId === recommendation.id}
+                copying={copyingRecommendationId === recommendation.id}
+                failed={copyFailedRecommendationId === recommendation.id}
+                onCopy={copyRecommendation}
+              />
+            ))
           ) : (
             <View style={styles.noMessage}>
               <Text style={styles.noMessageTitle}>추천 메시지를 만들지 못했어요</Text>
@@ -261,6 +281,57 @@ function RecommendationRow({ recommendation }: { recommendation: AnalysisRecomme
       <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
       <Text style={styles.signalDescription}>{recommendation.content}</Text>
       {!!recommendation.rationale && <Text style={styles.rationale}>{recommendation.rationale}</Text>}
+    </View>
+  );
+}
+
+function MessageRecommendation({
+  copied,
+  copyBusy,
+  copying,
+  failed,
+  index,
+  onCopy,
+  recommendation,
+}: {
+  copied: boolean;
+  copyBusy: boolean;
+  copying: boolean;
+  failed: boolean;
+  index: number;
+  onCopy: (recommendation: AnalysisRecommendation) => Promise<void>;
+  recommendation: AnalysisRecommendation;
+}) {
+  const label = index === 0 ? '추천 메시지' : `추천 메시지 ${index + 1}`;
+  return (
+    <View
+      accessibilityLabel={`${label}: ${recommendation.content}`}
+      style={styles.messagePanel}
+      testID="recommendation-row"
+    >
+      <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
+      <Text selectable style={styles.messageText}>{recommendation.content}</Text>
+      {!!recommendation.rationale && <Text style={styles.rationale}>{recommendation.rationale}</Text>}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label} ${copied ? '복사 완료' : '복사'}`}
+        accessibilityState={{ busy: copyBusy, disabled: copyBusy }}
+        disabled={copyBusy}
+        onPress={() => { void onCopy(recommendation); }}
+        style={({ pressed }) => [
+          styles.copyButton,
+          pressed && styles.commandPressed,
+          copyBusy && styles.commandDisabled,
+        ]}
+      >
+        {copied
+          ? <Check color={colors.background} size={18} strokeWidth={2.5} />
+          : <Copy color={colors.background} size={18} strokeWidth={2.25} />}
+        <Text style={styles.copyButtonText}>
+          {copying ? '복사 중' : copied ? '복사 완료' : '복사'}
+        </Text>
+      </Pressable>
+      {failed && <Text accessibilityRole="alert" style={styles.inlineError}>메시지를 복사하지 못했어요. 다시 시도해 주세요.</Text>}
     </View>
   );
 }

@@ -153,18 +153,9 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
 
   const resetDraft = useCallback(async () => {
     generation.current += 1;
+    const resetGeneration = generation.current;
     analysisRunGeneration.current += 1;
     cancelPendingPersist();
-    hasCompletedInitialHydration.current = true;
-    skipNextPersist.current = true;
-
-    if (mounted.current) {
-      const emptyDraft = createEmptyDraft();
-      draftRef.current = emptyDraft;
-      setDraft(emptyDraft);
-      setResult(null);
-      setHydrated(true);
-    }
 
     let cleanupError: unknown;
     try {
@@ -180,6 +171,15 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     }
 
     if (cleanupError) throw cleanupError;
+    if (!mounted.current || generation.current !== resetGeneration) return;
+
+    hasCompletedInitialHydration.current = true;
+    skipNextPersist.current = true;
+    const emptyDraft = createEmptyDraft();
+    draftRef.current = emptyDraft;
+    setDraft(emptyDraft);
+    setResult(null);
+    setHydrated(true);
   }, [cancelPendingPersist, enqueueStorageOperation]);
 
   const value = useMemo<AnalysisContextValue>(() => ({

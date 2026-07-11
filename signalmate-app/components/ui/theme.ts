@@ -6,7 +6,7 @@ export const colors = {
   border: '#D8D6CE',
   positive: '#287B53',
   positiveSurface: '#EDF6F1',
-  caution: '#A56C12',
+  caution: '#98600D',
   cautionSurface: '#FFF7E8',
   ambiguous: '#6B687A',
   action: '#285F9E',
