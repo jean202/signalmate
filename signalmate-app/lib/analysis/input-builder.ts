@@ -15,11 +15,9 @@ export function duplicateCandidateId(imageId: string, lineIndex: number, text: s
 
 function replacementResult(text: string, rules: readonly ReplacementRule[]) {
   const activeRules = rules.filter((rule) => rule.source.length > 0);
-  const protectedCharactersByRule = new Map<ReplacementRule, boolean[]>();
+  const protectedCharacters = Array.from({ length: text.length }, () => false);
 
   for (const rule of activeRules) {
-    const protectedCharacters = Array.from({ length: text.length }, () => false);
-    protectedCharactersByRule.set(rule, protectedCharacters);
     if (!rule.replacement) continue;
     let position = text.indexOf(rule.replacement);
     while (position !== -1) {
@@ -34,9 +32,13 @@ function replacementResult(text: string, rules: readonly ReplacementRule[]) {
   let changes = 0;
   let index = 0;
   while (index < text.length) {
+    if (protectedCharacters[index]) {
+      output += text[index];
+      index += 1;
+      continue;
+    }
     const rule = activeRules.find((candidate) => {
       if (!text.startsWith(candidate.source, index)) return false;
-      const protectedCharacters = protectedCharactersByRule.get(candidate) ?? [];
       return !protectedCharacters.slice(index, index + candidate.source.length).some(Boolean);
     });
     if (!rule) {

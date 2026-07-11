@@ -13,6 +13,30 @@ type ReplacementRuleEditorProps = {
   onApply?: (rules: ReplacementRule[]) => void;
 };
 
+function overlaps(left: string, right: string): boolean {
+  return left.length > 0 && right.length > 0
+    && (left.includes(right) || right.includes(left));
+}
+
+function conflictMessage(
+  rules: readonly ReplacementRule[],
+  source: string,
+  replacement: string,
+): string | null {
+  if (!source.trim()) return null;
+  if (rules.some((rule) => rule.source === source)) {
+    return '같은 원문의 치환 규칙이 이미 있어요.';
+  }
+  if (rules.some((rule) => overlaps(source, rule.replacement))) {
+    return '원문이 저장된 치환값과 겹쳐 반복 적용될 수 있어요.';
+  }
+  if ([source, ...rules.map((rule) => rule.source)]
+    .some((ruleSource) => ruleSource.length > 0 && replacement.includes(ruleSource))) {
+    return '치환값에 규칙 원문이 포함되어 반복 적용될 수 있어요.';
+  }
+  return null;
+}
+
 export function ReplacementRuleEditor({
   text,
   rules = [],
@@ -23,13 +47,15 @@ export function ReplacementRuleEditor({
   const [replacement, setReplacement] = useState('');
   const sequence = useRef(0);
   const sourceIsEmpty = source.trim().length === 0;
+  const ruleConflict = conflictMessage(rules, source, replacement);
+  const addDisabled = sourceIsEmpty || ruleConflict !== null;
   const matchCount = sourceIsEmpty ? 0 : countReplacementChanges(text, [{
     id: 'pending-rule-preview', source, replacement,
   }]);
   const savedRuleMatchCount = countReplacementChanges(text, rules);
 
   const addRule = () => {
-    if (sourceIsEmpty) return;
+    if (addDisabled) return;
     sequence.current += 1;
     onRulesChange?.([
       ...rules,
@@ -90,19 +116,25 @@ export function ReplacementRuleEditor({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="치환 규칙 추가"
-          accessibilityState={{ disabled: sourceIsEmpty }}
-          disabled={sourceIsEmpty}
+          accessibilityState={{ disabled: addDisabled }}
+          disabled={addDisabled}
           onPress={addRule}
           style={({ pressed }) => [
             styles.addButton,
-            pressed && !sourceIsEmpty && styles.pressed,
-            sourceIsEmpty && styles.disabled,
+            pressed && !addDisabled && styles.pressed,
+            addDisabled && styles.disabled,
           ]}
         >
           <Plus color={colors.text} size={18} strokeWidth={2.2} />
           <Text style={styles.addButtonText}>규칙 추가</Text>
         </Pressable>
       </View>
+
+      {ruleConflict && (
+        <Text accessibilityLiveRegion="polite" style={styles.conflictMessage}>
+          {ruleConflict}
+        </Text>
+      )}
 
       {rules.length > 0 && (
         <>
@@ -178,6 +210,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   matchCount: { color: colors.positive, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  conflictMessage: { color: colors.danger, fontSize: 13, fontWeight: '600', lineHeight: 19 },
   savedMatchCount: { color: colors.muted, fontSize: 13, fontWeight: '600', lineHeight: 18 },
   addButton: {
     minHeight: touchTarget,

@@ -9,7 +9,8 @@
 - 연속 캡처 중복 후보를 체크박스로 표시하고 `excludedDuplicateIds`만 토글한다.
 - 중복 후보 ID는 이미지 ID, 원본 줄 인덱스, 정규화된 줄 내용을 함께 사용한다. 최종 병합은 현재 complete 이미지에서 후보를 다시 계산하고 현재도 유효한 제외 ID만 적용한다.
 - 수동 편집과 전체 치환 후에는 전체 이미지 경계의 현재 후보 집합과 제외 목록의 교집합만 유지해 양쪽 경계 중 어느 쪽이 바뀌어도 stale 선택이 남지 않는다.
-- 치환은 원문을 한 번만 스캔해 규칙 간 연쇄 적용을 막고, 이미 같은 치환값 안에 있는 source는 다시 감싸지 않는다.
+- 치환은 모든 저장 규칙의 기존 replacement 구간을 먼저 보호하고 원문을 한 번만 스캔해, 같은 실행과 반복 실행 모두에서 규칙 간 연쇄 적용을 막는다.
+- 새 규칙의 source가 저장된 replacement와 겹치거나 새 replacement가 자신 또는 저장된 source를 포함하면 구체적인 한국어 안내와 함께 추가를 차단한다.
 - `ocr-review` 라우트를 등록했다. 아직 없는 `situation` 및 `review` 화면은 추가하지 않았다.
 - Expo Web에서 모듈 import만으로 `Directory`를 생성하던 이미지 캐시를 지연 생성으로 바꿔 검수 화면의 브라우저 확인을 가능하게 했다.
 
@@ -24,6 +25,8 @@
 7. 상태 누적 화면 harness로 중복 선택 후 앞줄 편집과 전체 치환 2회 적용을 연속 검증했다.
 8. 이미지 2 중복 선택 후 이미지 1 마지막 줄 수정, 이미지 1 삭제, 이미지 1 경계 치환, 임의 ID 주입 시 이미지 2 첫 줄이 사라지는 실패를 각각 확인했다.
 9. 상태 누적 화면 harness로 이미지 1 경계 수정 후 이미지 2 제외 선택이 정리되고 최종 병합에 메시지가 유지되는 것을 검증했다.
+10. `민수→친구`, `친구→[상대]` 규칙을 반복 적용하면 첫 결과의 `친구`가 두 번째 적용에서 `[상대]`로 바뀌는 실패를 확인했다.
+11. 상태 누적 화면에서 저장된 교차 규칙을 두 번 적용하고, 컴포넌트에서 source/replacement 교차 충돌 두 종류가 차단되는지 검증했다.
 
 ## UI 및 접근성 확인
 
@@ -35,10 +38,10 @@
 
 ## 검증 결과
 
-- 집중 테스트 명령: `npm test -- lib/analysis/__tests__/input-builder.test.ts app/__tests__/ocr-review.test.tsx`
-- 집중 테스트: 2 suites, 36 tests passed
-- 관련 회귀 테스트: 9 suites, 82 tests passed
-- 전체 테스트: 14 suites, 114 tests passed
+- 집중 테스트 명령: `npm test -- lib/analysis/__tests__/input-builder.test.ts components/review/__tests__/replacement-rule-editor.test.tsx app/__tests__/ocr-review.test.tsx`
+- 집중 테스트: 3 suites, 45 tests passed
+- 관련 회귀 테스트: 9 suites, 86 tests passed
+- 전체 테스트: 14 suites, 118 tests passed
 - `npm run typecheck`: passed, TypeScript errors 0
 - `git diff --check`: passed
 - Expo Web: `http://localhost:8091/ocr-review`에서 320pt 레이아웃 확인

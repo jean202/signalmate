@@ -278,6 +278,28 @@ describe('OcrReviewScreen', () => {
     expect(latestStatefulDraft.pastedText).toBe('[민수]: 붙여넣기');
   });
 
+  test('저장된 교차 치환 규칙을 두 번 전체 적용해도 첫 결과를 유지한다', async () => {
+    const screen = renderStatefulReview(draftWith({
+      pastedText: '민수와 친구',
+      replacementRules: [
+        { id: 'rule-1', source: '민수', replacement: '친구' },
+        { id: 'rule-2', source: '친구', replacement: '[상대]' },
+      ],
+      images: [image({ extractedText: '민수 OCR 원본', editedText: '민수와 친구' })],
+    }));
+    const applyButton = screen.getByRole('button', { name: '치환 규칙 전체 적용' });
+
+    fireEvent.press(applyButton);
+    await waitFor(() => expect(latestStatefulDraft.images[0].editedText).toBe('친구와 친구'));
+    fireEvent.press(applyButton);
+
+    await waitFor(() => expect(latestStatefulDraft.images[0]).toMatchObject({
+      extractedText: '민수 OCR 원본',
+      editedText: '친구와 친구',
+    }));
+    expect(latestStatefulDraft.pastedText).toBe('친구와 친구');
+  });
+
   test('320pt 화면을 위한 고정 비율 미리보기와 최소 220pt 편집 영역을 제공한다', () => {
     const screen = renderReview();
     const previewStyle = StyleSheet.flatten(screen.getByTestId('ocr-image-preview').props.style);

@@ -81,4 +81,57 @@ describe('ReplacementRuleEditor', () => {
 
     expect(screen.getByText('저장 규칙 전체 적용 시 2곳이 변경돼요')).toBeTruthy();
   });
+
+  test('새 원문이 저장된 규칙의 치환값과 겹치면 추가를 거부한다', () => {
+    const onRulesChange = jest.fn();
+    const screen = render(
+      <ReplacementRuleEditor
+        text="친구"
+        rules={[{ id: 'saved', source: '민수', replacement: '친구' }]}
+        onRulesChange={onRulesChange}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('원문'), '친구');
+    fireEvent.changeText(screen.getByLabelText('치환값'), '[상대]');
+
+    expect(screen.getByText('원문이 저장된 치환값과 겹쳐 반복 적용될 수 있어요.')).toBeTruthy();
+    const addButton = screen.getByRole('button', { name: '치환 규칙 추가' });
+    expect(addButton.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    fireEvent.press(addButton);
+    expect(onRulesChange).not.toHaveBeenCalled();
+  });
+
+  test('새 치환값이 자신이나 저장된 규칙의 원문을 포함하면 추가를 거부한다', () => {
+    const onRulesChange = jest.fn();
+    const screen = render(
+      <ReplacementRuleEditor
+        text="민수"
+        rules={[{ id: 'saved', source: '친구', replacement: '[상대]' }]}
+        onRulesChange={onRulesChange}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('원문'), '민수');
+    fireEvent.changeText(screen.getByLabelText('치환값'), '[민수와 친구]');
+
+    expect(screen.getByText('치환값에 규칙 원문이 포함되어 반복 적용될 수 있어요.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '치환 규칙 추가' }));
+    expect(onRulesChange).not.toHaveBeenCalled();
+  });
+
+  test('일반 이름을 개인정보 토큰으로 바꾸는 규칙은 추가한다', () => {
+    const onRulesChange = jest.fn();
+    const screen = render(
+      <ReplacementRuleEditor text="진하님" onRulesChange={onRulesChange} />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('원문'), '진하');
+    fireEvent.changeText(screen.getByLabelText('치환값'), '[내이름]');
+    fireEvent.press(screen.getByRole('button', { name: '치환 규칙 추가' }));
+
+    expect(onRulesChange).toHaveBeenCalledWith([
+      expect.objectContaining({ source: '진하', replacement: '[내이름]' }),
+    ]);
+  });
 });

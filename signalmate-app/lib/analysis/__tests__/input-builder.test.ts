@@ -16,11 +16,16 @@ test('치환값을 정규식이 아닌 일반 문자열로 적용한다', () => 
   ])).toBe('[내이름]님 [내이름]');
 });
 
-test('여러 치환 규칙은 한 번의 적용에서 서로 연쇄되지 않는다', () => {
-  expect(applyReplacementRules('민수와 친구', [
+test('교차하는 치환 규칙 집합을 반복 적용해도 결과가 달라지지 않는다', () => {
+  const rules = [
     { id: '1', source: '민수', replacement: '친구' },
     { id: '2', source: '친구', replacement: '[상대]' },
-  ])).toBe('친구와 [상대]');
+  ];
+  const once = applyReplacementRules('민수와 친구', rules);
+
+  expect(once).toBe('친구와 친구');
+  expect(applyReplacementRules(once, rules)).toBe(once);
+  expect(countReplacementChanges(once, rules)).toBe(0);
 });
 
 test('source를 포함한 치환값에 같은 규칙을 다시 적용해도 중첩되지 않는다', () => {
