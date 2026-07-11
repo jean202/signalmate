@@ -76,9 +76,10 @@ export type AnalysisRecommendation = {
   title: string; content: string; rationale: string; toneLabel: string | null;
   displayOrder: number;
 };
+export type ConfidenceLevel = 'low' | 'medium' | 'high';
 export type AnalysisResult = {
   analysisId: string; overallSummary: string; signals: AnalysisSignal[];
   recommendations: AnalysisRecommendation[];
   recommendedAction: string; recommendedActionReason: string;
-  confidenceLevel: 'low' | 'medium' | 'high'; warnings: string[];
+  confidenceLevel: ConfidenceLevel; warnings: string[];
 };

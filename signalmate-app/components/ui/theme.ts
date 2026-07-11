@@ -8,6 +8,9 @@ export const colors = {
   positiveSurface: '#EDF6F1',
   caution: '#A56C12',
   cautionSurface: '#FFF7E8',
+  ambiguous: '#6B687A',
+  action: '#285F9E',
+  actionSurface: '#EFF5FB',
   danger: '#B44836',
 } as const;
 
