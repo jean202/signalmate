@@ -147,6 +147,51 @@ describe("POST /api/v1/conversations", () => {
   });
 
   it.each([
+    ["relationshipStage", { relationshipStage: "unknown_stage" }],
+    ["meetingChannel", { meetingChannel: "unknown_channel" }],
+    ["userGoal", { userGoal: "unknown_goal" }],
+  ])("rejects unknown required enum: %s", async (_label, invalidField) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      rawText: "나: 안녕하세요\n상대: 반가워요",
+      ...invalidField,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["relationshipStage", [
+      "before_meeting", "after_first_date", "after_second_date", "ongoing_chat", "cooling_down",
+    ]],
+    ["meetingChannel", [
+      "blind_date", "dating_app", "marriage_agency", "mutual_friend", "other",
+    ]],
+    ["userGoal", [
+      "continue_chat", "ask_for_date", "evaluate_interest", "decide_to_stop",
+    ]],
+  ] as const)("accepts every Prisma enum value for %s", async (field, values) => {
+    const { POST } = await import("../route");
+    for (const value of values) {
+      createConversationMock.mockClear();
+      const response = await POST(request({
+        relationshipStage: "before_meeting",
+        meetingChannel: "dating_app",
+        userGoal: "continue_chat",
+        rawText: "나: 안녕하세요\n상대: 반가워요",
+        [field]: value,
+      }));
+
+      expect(response.status).toBe(201);
+      expect(createConversationMock).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it.each([
     ["null message", [null]],
     ["array message", [[]]],
     ["senderRole number", [{ senderRole: 1 }]],
@@ -167,6 +212,73 @@ describe("POST /api/v1/conversations", () => {
 
     expect(response.status).toBe(400);
     expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["invalid date text", [{ messageText: "안녕", sentAt: "not-a-date", sequenceNo: 1 }]],
+    ["empty date text", [{ messageText: "안녕", sentAt: "", sequenceNo: 1 }]],
+    ["above Prisma Int max", [{ messageText: "안녕", sequenceNo: 2147483648 }]],
+    ["below Prisma Int min", [{ messageText: "안녕", sequenceNo: -2147483649 }]],
+  ])("rejects DB-unsafe message value: %s", async (_label, messages) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      messages,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["explicit duplicate", [
+      { messageText: "첫 번째", sequenceNo: 7 },
+      { messageText: "두 번째", sequenceNo: 7 },
+    ]],
+    ["explicit and fallback collision", [
+      { messageText: "첫 번째", sequenceNo: 2 },
+      { messageText: "두 번째" },
+    ]],
+  ])("rejects normalized duplicate sequenceNo: %s", async (_label, messages) => {
+    const { POST } = await import("../route");
+    const response = await POST(request({
+      relationshipStage: "before_meeting",
+      meetingChannel: "dating_app",
+      userGoal: "continue_chat",
+      messages,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createConversationMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts valid date strings, Prisma Int boundaries, and unique sequence numbers", async () => {
+    const { POST } = await import("../route");
+    const messages = [
+      {
+        senderRole: "self",
+        messageText: "최솟값 순번",
+        sentAt: "2026-03-27T20:10:00+09:00",
+        sequenceNo: -2147483648,
+      },
+      {
+        senderRole: "other",
+        messageText: "최댓값 순번",
+        sentAt: "2026-03-27",
+        sequenceNo: 2147483647,
+      },
+    ];
+    const response = await POST(request({
+      relationshipStage: "ongoing_chat",
+      meetingChannel: "marriage_agency",
+      userGoal: "evaluate_interest",
+      messages,
+    }));
+
+    expect(response.status).toBe(201);
+    expect(createConversationMock).toHaveBeenCalledWith(expect.objectContaining({ messages }));
   });
 
   it("keeps null optional fields and null message selections compatible", async () => {

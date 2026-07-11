@@ -37,6 +37,17 @@ export const dynamic = "force-dynamic";
 
 const validSenderRoles: SenderRole[] = ["self", "other", "unknown"];
 const validSaveModes: SaveMode[] = ["temporary", "saved"];
+const validRelationshipStages = [
+  "before_meeting", "after_first_date", "after_second_date", "ongoing_chat", "cooling_down",
+] as const;
+const validMeetingChannels = [
+  "blind_date", "dating_app", "marriage_agency", "mutual_friend", "other",
+] as const;
+const validUserGoals = [
+  "continue_chat", "ask_for_date", "evaluate_interest", "decide_to_stop",
+] as const;
+const PRISMA_INT_MIN = -2147483648;
+const PRISMA_INT_MAX = 2147483647;
 const guidedAnswerValues = {
   inputFocus: ["chat", "meeting_note", "mixed", "follow_up"],
   meetingCount: ["none", "once", "2_3_times", "4_plus"],
@@ -68,9 +79,14 @@ function isMessageInput(value: unknown): value is ConversationMessageInput {
     && validSenderRoles.includes(value.senderRole as SenderRole)
   ))
     && isOptionalNullableString(value.messageText)
-    && isOptionalNullableString(value.sentAt)
+    && (value.sentAt == null || (
+      typeof value.sentAt === "string" && Number.isFinite(new Date(value.sentAt).getTime())
+    ))
     && (value.sequenceNo == null || (
-      typeof value.sequenceNo === "number" && Number.isInteger(value.sequenceNo)
+      typeof value.sequenceNo === "number"
+      && Number.isInteger(value.sequenceNo)
+      && value.sequenceNo >= PRISMA_INT_MIN
+      && value.sequenceNo <= PRISMA_INT_MAX
     ));
 }
 
@@ -116,6 +132,15 @@ export async function POST(request: Request) {
       "VALIDATION_ERROR",
       "relationshipStage, meetingChannel, and userGoal are required.",
     );
+  }
+  if (!validRelationshipStages.includes(
+    body.relationshipStage as typeof validRelationshipStages[number],
+  ) || !validMeetingChannels.includes(
+    body.meetingChannel as typeof validMeetingChannels[number],
+  ) || !validUserGoals.includes(
+    body.userGoal as typeof validUserGoals[number],
+  )) {
+    return errorResponse(400, "VALIDATION_ERROR", "Relationship context has an invalid value.");
   }
 
   if (!isOptionalNullableString(body.title)
@@ -188,6 +213,11 @@ export async function POST(request: Request) {
     }));
   } else {
     normalizedMessages = [];
+  }
+
+  const sequenceNumbers = normalizedMessages.map((message) => message.sequenceNo);
+  if (new Set(sequenceNumbers).size !== sequenceNumbers.length) {
+    return errorResponse(400, "VALIDATION_ERROR", "Message sequence numbers must be unique.");
   }
 
   if (normalizedMessages.length === 0 && !allowsSituationOnly) {

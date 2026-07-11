@@ -35,6 +35,7 @@
 - `situationContext`와 `guidedAnswers`의 `null`/`undefined` 호환을 유지하면서 값이 있을 때만 타입, 길이, enum을 검증한다.
 - 실제 Provider와 deferred promise로 stream blur/unmount resolve/reject, 복수 Review create 경쟁, blur 재진입, late stream reject의 최신 상태 보존을 검증한다.
 - conversations POST는 required 문자열, optional nullable 문자열, saveMode, messages 배열과 메시지 필드 타입을 사용 전에 검증한다. 오류 응답과 로그에는 입력 원문을 포함하지 않는다.
+- required 관계 enum은 Prisma schema allowlist와 일치시키고, `sentAt` 유효 날짜·`sequenceNo` signed 32-bit Int 범위·정규화 후 순번 유일성을 DB 호출 전에 검증한다.
 
 ## TDD 기록
 
@@ -50,13 +51,14 @@
 10. top-level JSON `null` 예외와 nullable 상황 필드 400을 RED로 확인하고 route 경계에서 수정했다.
 11. 분석 경쟁 회귀 9개를 실제 Provider/deferred promise로 추가했으며 기존 실행 토큰 구현에서 모두 통과했다. act 경고는 숨기지 않았고 테스트 출력에 경고가 없음을 확인했다.
 12. 숫자/객체/배열 top-level 필드와 잘못된 messages 요소가 500 또는 201이 되는 11건을 RED로 확인하고 route 선행 validator로 수정했다.
+13. unknown required enum, invalid date, Prisma Int 범위 밖, 명시/fallback 순번 충돌 9건이 201이 되는 것을 RED로 확인하고 DB 저장 전 validator로 수정했다.
 
 ## 검증 결과
 
 - 리뷰 후속 집중 테스트: 7 suites, 65 tests passed
 - 앱 전체 `npm test`: 19 suites, 174 tests passed
 - 앱 `npm run typecheck`: 통과
-- landing route 테스트: 1 file, 53 tests passed
+- landing route 테스트: 1 file, 66 tests passed
 - landing `npx tsc --noEmit`: 통과
 - `git diff --check`: 통과
 
