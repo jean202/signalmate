@@ -140,6 +140,16 @@ describe('OcrReviewScreen', () => {
     });
   });
 
+  test('검수 완료를 누르면 다음 미검수 캡처로 자동 이동한다', () => {
+    const screen = renderReview();
+
+    expect(screen.getByText('검수 완료 후 다음 캡처')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '이 캡처 검수 완료' }));
+
+    expect(screen.getByText('2 / 2')).toBeTruthy();
+    expect(screen.getByLabelText('2번 캡처 추출 텍스트')).toBeTruthy();
+  });
+
   test('complete 이미지만 이전과 다음으로 이동한다', () => {
     const screen = renderReview();
 

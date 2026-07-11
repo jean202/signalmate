@@ -27,6 +27,15 @@ export default function OcrReviewScreen() {
   ), [draft.images]);
   const currentImage = completeImages[currentIndex];
   const [editedText, setEditedText] = useState(currentImage?.editedText ?? '');
+  const nextUnreviewedIndex = useMemo(() => {
+    const afterCurrent = completeImages.findIndex((image, index) => (
+      index > currentIndex && !image.reviewed
+    ));
+    if (afterCurrent >= 0) return afterCurrent;
+    return completeImages.findIndex((image, index) => (
+      index < currentIndex && !image.reviewed
+    ));
+  }, [completeImages, currentIndex]);
 
   useEffect(() => {
     if (currentIndex >= completeImages.length) {
@@ -70,6 +79,7 @@ export default function OcrReviewScreen() {
         ? { ...image, editedText, reviewed: true }
         : image),
     }));
+    if (nextUnreviewedIndex >= 0) setCurrentIndex(nextUnreviewedIndex);
   };
 
   const updateRules = (replacementRules: ReplacementRule[]) => {
@@ -179,7 +189,9 @@ export default function OcrReviewScreen() {
                 onPress={completeReview}
                 style={({ pressed }) => [styles.reviewButton, pressed && styles.reviewPressed]}
               >
-                <Text style={styles.reviewButtonText}>이 캡처 검수 완료</Text>
+                <Text style={styles.reviewButtonText}>
+                  {nextUnreviewedIndex >= 0 ? '검수 완료 후 다음 캡처' : '이 캡처 검수 완료'}
+                </Text>
               </Pressable>
             </View>
           </>
