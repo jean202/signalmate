@@ -603,4 +603,170 @@ describe("situation-first analysis", () => {
 
     expect(signalKeys).toContain("meeting_positive_vibe");
   });
+
+  it("treats an explicit relationship-ending message as a high-confidence stop signal", () => {
+    const conversation = makeConversation([
+      { role: "other", text: "안녕하세요! 먼저 연락드려요." },
+      { role: "self", text: "반가워요. 다음에 커피 한잔해요." },
+      { role: "other", text: "좋아요! 다음 주에 시간 맞춰봐요 ㅎㅎ" },
+      { role: "self", text: "이번 주말은 어떠세요?" },
+      { role: "other", text: "음.. 제가 마음 불편하게 해드렸다면 죄송합니다." },
+      { role: "other", text: "네 저는 여기까지 연락해야했네요" },
+      { role: "other", text: "하시는 일 잘 되시길 바랍습니다 🙏" },
+    ], {
+      relationshipStage: "cooling_down",
+      meetingChannel: "dating_app",
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+    const explicitEndSignal = result.signals.find(
+      (signal) => signal.signalKey === "explicit_relationship_end",
+    );
+
+    expect(explicitEndSignal).toMatchObject({
+      signalType: "caution",
+      confidenceLevel: "high",
+    });
+    expect(result.recommendedAction).toBe("consider_stopping");
+    expect(result.overallSummary).toContain("종료");
+    expect(result.recommendations[0]).toMatchObject({
+      recommendationType: "next_message",
+    });
+    expect(result.recommendations[0].content).toContain("알겠습니다");
+    expect(result.recommendations.map((item) => item.content).join(" ")).not.toMatch(
+      /다음\s*(?:만남|약속)|만나(?:요|볼까요)|데이트\s*제안/,
+    );
+  });
+
+  it("does not treat the user's own closing phrase as the other person's boundary", () => {
+    const conversation = makeConversation([
+      { role: "other", text: "다음에 또 이야기해요!" },
+      { role: "self", text: "네 저는 여기까지 연락해야겠네요." },
+    ]);
+
+    const result = buildRuleBasedAnalysis(conversation);
+
+    expect(result.signals.map((signal) => signal.signalKey)).not.toContain(
+      "explicit_relationship_end",
+    );
+  });
+
+  it("prioritizes an explicit end over positive situation context", () => {
+    const conversation = makeConversation([
+      { role: "other", text: "저는 여기까지 연락해야겠네요." },
+    ], {
+      rawText: "상대: 저는 여기까지 연락해야겠네요.",
+      situationContext:
+        "입력은 실제 만남 후기 중심입니다. 만남 분위기는 좋았고 대화가 편하게 이어졌습니다. 만남 뒤 연락도 이어지고 있습니다.",
+    });
+
+    const result = buildRuleBasedAnalysis(conversation);
+
+    expect(result.recommendedAction).toBe("consider_stopping");
+    expect(result.overallSummary).toContain("종료");
+    expect(result.recommendations[0].content).toContain("알겠습니다");
+  });
+
+  it("clears an older end signal when the other person explicitly resumes contact", () => {
+    const conversation = makeConversation([
+      { role: "other", text: "여기까지 연락하겠습니다." },
+      { role: "other", text: "제가 다시 연락드린 건 계속 이야기하고 싶어서예요." },
+    ]);
+
+    const result = buildRuleBasedAnalysis(conversation);
+
+    expect(result.signals.map((signal) => signal.signalKey)).not.toContain(
+      "explicit_relationship_end",
+    );
+    expect(result.recommendedAction).not.toBe("consider_stopping");
+  });
+
+  it("keeps an end signal when a later message forbids renewed contact", () => {
+    const conversation = makeConversation([
+      { role: "other", text: "여기까지 연락하겠습니다." },
+      { role: "other", text: "다시 연락하지 마세요." },
+    ]);
+
+    const result = buildRuleBasedAnalysis(conversation);
+
+    expect(result.signals.map((signal) => signal.signalKey)).toContain(
+      "explicit_relationship_end",
+    );
+    expect(result.recommendedAction).toBe("consider_stopping");
+  });
+
+  it("does not confuse temporary conversation endings or unrelated relationships with a breakup", () => {
+    const variants = [
+      "오늘 대화는 여기서 마무리하고 내일 봐요.",
+      "회사 인간관계를 정리하는 중이에요.",
+      "이 대화는 그만하고 영화 이야기해요.",
+    ];
+
+    for (const text of variants) {
+      const result = buildRuleBasedAnalysis(
+        makeConversation([{ role: "other", text }]),
+      );
+
+      expect(result.signals.map((signal) => signal.signalKey)).not.toContain(
+        "explicit_relationship_end",
+      );
+    }
+  });
+
+  it("detects direct no-contact requests without a time prefix", () => {
+    const variants = [
+      "연락하지 말아 주세요.",
+      "그만 연락해 주세요.",
+      "이제 연락하지 않았으면 좋겠어요.",
+    ];
+
+    for (const text of variants) {
+      const result = buildRuleBasedAnalysis(
+        makeConversation([{ role: "other", text }]),
+      );
+
+      expect(result.signals.map((signal) => signal.signalKey)).toContain(
+        "explicit_relationship_end",
+      );
+      expect(result.recommendedAction).toBe("consider_stopping");
+    }
+  });
+
+  it("does not treat negative meeting plans as renewed contact", () => {
+    const variants = [
+      "다음에 다시 만나지는 않을 것 같아요.",
+      "내일 보지 말아요.",
+    ];
+
+    for (const text of variants) {
+      const result = buildRuleBasedAnalysis(
+        makeConversation([
+          { role: "other", text: "여기까지 연락하겠습니다." },
+          { role: "other", text },
+        ]),
+      );
+
+      expect(result.signals.map((signal) => signal.signalKey)).toContain(
+        "explicit_relationship_end",
+      );
+    }
+  });
+
+  it("does not confuse affirmative contact statements with no-contact requests", () => {
+    const variants = [
+      "앞으로 연락 안 하는 날이 없었으면 좋겠어요.",
+      "더 이상 연락을 미루지 않을게요.",
+      "다음에 다시 연락 안 하면 제가 먼저 할게요.",
+    ];
+
+    for (const text of variants) {
+      const result = buildRuleBasedAnalysis(
+        makeConversation([{ role: "other", text }]),
+      );
+
+      expect(result.signals.map((signal) => signal.signalKey)).not.toContain(
+        "explicit_relationship_end",
+      );
+    }
+  });
 });

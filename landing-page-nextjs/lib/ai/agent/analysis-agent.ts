@@ -141,8 +141,6 @@ const agentTools: Tool[] = [
         },
         recommendations: {
           type: "array",
-          minItems: 3,
-          maxItems: 3,
           items: {
             type: "object",
             properties: {

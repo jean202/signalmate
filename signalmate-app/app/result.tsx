@@ -1,175 +1,451 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Clipboard,
-  Alert,
-} from 'react-native';
-import type { Signal, Recommendation } from '../lib/api';
+import * as Clipboard from 'expo-clipboard';
+import { usePreventRemove } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { Check, Copy } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-const SIGNAL_CONFIG = {
-  positive: { bg: '#f0fdf4', border: '#86efac', badge: '#16a34a', label: '긍정' },
-  caution: { bg: '#fff7ed', border: '#fdba74', badge: '#ea580c', label: '주의' },
-  ambiguous: { bg: '#f8fafc', border: '#cbd5e1', badge: '#64748b', label: '애매' },
+import { ScreenShell } from '../components/ui/screen-shell';
+import { colors, radius, touchTarget } from '../components/ui/theme';
+import { groupSignalsByContext } from '../lib/analysis/signal-groups';
+import type {
+  AnalysisRecommendation,
+  AnalysisSignal,
+  ConfidenceLevel,
+  SignalType,
+} from '../lib/analysis/types';
+import { useAnalysis } from '../providers/analysis-provider';
+
+const SIGNAL_PRESENTATION: Record<SignalType, { color: string; label: string }> = {
+  positive: { color: colors.positive, label: '긍정' },
+  caution: { color: colors.caution, label: '주의' },
+  ambiguous: { color: colors.ambiguous, label: '애매' },
 };
 
+const CONFIDENCE_LABEL: Record<ConfidenceLevel, string> = {
+  low: '낮음',
+  medium: '보통',
+  high: '높음',
+};
+
+type ResetState = 'idle' | 'running' | 'failed';
+
 export default function ResultScreen() {
-  const { signals: rawSignals, recommendations: rawRecs } = useLocalSearchParams<{
-    signals: string;
-    recommendations: string;
-  }>();
   const router = useRouter();
+  const { resetDraft, result } = useAnalysis();
+  const mounted = useRef(true);
+  const resetting = useRef(false);
+  const copyInFlight = useRef(false);
+  const copyRunId = useRef(0);
+  const pendingHomeNavigation = useRef(false);
+  const [removalAllowed, setRemovalAllowed] = useState(false);
+  const [resetState, setResetState] = useState<ResetState>('idle');
+  const [copyingRecommendationId, setCopyingRecommendationId] = useState<string | null>(null);
+  const [copiedRecommendationId, setCopiedRecommendationId] = useState<string | null>(null);
+  const [copyFailedRecommendationId, setCopyFailedRecommendationId] = useState<string | null>(null);
 
-  const signals: Signal[] = rawSignals ? JSON.parse(rawSignals) : [];
-  const recommendations: Recommendation[] = rawRecs ? JSON.parse(rawRecs) : [];
+  useEffect(() => () => {
+    mounted.current = false;
+    copyRunId.current += 1;
+    copyInFlight.current = false;
+  }, []);
 
-  const positiveCount = signals.filter((s) => s.type === 'positive').length;
-  const cautionCount = signals.filter((s) => s.type === 'caution').length;
+  usePreventRemove(!removalAllowed, () => undefined);
 
-  function copyMessage(text: string) {
-    Clipboard.setString(text);
-    Alert.alert('복사됨', '메시지가 클립보드에 복사됐어요.');
+  useEffect(() => {
+    if (!removalAllowed || !pendingHomeNavigation.current) return;
+    pendingHomeNavigation.current = false;
+    router.replace('/');
+  }, [removalAllowed, router]);
+
+  const groups = useMemo(
+    () => groupSignalsByContext(result?.signals ?? []),
+    [result?.signals],
+  );
+  const recommendations = useMemo(
+    () => sortRecommendations(result?.recommendations ?? []),
+    [result?.recommendations],
+  );
+  const nextMessages = recommendations.filter((item) => item.recommendationType === 'next_message');
+
+  const startNewAnalysis = async () => {
+    if (resetting.current) return;
+    resetting.current = true;
+    setResetState('running');
+    try {
+      await resetDraft();
+      if (mounted.current) {
+        pendingHomeNavigation.current = true;
+        setRemovalAllowed(true);
+      }
+    } catch {
+      if (mounted.current) setResetState('failed');
+    } finally {
+      resetting.current = false;
+    }
+  };
+
+  const copyRecommendation = async (recommendation: AnalysisRecommendation) => {
+    if (copyInFlight.current) return;
+    copyInFlight.current = true;
+    const runId = ++copyRunId.current;
+    setCopiedRecommendationId(null);
+    setCopyFailedRecommendationId(null);
+    setCopyingRecommendationId(recommendation.id);
+    try {
+      await Clipboard.setStringAsync(recommendation.content);
+      if (mounted.current && copyRunId.current === runId) {
+        setCopiedRecommendationId(recommendation.id);
+      }
+    } catch {
+      if (mounted.current && copyRunId.current === runId) {
+        setCopyFailedRecommendationId(recommendation.id);
+      }
+    } finally {
+      if (copyRunId.current === runId) {
+        copyInFlight.current = false;
+        if (mounted.current) setCopyingRecommendationId(null);
+      }
+    }
+  };
+
+  if (!result) {
+    return (
+      <View style={styles.screen}>
+        <ScreenShell contentContainerStyle={styles.emptyContent} bottomInset={32}>
+          <View style={styles.emptyState}>
+            <Text style={styles.eyebrow}>분석 결과</Text>
+            <Text accessibilityRole="header" style={styles.emptyTitle}>분석 결과를 찾지 못했어요</Text>
+            <Text style={styles.bodyText}>저장된 결과가 없거나 앱이 다시 시작됐어요. 입력 화면으로 돌아가 새 분석을 시작해 주세요.</Text>
+            {resetState === 'failed' && <ResetFailure />}
+            <NewAnalysisButton
+              label={resetState === 'failed' ? '새 분석 다시 시도' : '새 분석으로 돌아가기'}
+              running={resetState === 'running'}
+              onPress={startNewAnalysis}
+            />
+          </View>
+        </ScreenShell>
+      </View>
+    );
   }
 
+  const hasMeetingSignals = groups.meeting.length > 0 || groups.followUp.length > 0;
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* 요약 배너 */}
-        <View style={styles.summary}>
-          <Text style={styles.summaryTitle}>분석 완료</Text>
-          <View style={styles.summaryRow}>
-            <SummaryBadge count={positiveCount} label="긍정 신호" color="#16a34a" />
-            <SummaryBadge count={cautionCount} label="주의 신호" color="#ea580c" />
-            <SummaryBadge count={recommendations.length} label="추천 메시지" color="#2563eb" />
-          </View>
+    <View style={styles.screen}>
+      <ScreenShell testID="result-scroll" contentContainerStyle={styles.content} bottomInset={40}>
+        <View style={styles.intro}>
+          <Text style={styles.eyebrow}>분석 완료</Text>
+          <Text accessibilityRole="header" style={styles.title}>관계 신호를 근거부터 확인하세요</Text>
+          <Text style={styles.bodyText}>신호는 가능성을 보여주는 참고 정보예요. 실제 반응을 보며 다음 행동을 조정하세요.</Text>
         </View>
 
-        {/* 신호 카드 */}
-        {signals.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>관계 신호</Text>
-            {signals.map((signal) => (
-              <SignalCard key={signal.id} signal={signal} />
-            ))}
-          </>
+        {hasMeetingSignals && (
+          <ResultSection title="실제 만남 신호">
+            {groups.meeting.length > 0 && (
+              <SignalGroup label="만남에서 확인된 신호" signals={groups.meeting} />
+            )}
+            {groups.followUp.length > 0 && (
+              <SignalGroup label="만남 뒤 연락" signals={groups.followUp} />
+            )}
+          </ResultSection>
         )}
 
-        {/* 추천 메시지 */}
-        {recommendations.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>추천 메시지</Text>
-            {recommendations.map((rec) => (
-              <RecommendationCard key={rec.id} rec={rec} onCopy={copyMessage} />
-            ))}
-          </>
+        {groups.chat.length > 0 && (
+          <ResultSection title="채팅 신호">
+            <View>{groups.chat.map((signal) => <SignalRow key={signal.id} signal={signal} />)}</View>
+          </ResultSection>
         )}
 
-        <TouchableOpacity
-          style={styles.retryBtn}
-          onPress={() => router.replace('/analyze')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.retryText}>다른 채팅 분석하기</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
+        {groups.uncertainty.length > 0 && (
+          <ResultSection title="판단이 어려운 부분">
+            <View>{groups.uncertainty.map((signal) => <SignalRow key={signal.id} signal={signal} />)}</View>
+          </ResultSection>
+        )}
 
-function SummaryBadge({ count, label, color }: { count: number; label: string; color: string }) {
-  return (
-    <View style={styles.badge}>
-      <Text style={[styles.badgeCount, { color }]}>{count}</Text>
-      <Text style={styles.badgeLabel}>{label}</Text>
+        <ResultSection title="종합 판단">
+          <Text style={styles.summaryText}>{result.overallSummary || '확인할 수 있는 종합 판단이 없어요.'}</Text>
+          <Text style={styles.overallConfidence}>전체 신뢰도 {CONFIDENCE_LABEL[result.confidenceLevel]}</Text>
+        </ResultSection>
+
+        <ResultSection title="추천하는 다음 행동">
+          {!!result.recommendedAction && <Text style={styles.actionTitle}>{result.recommendedAction}</Text>}
+          <Text style={styles.bodyText}>{result.recommendedActionReason || '현재 정보만으로 구체적인 다음 행동을 추천하기 어려워요.'}</Text>
+        </ResultSection>
+
+        <ResultSection title="추천 메시지">
+          {nextMessages.length > 0 ? (
+            nextMessages.map((recommendation, index) => (
+              <MessageRecommendation
+                key={recommendation.id}
+                recommendation={recommendation}
+                index={index}
+                copyBusy={copyingRecommendationId !== null}
+                copied={copiedRecommendationId === recommendation.id}
+                copying={copyingRecommendationId === recommendation.id}
+                failed={copyFailedRecommendationId === recommendation.id}
+                onCopy={copyRecommendation}
+              />
+            ))
+          ) : (
+            <View style={styles.noMessage}>
+              <Text style={styles.noMessageTitle}>추천 메시지를 만들지 못했어요</Text>
+              <Text style={styles.bodyText}>추천하는 다음 행동을 참고해 직접 메시지를 작성해 보세요.</Text>
+            </View>
+          )}
+
+          {recommendations
+            .filter((item) => item.recommendationType !== 'next_message')
+            .map((recommendation) => (
+              <RecommendationRow key={recommendation.id} recommendation={recommendation} />
+            ))}
+        </ResultSection>
+
+        {result.warnings.length > 0 && (
+          <ResultSection title="분석 처리 안내">
+            <View accessibilityRole="alert" style={styles.warningList}>
+              {result.warnings.map((warning, index) => (
+                <Text key={`${index}-${warning}`} style={styles.warningText}>{warning}</Text>
+              ))}
+            </View>
+          </ResultSection>
+        )}
+
+        {resetState === 'failed' && <ResetFailure />}
+        <NewAnalysisButton
+          label={resetState === 'failed' ? '새 분석 다시 시도' : '새 분석 시작'}
+          running={resetState === 'running'}
+          onPress={startNewAnalysis}
+        />
+      </ScreenShell>
     </View>
   );
 }
 
-function SignalCard({ signal }: { signal: Signal }) {
-  const cfg = SIGNAL_CONFIG[signal.type];
+function sortRecommendations(recommendations: readonly AnalysisRecommendation[]) {
+  return recommendations
+    .map((recommendation, inputOrder) => ({ recommendation, inputOrder }))
+    .sort((left, right) => {
+      const leftPriority = left.recommendation.recommendationType === 'next_message' ? 0 : 1;
+      const rightPriority = right.recommendation.recommendationType === 'next_message' ? 0 : 1;
+      return leftPriority - rightPriority
+        || left.recommendation.displayOrder - right.recommendation.displayOrder
+        || left.inputOrder - right.inputOrder;
+    })
+    .map(({ recommendation }) => recommendation);
+}
+
+function ResultSection({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <View style={[styles.signalCard, { backgroundColor: cfg.bg, borderColor: cfg.border }]}>
-      <View style={styles.signalHeader}>
-        <Text style={[styles.signalBadge, { color: cfg.badge }]}>{cfg.label}</Text>
-        <Text style={styles.signalLabel}>{signal.label}</Text>
+    <View style={styles.section}>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function SignalGroup({ label, signals }: { label: string; signals: AnalysisSignal[] }) {
+  return (
+    <View style={styles.signalGroup}>
+      <Text style={styles.groupLabel}>{label}</Text>
+      <View>{signals.map((signal) => <SignalRow key={signal.id} signal={signal} />)}</View>
+    </View>
+  );
+}
+
+function SignalRow({ signal }: { signal: AnalysisSignal }) {
+  const presentation = SIGNAL_PRESENTATION[signal.signalType];
+  return (
+    <View
+      accessibilityLabel={`${presentation.label} 신호. ${signal.title}. 신뢰도 ${CONFIDENCE_LABEL[signal.confidenceLevel]}`}
+      style={[styles.signalRow, { borderLeftColor: presentation.color }]}
+      testID={`signal-row-${signal.id}`}
+    >
+      <View style={styles.signalMeta}>
+        <Text style={[styles.signalType, { color: presentation.color }]}>{presentation.label}</Text>
+        <Text style={styles.confidence}>신뢰도 {CONFIDENCE_LABEL[signal.confidenceLevel]}</Text>
       </View>
-      <Text style={styles.signalEvidence}>{signal.evidenceText}</Text>
+      <Text style={styles.signalTitle}>{signal.title}</Text>
+      <Text style={styles.signalDescription}>{signal.description}</Text>
+      <View style={styles.evidence}>
+        <Text style={styles.evidenceLabel}>근거</Text>
+        <Text selectable style={styles.evidenceText}>{signal.evidenceText || '표시할 근거가 없어요.'}</Text>
+      </View>
     </View>
   );
 }
 
-function RecommendationCard({
-  rec,
+function RecommendationRow({ recommendation }: { recommendation: AnalysisRecommendation }) {
+  return (
+    <View style={styles.recommendationRow} testID="recommendation-row">
+      <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
+      <Text style={styles.signalDescription}>{recommendation.content}</Text>
+      {!!recommendation.rationale && <Text style={styles.rationale}>{recommendation.rationale}</Text>}
+    </View>
+  );
+}
+
+function MessageRecommendation({
+  copied,
+  copyBusy,
+  copying,
+  failed,
+  index,
   onCopy,
+  recommendation,
 }: {
-  rec: Recommendation;
-  onCopy: (text: string) => void;
+  copied: boolean;
+  copyBusy: boolean;
+  copying: boolean;
+  failed: boolean;
+  index: number;
+  onCopy: (recommendation: AnalysisRecommendation) => Promise<void>;
+  recommendation: AnalysisRecommendation;
+}) {
+  const label = index === 0 ? '추천 메시지' : `추천 메시지 ${index + 1}`;
+  return (
+    <View
+      accessibilityLabel={`${label}: ${recommendation.content}`}
+      style={styles.messagePanel}
+      testID="recommendation-row"
+    >
+      <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
+      <Text selectable style={styles.messageText}>{recommendation.content}</Text>
+      {!!recommendation.rationale && <Text style={styles.rationale}>{recommendation.rationale}</Text>}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label} ${copied ? '복사 완료' : '복사'}`}
+        accessibilityState={{ busy: copyBusy, disabled: copyBusy }}
+        disabled={copyBusy}
+        onPress={() => { void onCopy(recommendation); }}
+        style={({ pressed }) => [
+          styles.copyButton,
+          pressed && styles.commandPressed,
+          copyBusy && styles.commandDisabled,
+        ]}
+      >
+        {copied
+          ? <Check color={colors.background} size={18} strokeWidth={2.5} />
+          : <Copy color={colors.background} size={18} strokeWidth={2.25} />}
+        <Text style={styles.copyButtonText}>
+          {copying ? '복사 중' : copied ? '복사 완료' : '복사'}
+        </Text>
+      </Pressable>
+      {failed && <Text accessibilityRole="alert" style={styles.inlineError}>메시지를 복사하지 못했어요. 다시 시도해 주세요.</Text>}
+    </View>
+  );
+}
+
+function NewAnalysisButton({ label, onPress, running }: {
+  label: string;
+  onPress: () => Promise<void>;
+  running: boolean;
 }) {
   return (
-    <View style={styles.recCard}>
-      <Text style={styles.recMessage}>"{rec.messageText}"</Text>
-      {rec.rationale && <Text style={styles.recRationale}>{rec.rationale}</Text>}
-      <TouchableOpacity style={styles.copyBtn} onPress={() => onCopy(rec.messageText)} activeOpacity={0.7}>
-        <Text style={styles.copyText}>복사</Text>
-      </TouchableOpacity>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ busy: running, disabled: running }}
+      disabled={running}
+      onPress={() => { void onPress(); }}
+      style={({ pressed }) => [
+        styles.newAnalysisButton,
+        pressed && styles.commandPressed,
+        running && styles.commandDisabled,
+      ]}
+    >
+      <Text style={styles.newAnalysisButtonText}>{running ? '새 분석 준비 중' : label}</Text>
+    </Pressable>
+  );
+}
+
+function ResetFailure() {
+  return (
+    <View accessibilityRole="alert" style={styles.resetFailure}>
+      <Text style={styles.resetFailureTitle}>새 분석을 준비하지 못했어요</Text>
+      <Text style={styles.bodyText}>잠시 후 다시 시도해 주세요.</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  container: { padding: 24, paddingBottom: 48 },
-  summary: {
-    backgroundColor: '#f8f8f8',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { gap: 28, width: '100%', maxWidth: 680, alignSelf: 'center' },
+  intro: { gap: 7, paddingBottom: 4 },
+  eyebrow: { color: colors.positive, fontSize: 13, fontWeight: '800', lineHeight: 18 },
+  title: { color: colors.text, fontSize: 24, fontWeight: '800', lineHeight: 32 },
+  bodyText: { color: colors.muted, fontSize: 15, lineHeight: 23 },
+  section: { gap: 12, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.border },
+  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '800', lineHeight: 26 },
+  signalGroup: { gap: 8 },
+  groupLabel: { color: colors.muted, fontSize: 13, fontWeight: '800', lineHeight: 19 },
+  signalRow: {
+    gap: 7,
+    paddingVertical: 14,
+    paddingLeft: 14,
+    paddingRight: 2,
+    borderLeftWidth: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  summaryTitle: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 12 },
-  summaryRow: { flexDirection: 'row', gap: 16 },
-  badge: { alignItems: 'center', flex: 1 },
-  badgeCount: { fontSize: 28, fontWeight: '800' },
-  badgeLabel: { fontSize: 11, color: '#666', marginTop: 2 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 12 },
-  signalCard: {
-    borderWidth: 1.5,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  signalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  signalBadge: { fontSize: 12, fontWeight: '700' },
-  signalLabel: { fontSize: 14, fontWeight: '600', color: '#111', flex: 1 },
-  signalEvidence: { fontSize: 13, color: '#555', lineHeight: 20 },
-  recCard: {
-    borderWidth: 1.5,
-    borderColor: '#e0e7ff',
-    backgroundColor: '#f5f7ff',
-    borderRadius: 12,
+  signalMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  signalType: { fontSize: 12, fontWeight: '900', lineHeight: 17 },
+  confidence: { color: colors.muted, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  signalTitle: { color: colors.text, fontSize: 16, fontWeight: '800', lineHeight: 23 },
+  signalDescription: { color: colors.text, fontSize: 14, lineHeight: 21 },
+  evidence: { gap: 3, marginTop: 2 },
+  evidenceLabel: { color: colors.muted, fontSize: 12, fontWeight: '800', lineHeight: 17 },
+  evidenceText: { color: colors.muted, fontSize: 14, lineHeight: 21 },
+  summaryText: { color: colors.text, fontSize: 16, lineHeight: 25 },
+  overallConfidence: { color: colors.muted, fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  actionTitle: { color: colors.text, fontSize: 17, fontWeight: '800', lineHeight: 24 },
+  messagePanel: {
+    gap: 10,
     padding: 16,
-    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.action,
+    borderRadius: radius.panel,
+    backgroundColor: colors.actionSurface,
   },
-  recMessage: { fontSize: 15, color: '#111', lineHeight: 22, marginBottom: 8, fontStyle: 'italic' },
-  recRationale: { fontSize: 12, color: '#666', marginBottom: 10, lineHeight: 18 },
-  copyBtn: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  copyText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  retryBtn: {
-    marginTop: 32,
-    borderWidth: 1.5,
-    borderColor: '#111',
-    borderRadius: 14,
-    paddingVertical: 16,
+  recommendationTitle: { color: colors.text, fontSize: 14, fontWeight: '800', lineHeight: 20 },
+  messageText: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 26 },
+  rationale: { color: colors.muted, fontSize: 13, lineHeight: 20 },
+  copyButton: {
+    minWidth: touchTarget,
+    minHeight: touchTarget,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.control,
+    backgroundColor: colors.action,
   },
-  retryText: { color: '#111', fontSize: 16, fontWeight: '600' },
+  copyButtonText: { color: colors.background, fontSize: 14, fontWeight: '800', lineHeight: 20 },
+  inlineError: { color: colors.danger, fontSize: 13, fontWeight: '700', lineHeight: 20 },
+  noMessage: { gap: 4, paddingVertical: 6 },
+  noMessageTitle: { color: colors.text, fontSize: 15, fontWeight: '800', lineHeight: 22 },
+  recommendationRow: { gap: 5, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  warningList: { gap: 8, padding: 12, borderRadius: radius.panel, backgroundColor: colors.surface },
+  warningText: { color: colors.muted, fontSize: 14, lineHeight: 21 },
+  newAnalysisButton: {
+    minHeight: touchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.text,
+    borderRadius: radius.control,
+    backgroundColor: colors.background,
+  },
+  newAnalysisButtonText: { color: colors.text, fontSize: 15, fontWeight: '800', lineHeight: 21 },
+  commandPressed: { opacity: 0.72 },
+  commandDisabled: { opacity: 0.48 },
+  resetFailure: { gap: 3, padding: 12, borderRadius: radius.panel, backgroundColor: colors.cautionSurface },
+  resetFailureTitle: { color: colors.caution, fontSize: 15, fontWeight: '800', lineHeight: 22 },
+  emptyContent: { justifyContent: 'center', width: '100%', maxWidth: 560, alignSelf: 'center' },
+  emptyState: { gap: 14 },
+  emptyTitle: { color: colors.text, fontSize: 23, fontWeight: '800', lineHeight: 31 },
 });
