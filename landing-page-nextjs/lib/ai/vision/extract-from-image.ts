@@ -9,10 +9,13 @@
  *   [오후 8:13] 상대: 네 덕분에요 :)
  */
 import {
+  buildInferenceOptions,
   callWithRetry,
   extractToolInput,
   getAnthropicClient,
+  getInferenceTimeoutMs,
   getModelName,
+  resolveMaxTokens,
 } from "@/lib/ai/anthropic-client";
 import { trackUsage } from "@/lib/ai/token-tracker";
 
@@ -111,6 +114,7 @@ export async function extractChatFromImage(params: {
   // Vision은 Sonnet/Haiku 4.5+ 모두 지원. Haiku로 우선 시도.
   const model = process.env.ANTHROPIC_VISION_MODEL?.trim() || getModelName();
   const startTime = Date.now();
+  const timeoutMs = getInferenceTimeoutMs("vision_extract");
   let retryCount = 0;
 
   try {
@@ -118,9 +122,9 @@ export async function extractChatFromImage(params: {
       async (requestOptions) => {
         const response = await client.messages.create(
           {
+            ...buildInferenceOptions(model, "vision_extract"),
             model,
-            max_tokens: 4000,
-            temperature: 0,
+            max_tokens: resolveMaxTokens(4000, "vision_extract", model),
             system: SYSTEM_PROMPT,
             tools: [submitExtractedChatTool],
             tool_choice: { type: "tool", name: "submit_extracted_chat" },
@@ -161,7 +165,7 @@ export async function extractChatFromImage(params: {
       {
         label: "vision_extract",
         extraRetries: 1,
-        timeoutMs: 30_000,
+        timeoutMs,
         onRetry: (info) => {
           retryCount = info.retryCount;
         },
@@ -178,6 +182,7 @@ export async function extractChatFromImage(params: {
       cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
       durationMs: Date.now() - startTime,
       retryCount,
+      timeoutMs,
       success: true,
     }).catch(() => {});
 
@@ -192,6 +197,7 @@ export async function extractChatFromImage(params: {
       outputTokens: 0,
       durationMs: Date.now() - startTime,
       retryCount,
+      timeoutMs,
       success: false,
       errorMessage,
     }).catch(() => {});

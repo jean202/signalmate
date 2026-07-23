@@ -477,12 +477,25 @@ LLM tuning knobs:
 |----------|---------|---------|
 | `ANTHROPIC_SIGNAL_TIMEOUT_MS` | `20000` | Signal enhancement timeout budget. |
 | `ANTHROPIC_RECOMMENDATION_TIMEOUT_MS` | `25000` | Recommendation generation timeout budget. |
+| `ANTHROPIC_DEEP_REPORT_TIMEOUT_MS` | `35000` | Deep report generation timeout budget. |
+| `ANTHROPIC_DRAFT_CHECK_TIMEOUT_MS` | `15000` | Draft checker timeout budget. |
 | `ANTHROPIC_AGENT_ITERATION_TIMEOUT_MS` | `8000` | Per-iteration agent timeout budget. |
+| `ANTHROPIC_VISION_TIMEOUT_MS` | `30000` | Screenshot OCR timeout budget. |
 | `ANTHROPIC_RETRY_BASE_DELAY_MS` | `500` | Base backoff for app-level Anthropic retries. |
-| `ANTHROPIC_THINKING_MODE` | stage default | Global thinking mode: `off`, `enabled`, or `adaptive`. |
+| `ANTHROPIC_THINKING_MODE` | stage default | Global thinking mode: `off`, `enabled`, or `adaptive`. `enabled` uses adaptive thinking with effort on Claude Sonnet/Opus 4.6+ and manual budgets on Haiku/earlier Claude 4 models. |
 | `ANTHROPIC_THINKING_SIGNAL_ENHANCER` | `off` | Stage override for signal enhancement. |
 | `ANTHROPIC_THINKING_RECOMMENDATION` | `enabled` | Stage override for recommendation generation. |
+| `ANTHROPIC_THINKING_DEEP_REPORT` | `enabled` | Stage override for deep report generation. |
+| `ANTHROPIC_THINKING_DRAFT_CHECK` | `off` | Stage override for draft checking. |
 | `ANTHROPIC_THINKING_AGENT` | `enabled` | Stage override for agent iterations. |
+| `ANTHROPIC_THINKING_VISION` | `off` | Stage override for screenshot OCR. |
+| `ANTHROPIC_EFFORT` | stage default | Global effort override for adaptive-thinking models. Accepted values: `low`, `medium`, `high`, `max`. |
+| `ANTHROPIC_EFFORT_SIGNAL_ENHANCER` | `low` | Stage effort override when signal enhancement uses adaptive thinking. |
+| `ANTHROPIC_EFFORT_RECOMMENDATION` | `medium` | Stage effort override for recommendation generation. |
+| `ANTHROPIC_EFFORT_DEEP_REPORT` | `medium` | Stage effort override for deep report generation. |
+| `ANTHROPIC_EFFORT_DRAFT_CHECK` | `low` | Stage effort override when draft checking uses adaptive thinking. |
+| `ANTHROPIC_EFFORT_AGENT` | `medium` | Stage effort override for agent iterations. |
+| `ANTHROPIC_EFFORT_VISION` | `low` | Stage effort override when screenshot OCR uses adaptive thinking. |
 
 Deployment notes:
 

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type {
   Message,
   MessageParam,
+  OutputConfig,
   ThinkingConfigParam,
 } from "@anthropic-ai/sdk/resources/messages";
 import { createLogger } from "@/lib/logger";
@@ -52,11 +53,19 @@ export function getModelName(): string {
 
 /**
  * 모델이 adaptive thinking을 지원하는지 확인합니다.
- * Sonnet 4.6+ / Opus 4.6+ 만 지원. Haiku 4.5는 미지원.
+ * Sonnet 4.6+ / Opus 4.6+ 계열은 effort와 함께 adaptive thinking을 사용합니다.
  */
 export function supportsAdaptiveThinking(model?: string): boolean {
-  const m = model ?? getModelName();
-  return m.includes("sonnet-4-6") || m.includes("opus-4-6") || m.includes("opus-4-7");
+  const m = normalizeModel(model);
+  return (
+    m.includes("sonnet-4-6") ||
+    m.includes("opus-4-6") ||
+    m.includes("opus-4-7") ||
+    m.includes("opus-4-8") ||
+    m.includes("sonnet-5") ||
+    m.includes("fable-5") ||
+    m.includes("mythos")
+  );
 }
 
 /**
@@ -79,7 +88,8 @@ type InferenceStage =
   | "recommendation_generator"
   | "deep_report"
   | "draft_check"
-  | "agent_iteration";
+  | "agent_iteration"
+  | "vision_extract";
 
 const DEFAULT_STAGE_TIMEOUT_MS: Record<InferenceStage, number> = {
   signal_enhancer: 20_000,
@@ -87,6 +97,7 @@ const DEFAULT_STAGE_TIMEOUT_MS: Record<InferenceStage, number> = {
   deep_report: 35_000,
   draft_check: 15_000,
   agent_iteration: 8_000,
+  vision_extract: 30_000,
 };
 
 const STAGE_TIMEOUT_ENV: Record<InferenceStage, string> = {
@@ -95,6 +106,7 @@ const STAGE_TIMEOUT_ENV: Record<InferenceStage, string> = {
   deep_report: "ANTHROPIC_DEEP_REPORT_TIMEOUT_MS",
   draft_check: "ANTHROPIC_DRAFT_CHECK_TIMEOUT_MS",
   agent_iteration: "ANTHROPIC_AGENT_ITERATION_TIMEOUT_MS",
+  vision_extract: "ANTHROPIC_VISION_TIMEOUT_MS",
 };
 
 const STAGE_THINKING_ENV: Record<InferenceStage, string> = {
@@ -103,6 +115,16 @@ const STAGE_THINKING_ENV: Record<InferenceStage, string> = {
   deep_report: "ANTHROPIC_THINKING_DEEP_REPORT",
   draft_check: "ANTHROPIC_THINKING_DRAFT_CHECK",
   agent_iteration: "ANTHROPIC_THINKING_AGENT",
+  vision_extract: "ANTHROPIC_THINKING_VISION",
+};
+
+const STAGE_EFFORT_ENV: Record<InferenceStage, string> = {
+  signal_enhancer: "ANTHROPIC_EFFORT_SIGNAL_ENHANCER",
+  recommendation_generator: "ANTHROPIC_EFFORT_RECOMMENDATION",
+  deep_report: "ANTHROPIC_EFFORT_DEEP_REPORT",
+  draft_check: "ANTHROPIC_EFFORT_DRAFT_CHECK",
+  agent_iteration: "ANTHROPIC_EFFORT_AGENT",
+  vision_extract: "ANTHROPIC_EFFORT_VISION",
 };
 
 // recommendation_generator: 핵심 추론 단계 — thinking으로 품질 ↑.
@@ -114,6 +136,7 @@ const STAGE_DEFAULT_THINKING: Record<InferenceStage, string> = {
   deep_report: "enabled",
   draft_check: "off",
   agent_iteration: "enabled",
+  vision_extract: "off",
 };
 
 const STAGE_THINKING_BUDGET_TOKENS: Record<InferenceStage, number> = {
@@ -122,6 +145,27 @@ const STAGE_THINKING_BUDGET_TOKENS: Record<InferenceStage, number> = {
   deep_report: 2048,
   draft_check: 1024,
   agent_iteration: 1024,
+  vision_extract: 1024,
+};
+
+const STAGE_TEMPERATURE: Record<InferenceStage, number> = {
+  signal_enhancer: 0.2,
+  recommendation_generator: 0.2,
+  deep_report: 0.2,
+  draft_check: 0.2,
+  agent_iteration: 0.2,
+  vision_extract: 0,
+};
+
+type EffortLevel = NonNullable<OutputConfig["effort"]>;
+
+const STAGE_DEFAULT_EFFORT: Record<InferenceStage, EffortLevel> = {
+  signal_enhancer: "low",
+  recommendation_generator: "medium",
+  deep_report: "medium",
+  draft_check: "low",
+  agent_iteration: "medium",
+  vision_extract: "low",
 };
 
 export function getInferenceTimeoutMs(stage: InferenceStage): number {
@@ -134,18 +178,27 @@ export function buildInferenceOptions(
 ): {
   temperature?: number;
   thinking?: ThinkingConfigParam;
+  output_config?: OutputConfig;
 } {
   const thinkingMode = resolveThinkingMode(stage);
 
   if (!thinkingMode || thinkingMode === "false" || thinkingMode === "off") {
-    return { temperature: 0.2 };
+    return buildNonThinkingOptions(model, stage);
   }
 
-  if (!supportsAdaptiveThinking(model)) {
-    return { temperature: 0.2 };
+  if (supportsAdaptiveThinking(model)) {
+    return {
+      thinking: {
+        type: "adaptive",
+        display: "omitted",
+      },
+      output_config: {
+        effort: resolveEffortLevel(stage),
+      },
+    };
   }
 
-  if (thinkingMode === "enabled") {
+  if (thinkingMode === "enabled" && supportsManualThinking(model)) {
     const budget_tokens = stage
       ? STAGE_THINKING_BUDGET_TOKENS[stage]
       : 1024;
@@ -158,12 +211,7 @@ export function buildInferenceOptions(
     };
   }
 
-  return {
-    thinking: {
-      type: "adaptive",
-      display: "omitted",
-    },
-  };
+  return buildNonThinkingOptions(model, stage);
 }
 
 function resolveThinkingMode(stage?: InferenceStage): string {
@@ -183,6 +231,63 @@ function resolveThinkingMode(stage?: InferenceStage): string {
   if (globalEnv) return globalEnv;
 
   return stage ? STAGE_DEFAULT_THINKING[stage] : "off";
+}
+
+function resolveEffortLevel(stage?: InferenceStage): EffortLevel {
+  const stageEnv = stage ? process.env[STAGE_EFFORT_ENV[stage]] : undefined;
+  const configured = (stageEnv ?? process.env.ANTHROPIC_EFFORT ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (isEffortLevel(configured)) {
+    return configured;
+  }
+
+  return stage ? STAGE_DEFAULT_EFFORT[stage] : "medium";
+}
+
+function isEffortLevel(value: string): value is EffortLevel {
+  return value === "low" || value === "medium" || value === "high" || value === "max";
+}
+
+function buildNonThinkingOptions(
+  model: string,
+  stage?: InferenceStage,
+): { temperature?: number } {
+  if (rejectsNonDefaultSampling(model)) {
+    return {};
+  }
+
+  return { temperature: stage ? STAGE_TEMPERATURE[stage] : 0.2 };
+}
+
+function supportsManualThinking(model: string): boolean {
+  const m = normalizeModel(model);
+  return (
+    m.includes("haiku-4-5") ||
+    m.includes("opus-4-5") ||
+    m.includes("sonnet-4-5") ||
+    m.includes("opus-4-1") ||
+    m.includes("opus-4-0") ||
+    m.includes("sonnet-4-0")
+  );
+}
+
+// 아래 모델들은 비기본 temperature/top_p/top_k를 보내면 400을 반환합니다.
+// (Opus 4.7/4.8, Sonnet 5, Fable 5, Mythos 5 계열)
+function rejectsNonDefaultSampling(model: string): boolean {
+  const m = normalizeModel(model);
+  return (
+    m.includes("opus-4-7") ||
+    m.includes("opus-4-8") ||
+    m.includes("sonnet-5") ||
+    m.includes("fable-5") ||
+    m.includes("mythos")
+  );
+}
+
+function normalizeModel(model?: string): string {
+  return (model ?? getModelName()).toLowerCase();
 }
 
 /**

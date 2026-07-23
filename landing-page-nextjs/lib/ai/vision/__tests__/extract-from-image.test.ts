@@ -77,6 +77,34 @@ describe("extractChatFromImage", () => {
     );
   });
 
+  it("uses the vision stage timeout budget for Claude requests", async () => {
+    vi.stubEnv("ANTHROPIC_VISION_TIMEOUT_MS", "1000");
+    anthropicMocks.create.mockResolvedValueOnce({
+      stop_reason: "tool_use",
+      content: [
+        {
+          type: "tool_use",
+          id: "tool-1",
+          name: "submit_extracted_chat",
+          input: {
+            rawText: "나: 안녕하세요\n상대: 네 안녕하세요",
+            messageCount: 2,
+          },
+        },
+      ],
+      usage: { input_tokens: 1500, output_tokens: 80 },
+    });
+
+    await extractChatFromImage({
+      imageBase64: FAKE_BASE64,
+      mimeType: "image/png",
+    });
+
+    const requestOptions = anthropicMocks.create.mock.calls[0]?.[1];
+    expect(requestOptions.timeout).toBeGreaterThan(0);
+    expect(requestOptions.timeout).toBeLessThanOrEqual(1000);
+  });
+
   it("rejects when the rawText returned by Claude is empty", async () => {
     anthropicMocks.create.mockResolvedValue({
       stop_reason: "tool_use",
