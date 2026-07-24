@@ -175,11 +175,17 @@ export function getInferenceTimeoutMs(stage: InferenceStage): number {
 export function buildInferenceOptions(
   model = getModelName(),
   stage?: InferenceStage,
+  options: { forcedToolUse?: boolean } = {},
 ): {
   temperature?: number;
   thinking?: ThinkingConfigParam;
   output_config?: OutputConfig;
 } {
+  // tool_choice가 특정 도구를 강제하면 thinking을 함께 보낼 수 없습니다 (API 400).
+  if (options.forcedToolUse) {
+    return buildNonThinkingOptions(model, stage);
+  }
+
   const thinkingMode = resolveThinkingMode(stage);
 
   if (!thinkingMode || thinkingMode === "false" || thinkingMode === "off") {

@@ -122,7 +122,9 @@ export async function extractChatFromImage(params: {
       async (requestOptions) => {
         const response = await client.messages.create(
           {
-            ...buildInferenceOptions(model, "vision_extract"),
+            ...buildInferenceOptions(model, "vision_extract", {
+              forcedToolUse: true,
+            }),
             model,
             max_tokens: resolveMaxTokens(4000, "vision_extract", model),
             system: SYSTEM_PROMPT,

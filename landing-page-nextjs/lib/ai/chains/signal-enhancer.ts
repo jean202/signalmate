@@ -78,7 +78,9 @@ export async function enhanceSignals(params: {
       async (requestOptions) => {
         const response = await client.messages.create(
           {
-            ...buildInferenceOptions(model, "signal_enhancer"),
+            ...buildInferenceOptions(model, "signal_enhancer", {
+              forcedToolUse: true,
+            }),
             model,
             max_tokens: resolveMaxTokens(3000, "signal_enhancer", model),
             system: [

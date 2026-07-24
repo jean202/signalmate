@@ -108,7 +108,9 @@ export async function generateDeepReport(params: {
       async (requestOptions) => {
         const response = await client.messages.create(
           {
-            ...buildInferenceOptions(model, "deep_report"),
+            ...buildInferenceOptions(model, "deep_report", {
+              forcedToolUse: true,
+            }),
             model,
             max_tokens: resolveMaxTokens(3000, "deep_report", model),
             system: [{ type: "text", text: DEEP_REPORT_SYSTEM_PROMPT }],

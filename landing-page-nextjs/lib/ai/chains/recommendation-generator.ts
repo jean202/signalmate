@@ -73,7 +73,9 @@ export async function generateRecommendations(params: {
       async (requestOptions) => {
         const response = await client.messages.create(
           {
-            ...buildInferenceOptions(model, "recommendation_generator"),
+            ...buildInferenceOptions(model, "recommendation_generator", {
+              forcedToolUse: true,
+            }),
             model,
             max_tokens: resolveMaxTokens(3000, "recommendation_generator", model),
             system: [

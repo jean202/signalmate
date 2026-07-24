@@ -74,6 +74,42 @@ describe("anthropic inference options", () => {
     );
   });
 
+  it("never enables thinking when the caller forces tool use", () => {
+    // Anthropic API: tool_choice가 도구를 강제하면 thinking을 함께 보낼 수 없다(400).
+    const models = [
+      "claude-haiku-4-5-20251001",
+      "claude-sonnet-4-6",
+      "claude-opus-4-8",
+    ];
+    const stages = ["recommendation_generator", "deep_report"] as const;
+
+    for (const model of models) {
+      for (const stage of stages) {
+        const options = buildInferenceOptions(model, stage, {
+          forcedToolUse: true,
+        });
+        expect(options, `${model}/${stage}`).not.toHaveProperty("thinking");
+        expect(options, `${model}/${stage}`).not.toHaveProperty("output_config");
+      }
+    }
+  });
+
+  it("still applies sampling rules when tool use is forced", () => {
+    // temperature를 거부하지 않는 모델은 stage temperature를 유지한다.
+    expect(
+      buildInferenceOptions("claude-haiku-4-5-20251001", "deep_report", {
+        forcedToolUse: true,
+      }),
+    ).toEqual({ temperature: 0.2 });
+
+    // 비기본 sampling을 거부하는 모델에는 아무것도 보내지 않는다.
+    expect(
+      buildInferenceOptions("claude-opus-4-8", "deep_report", {
+        forcedToolUse: true,
+      }),
+    ).toEqual({});
+  });
+
   it("lets stage-specific effort override the default", () => {
     vi.stubEnv("ANTHROPIC_EFFORT_RECOMMENDATION", "low");
 

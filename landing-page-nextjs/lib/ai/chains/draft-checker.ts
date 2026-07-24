@@ -66,7 +66,9 @@ export async function checkDraft(params: {
       async (requestOptions) => {
         const response = await client.messages.create(
           {
-            ...buildInferenceOptions(model, "draft_check"),
+            ...buildInferenceOptions(model, "draft_check", {
+              forcedToolUse: true,
+            }),
             model,
             max_tokens: resolveMaxTokens(1200, "draft_check", model),
             system: [{ type: "text", text: DRAFT_CHECK_SYSTEM_PROMPT }],
