@@ -3,6 +3,7 @@ import type { ConfidenceLevel, RecommendedAction } from "../../lib/analysis-stor
 type FixtureMessage = {
   senderRole: "self" | "other" | "unknown";
   messageText: string;
+  sentAt?: string | null;
 };
 
 export type RuleAnalysisCase = {
@@ -412,6 +413,56 @@ export const ruleAnalysisCases: RuleAnalysisCase[] = [
       includeSignalKeys: ["sample_size", "awaiting_reply"],
       excludeSignalKeys: ["limited_signal", "question_balance", "reply_continuity"],
       summaryIncludes: ["상대 반응이 아직 없어", "충분히 읽기 어려운"],
+    },
+  },
+  {
+    name: "답장은 이어지지만 평균 응답 지연이 긴 대화",
+    why: "시간 정보가 있는 로그에서는 응답 연속성만 보지 않고 답장 간격을 별도 주의 시그널로 고정해야 합니다.",
+    input: {
+      relationshipStage: "ongoing_chat",
+      meetingChannel: "dating_app",
+      userGoal: "ask_for_date",
+      messages: [
+        {
+          senderRole: "self",
+          messageText: "이번 주말에 잠깐 커피 어떠세요?",
+          sentAt: "2026-05-01T10:00:00+09:00",
+        },
+        {
+          senderRole: "other",
+          messageText: "이번 주말은 좀 어려워요. 나중에 볼게요",
+          sentAt: "2026-05-03T11:00:00+09:00",
+        },
+        {
+          senderRole: "self",
+          messageText: "그럼 다음 주 평일은요?",
+          sentAt: "2026-05-03T11:05:00+09:00",
+        },
+        {
+          senderRole: "other",
+          messageText: "일정 봐야 할 것 같아요",
+          sentAt: "2026-05-06T12:00:00+09:00",
+        },
+      ],
+    },
+    expect: {
+      recommendedAction: "keep_light",
+      confidenceLevel: "low",
+      counts: {
+        positive: 3,
+        ambiguous: 1,
+        caution: 2,
+      },
+      includeSignalKeys: [
+        "reply_continuity",
+        "future_reference",
+        "length_balance",
+        "question_balance",
+        "date_specificity",
+        "slow_response_cadence",
+      ],
+      excludeSignalKeys: ["definite_plan", "awaiting_reply"],
+      summaryIncludes: ["관심 신호", "확신"],
     },
   },
 ];
